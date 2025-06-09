@@ -1,0 +1,46 @@
+cmake_minimum_required(VERSION 3.9)
+project(VulkanLibrary)
+
+# 支持相对路径
+SET(CMAKE_USE_RELATIVE_PATHS ON)
+
+# 开启最大优化速度
+add_compile_options(/O2)
+
+# 是否x86 还是x64，默认x64
+if(CMAKE_CL_64)
+    SET(PLATFORM_CPU "x64")
+else()
+    SET(PLATFORM_CPU "x86")
+endif()
+
+# 设置CMAKE_PREFIX_PATH，供find_package()使用
+# set(CMAKE_PREFIX_PATH xxx)
+
+# 启用C++17
+add_compile_options(-std=c++17)
+
+# 解决节数超过对象文件格式限制
+add_compile_options(-bigobj)
+
+# 常规-多处理器编译
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
+
+# 默认开启从父级或项目默认设置继承
+set(CMAKE_CXX_STANDARD_LIBRARIES "%(AdditionalDependencies)")
+
+# 添加VS过滤器
+macro(source_group_by_dir source_files)
+    if(MSVC)
+        set(cur_dir ${CMAKE_CURRENT_SOURCE_DIR})
+        foreach(file ${${source_files}})
+            string(REGEX REPLACE ${cur_dir}/\(.*\) \\1 file_path ${file})
+            string(REGEX REPLACE "\(.*\)/.*" \\1 sgbd_group_name ${file_path})
+            string(COMPARE EQUAL ${file_path} ${sgbd_group_name} nogroup)
+            string(REPLACE "/" "\\" sgbd_group_name ${sgbd_group_name})
+            get_filename_component(file_extension ${file} EXT)
+        endforeach(file)
+    endif(MSVC)
+endmacro(source_group_by_dir)
+
+add_subdirectory(tools)

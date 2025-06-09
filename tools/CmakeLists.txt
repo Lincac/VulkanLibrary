@@ -1,0 +1,8 @@
+project(tools)
+
+file(GLOB_RECURSE SRC_FILE "*.cpp" "*.cxx" "*.cc" "*.C" "*.c++" "*.h" "*.hpp" "*.H" "*.hxx" "*.c")
+
+# 添加VS过滤器
+source_group_by_dir(SOURCES)
+
+add_library(${PROJECT_NAME} STATIC ${SOURCES})
