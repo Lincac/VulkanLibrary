@@ -1,24 +1,29 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.15)
 project(VulkanLibrary)
 
 # 支持相对路径
-SET(CMAKE_USE_RELATIVE_PATHS ON)
+set(CMAKE_USE_RELATIVE_PATHS ON)
 
 # 开启最大优化速度
 add_compile_options(/O2)
 
 # 是否x86 还是x64，默认x64
 if(CMAKE_CL_64)
-    SET(PLATFORM_CPU "x64")
+    set(PLATFORM_CPU "x64")
 else()
-    SET(PLATFORM_CPU "x86")
+    set(PLATFORM_CPU "x86")
 endif()
 
 # 设置CMAKE_PREFIX_PATH，供find_package()使用
 # set(CMAKE_PREFIX_PATH xxx)
 
 # 启用C++17
-add_compile_options(-std=c++17)
+if(MSVC)
+	set(CMAKE_CXX_STANDARD 17)
+	set(CMAKE_CXX_STANDARD_REQUIRED On)
+else()
+	add_compile_options(-std=c++17)
+endif()
 
 # 解决节数超过对象文件格式限制
 add_compile_options(-bigobj)
@@ -39,8 +44,29 @@ macro(source_group_by_dir source_files)
             string(COMPARE EQUAL ${file_path} ${sgbd_group_name} nogroup)
             string(REPLACE "/" "\\" sgbd_group_name ${sgbd_group_name})
             get_filename_component(file_extension ${file} EXT)
+            if(NOT nogroup)
+                source_group(${sgbd_group_name} FILES ${file})  # 使用所在子目录名作为过滤器名
+            endif()
         endforeach(file)
     endif(MSVC)
 endmacro(source_group_by_dir)
 
+# 设置输出路径
+if(${PLATFORM_CPU} STREQUAL "x64")
+    SET(OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/x64/)
+else()
+    SET(OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/Win32/)
+endif()
+
+# 输出目录
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_PATH})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${OUTPUT_PATH})
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${OUTPUT_PATH})
+
 add_subdirectory(tools)
+target_compile_definitions(tools PRIVATE _CRT_SECURE_NO_WARNINGS _GLFW_WIN32)
+
+# 项目分组-------将子项目关联到组
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+# set_target_properties(project_name PROPERTIES FOLDER "file name")
