@@ -9,32 +9,51 @@
 
 #include <glfwCallback.h>
 
+#include <VulkanAPI/VulkanAPI.h>
+
 int main()
 {
-    glfwInit();
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	glfwInit();
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    GLFWwindow* window = glfwCreateWindow(800,600,"Vulkan window", nullptr, nullptr);
-    
-    glfwSetWindowSizeCallback(window, WindowSizeCallback);
+	GLFWwindow* window = glfwCreateWindow(800, 600, "Vulkan window", nullptr, nullptr);
 
-    uint32_t extensionCount = 0;
-    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+	glfwSetWindowSizeCallback(window, WindowSizeCallback);
 
-    std::cout << extensionCount << " extensions supported\n";
+	uint32_t glfwExtensionCount = 0;
+	const char** glfwExtensions;
+	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+	std::cout << "glfw extensions" << std::endl;
+	for (uint32_t i = 0; i < glfwExtensionCount; i++)
+	{
+		std::cout << glfwExtensions[i] << std::endl;
+	}
 
-    glm::mat4 matrix;
-    glm::vec4 vec;
-    auto test = matrix * vec;
+	std::cout << std::endl;
 
-    while(!glfwWindowShouldClose(window)) 
-    {
-        glfwPollEvents();
-    }
+	auto extensions = VulkanAPI::getVKExtensionProperties();
+	std::cout << "vulkan extensions" << std::endl;
+	for (auto extension : extensions)
+	{
+		std::cout << extension.extensionName << std::endl;
+	}
 
-    glfwDestroyWindow(window);
+	VulkanAPI vulkan;
+	vulkan.setApplicationInfo();
+	vulkan.createInstance(glfwExtensions, glfwExtensionCount);
 
-    glfwTerminate();
+	glm::mat4 matrix;
+	glm::vec4 vec;
+	auto test = matrix * vec;
 
-    return 0;    
+	while (!glfwWindowShouldClose(window))
+	{
+		glfwPollEvents();
+	}
+
+	glfwDestroyWindow(window);
+
+	glfwTerminate();
+
+	return 0;
 }
