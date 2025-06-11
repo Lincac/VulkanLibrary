@@ -66,6 +66,9 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${OUTPUT_PATH})
 add_subdirectory(tools)
 target_compile_definitions(tools PRIVATE _CRT_SECURE_NO_WARNINGS _GLFW_WIN32)
 
+add_subdirectory(example/hello_window)
+target_link_libraries(hello_window PRIVATE tools)
+
 # 项目分组-------将子项目关联到组
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
