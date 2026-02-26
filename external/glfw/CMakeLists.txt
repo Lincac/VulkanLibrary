@@ -2,22 +2,13 @@ cmake_minimum_required(VERSION 3.20)
 
 project(glfw LANGUAGES C)
 
+file(GLOB_RECURSE SRC_FILES *.c)
+
+file(GLOB_RECURSE HEADER_FILES *.h)
+
 add_library(glfw STATIC
-    context.c
-    init.c
-    input.c
-    monitor.c
-    platform.c
-    vulkan.c
-    window.c
-    win32_init.c
-    win32_joystick.c
-    win32_monitor.c
-    win32_module.c
-    win32_time.c
-    win32_thread.c
-    win32_window.c
-    wgl_context.c
+    ${SRC_FILES}
+    ${HEADER_FILES}
 )
 
 target_compile_definitions(glfw PRIVATE _GLFW_WIN32)
