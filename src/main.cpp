@@ -1,9 +1,18 @@
-#include <iostream>
-
-#include <volk.h>
+#include "vkContext.h"
 
 int main() {
-    volkInitialize();
+    glfwInit();
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    GLFWwindow* window = glfwCreateWindow(1280, 720, "Vulkan", nullptr, nullptr);
 
-    return 0;
+    vkContext context;
+    context.initialize(window);
+
+    while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+    }
+
+    context.cleanup();
+    glfwDestroyWindow(window);
+    glfwTerminate();
 }
