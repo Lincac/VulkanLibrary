@@ -1,4 +1,4 @@
-#include "vkContext.h"
+#include "Context.h"
 
 #include <iostream>
 #include <algorithm>
@@ -32,7 +32,12 @@ void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& create
 }
 } // namespace
 
-void vkContext::initialize(GLFWwindow* window) {
+void Context::initialize(GLFWwindow* window) {
+    if (window == nullptr) {
+        throw std::runtime_error("Window is null");
+    }
+    this->window = window;
+
     // 1. 初始化 volk（加载全局函数）
     if (volkInitialize() != VK_SUCCESS) {
         throw std::runtime_error("Failed to initialize volk");
@@ -62,11 +67,9 @@ void vkContext::initialize(GLFWwindow* window) {
     std::cout << "vkContext initialized.\n";
 }
 
-void vkContext::cleanup() {
+void Context::cleanup() {
     if (device != VK_NULL_HANDLE) {
-        if (swapchain != VK_NULL_HANDLE) {
-            vkDestroySwapchainKHR(device, swapchain, nullptr);
-        }
+        destroySwapchain();
         vkDestroyDevice(device, nullptr);
     }
 
@@ -82,12 +85,34 @@ void vkContext::cleanup() {
         vkDestroyInstance(instance, nullptr);
     }
 
+    window = nullptr;
+
     std::cout << "vkContext cleaned up.\n";
+}
+
+void Context::recreateSwapchain() {
+    if (device == VK_NULL_HANDLE || physicalDevice == VK_NULL_HANDLE || surface == VK_NULL_HANDLE) {
+        throw std::runtime_error("Cannot recreate swapchain before Vulkan context is fully initialized");
+    }
+    if (window == nullptr) {
+        throw std::runtime_error("Window is null when recreating swapchain");
+    }
+
+    int width = 0;
+    int height = 0;
+    glfwGetFramebufferSize(window, &width, &height);
+    while (width == 0 || height == 0) {
+        glfwWaitEvents();
+        glfwGetFramebufferSize(window, &width, &height);
+    }
+
+    destroySwapchain();
+    createSwapchain();
 }
 
 // ----------------- Instance -----------------
 
-void vkContext::createInstance() {
+void Context::createInstance() {
     if (enableValidationLayers && !checkValidationLayerSupport()) {
         throw std::runtime_error("Validation layers requested, but not available");
     }
@@ -131,7 +156,7 @@ void vkContext::createInstance() {
     }
 }
 
-void vkContext::setupDebugMessenger() {
+void Context::setupDebugMessenger() {
     if (!enableValidationLayers) {
         return;
     }
@@ -143,7 +168,7 @@ void vkContext::setupDebugMessenger() {
     }
 }
 
-bool vkContext::checkValidationLayerSupport() {
+bool Context::checkValidationLayerSupport() {
     uint32_t layerCount = 0;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
@@ -167,7 +192,7 @@ bool vkContext::checkValidationLayerSupport() {
 
 // ----------------- Physical Device -----------------
 
-uint32_t vkContext::findGraphicsQueueFamily(VkPhysicalDevice gpu) {
+uint32_t Context::findGraphicsQueueFamily(VkPhysicalDevice gpu) {
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, nullptr);
 
@@ -183,7 +208,7 @@ uint32_t vkContext::findGraphicsQueueFamily(VkPhysicalDevice gpu) {
     throw std::runtime_error("Failed to find graphics queue family");
 }
 
-void vkContext::pickPhysicalDevice() {
+void Context::pickPhysicalDevice() {
     uint32_t gpuCount = 0;
     vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr);
     if (gpuCount == 0) {
@@ -219,7 +244,7 @@ void vkContext::pickPhysicalDevice() {
 
 // ----------------- Logical Device -----------------
 
-void vkContext::createLogicalDevice() {
+void Context::createLogicalDevice() {
     float queuePriority = 1.0f;
 
     VkDeviceQueueCreateInfo queueInfo{};
@@ -231,15 +256,21 @@ void vkContext::createLogicalDevice() {
     VkPhysicalDeviceFeatures features{};
     // 先不启用额外特性，后面做进阶任务时再加
 
+    VkPhysicalDeviceSynchronization2Features sync2Features{};
+    sync2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
+    sync2Features.synchronization2 = VK_TRUE;
+
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.pNext = &sync2Features;
     createInfo.queueCreateInfoCount = 1;
     createInfo.pQueueCreateInfos = &queueInfo;
     createInfo.pEnabledFeatures = &features;
     const char* deviceExtensions[] = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME
     };
-    createInfo.enabledExtensionCount = 1;
+    createInfo.enabledExtensionCount = 2;
     createInfo.ppEnabledExtensionNames = deviceExtensions;
     createInfo.enabledLayerCount = 0;
 
@@ -255,7 +286,7 @@ void vkContext::createLogicalDevice() {
 
 // ----------------- Surface -----------------
 
-void vkContext::createSurface(GLFWwindow* window) {
+void Context::createSurface(GLFWwindow* window) {
     if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create window surface");
     }
@@ -263,13 +294,16 @@ void vkContext::createSurface(GLFWwindow* window) {
 
 // ----------------- Swapchain -----------------
 
-void vkContext::createSwapchain() {
+void Context::createSwapchain() {
     // 查询 surface 能力
     VkSurfaceCapabilitiesKHR caps{};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &caps);
 
     uint32_t formatCount = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
+    if (formatCount == 0) {
+        throw std::runtime_error("No surface formats found");
+    }
     std::vector<VkSurfaceFormatKHR> formats(formatCount);
     vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, formats.data());
 
@@ -288,8 +322,13 @@ void vkContext::createSwapchain() {
         swapchainExtent = caps.currentExtent;
     }
     else {
-        // 这里简单用 capabilities 的 min/max 做 clamp，后面可以用窗口大小
-        swapchainExtent = { 1280, 720 };
+        int width = 0;
+        int height = 0;
+        glfwGetFramebufferSize(window, &width, &height);
+        swapchainExtent = {
+            static_cast<uint32_t>(width),
+            static_cast<uint32_t>(height)
+        };
         swapchainExtent.width = std::max(caps.minImageExtent.width,
             std::min(caps.maxImageExtent.width, swapchainExtent.width));
         swapchainExtent.height = std::max(caps.minImageExtent.height,
@@ -329,4 +368,11 @@ void vkContext::createSwapchain() {
     if (vkCreateSwapchainKHR(device, &info, nullptr, &swapchain) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create swapchain");
     }
+}
+
+void Context::destroySwapchain() {
+    if (device != VK_NULL_HANDLE && swapchain != VK_NULL_HANDLE) {
+        vkDestroySwapchainKHR(device, swapchain, nullptr);
+    }
+    swapchain = VK_NULL_HANDLE;
 }
