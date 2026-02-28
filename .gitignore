@@ -1,2 +1,6 @@
-/build
-/cmake/build_check
+/external/glfw/glfw/x64
+/external/glfw/x64
+/external/glfw/.vs
+/vkEngine/x64
+/vkEngine/.vs
+/vkEngine/vkEngine/x64
