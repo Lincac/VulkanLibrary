@@ -1,2 +1,19 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" />
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="Core\Instance.h" />
+    <ClInclude Include="Core\PhysicalDevice.h" />
+    <ClInclude Include="Core\Device.h" />
+    <ClInclude Include="Core\Context.h" />
+    <ClInclude Include="Swapchain\Swapchain.h" />
+    <ClInclude Include="Swapchain\SwapchainImageViews.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Core\Instance.cpp" />
+    <ClCompile Include="Core\PhysicalDevice.cpp" />
+    <ClCompile Include="Core\Device.cpp" />
+    <ClCompile Include="Core\Context.cpp" />
+    <ClCompile Include="Swapchain\Swapchain.cpp" />
+    <ClCompile Include="Swapchain\SwapchainImageViews.cpp" />
+  </ItemGroup>
+</Project>

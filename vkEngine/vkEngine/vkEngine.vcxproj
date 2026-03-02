@@ -10,6 +10,28 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Core\Context.h" />
+    <ClInclude Include="Core\Instance.h" />
+    <ClInclude Include="Core\PhysicalDevice.h" />
+    <ClInclude Include="Core\Device.h" />
+    <ClInclude Include="Pipeline\Framebuffer.h" />
+    <ClInclude Include="Pipeline\RenderPass.h" />
+    <ClInclude Include="Pipeline\ShaderModule.h" />
+    <ClInclude Include="Swapchain\SwapchainImageViews.h" />
+    <ClInclude Include="Swapchain\Swapchain.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Core\Context.cpp" />
+    <ClCompile Include="Core\Instance.cpp" />
+    <ClCompile Include="Core\PhysicalDevice.cpp" />
+    <ClCompile Include="Core\Device.cpp" />
+    <ClCompile Include="Pipeline\Framebuffer.cpp" />
+    <ClCompile Include="Pipeline\RenderPass.cpp" />
+    <ClCompile Include="Pipeline\ShaderModule.cpp" />
+    <ClCompile Include="Swapchain\SwapchainImageViews.cpp" />
+    <ClCompile Include="Swapchain\Swapchain.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -51,6 +73,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
+      <AdditionalIncludeDirectories>Core;Pipeline;Swapchain;../Dependence/include;$(VULKAN_SDK)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -67,6 +90,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
+      <AdditionalIncludeDirectories>Core;Pipeline;Swapchain;../Dependence/include;$(VULKAN_SDK)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
