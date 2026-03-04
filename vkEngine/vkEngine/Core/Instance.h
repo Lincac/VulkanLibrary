@@ -30,12 +30,15 @@ public:
 
 private:
     void CreateInstance(const std::string& applicationName);
+    void SetupDebugMessenger();
+    void DestroyDebugMessenger() noexcept;
     void Destroy() noexcept;
     bool CheckValidationLayerSupport(const std::vector<const char*>& validationLayers) const;
     std::vector<const char*> BuildEnabledExtensions(const std::vector<const char*>& requiredExtensions) const;
 
 private:
     VkInstance instance_{VK_NULL_HANDLE};
+    VkDebugUtilsMessengerEXT debugMessenger_{VK_NULL_HANDLE};
     bool validationLayersEnabled_{false};
     std::vector<const char*> enabledExtensions_{};
     std::vector<const char*> enabledValidationLayers_{};

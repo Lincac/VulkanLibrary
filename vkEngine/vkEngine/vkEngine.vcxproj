@@ -18,6 +18,7 @@
     <ClInclude Include="Pipeline\Framebuffer.h" />
     <ClInclude Include="Pipeline\RenderPass.h" />
     <ClInclude Include="Pipeline\ShaderModule.h" />
+    <ClInclude Include="Render\Render.h" />
     <ClInclude Include="Swapchain\SwapchainImageViews.h" />
     <ClInclude Include="Swapchain\Swapchain.h" />
   </ItemGroup>
@@ -29,6 +30,7 @@
     <ClCompile Include="Pipeline\Framebuffer.cpp" />
     <ClCompile Include="Pipeline\RenderPass.cpp" />
     <ClCompile Include="Pipeline\ShaderModule.cpp" />
+    <ClCompile Include="Render\Render.cpp" />
     <ClCompile Include="Swapchain\SwapchainImageViews.cpp" />
     <ClCompile Include="Swapchain\Swapchain.cpp" />
   </ItemGroup>
