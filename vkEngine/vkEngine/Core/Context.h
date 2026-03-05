@@ -6,10 +6,6 @@
 
 #include <volk/volk.h>
 
-#include "Device.h"
-#include "Instance.h"
-#include "PhysicalDevice.h"
-
 class Context
 {
 public:
