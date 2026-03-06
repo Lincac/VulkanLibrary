@@ -11,23 +11,19 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Core\Context.h" />
+    <ClInclude Include="Core\Instance.h" />
+    <ClInclude Include="Core\Device.h" />
+    <ClInclude Include="Core\PhysicalDevice.h" />
     <ClInclude Include="Resource\Image2D.h" />
-    <ClInclude Include="Pipeline\Framebuffer.h" />
-    <ClInclude Include="Pipeline\RenderPass.h" />
-    <ClInclude Include="Pipeline\ShaderModule.h" />
     <ClInclude Include="Render\Render.h" />
-    <ClInclude Include="Swapchain\SwapchainImageViews.h" />
     <ClInclude Include="Swapchain\Swapchain.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Core\Context.cpp" />
+    <ClCompile Include="Core\Instance.cpp" />
+    <ClCompile Include="Core\Device.cpp" />
+    <ClCompile Include="Core\PhysicalDevice.cpp" />
     <ClCompile Include="Resource\Image2D.cpp" />
-    <ClCompile Include="Pipeline\Framebuffer.cpp" />
-    <ClCompile Include="Pipeline\RenderPass.cpp" />
-    <ClCompile Include="Pipeline\ShaderModule.cpp" />
     <ClCompile Include="Render\Render.cpp" />
-    <ClCompile Include="Swapchain\SwapchainImageViews.cpp" />
     <ClCompile Include="Swapchain\Swapchain.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

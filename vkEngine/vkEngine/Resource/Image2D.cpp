@@ -90,14 +90,22 @@ void Image2D::setImageAspectMask(VkImageAspectFlagBits bits)
 	switch (_imgViewInfo.format)
 	{
 	case VK_FORMAT_R8G8B8A8_UNORM:
-		if (bits == VK_IMAGE_ASPECT_COLOR_BIT)
+		if (bits & VK_IMAGE_ASPECT_COLOR_BIT)
 		{
 			_imgViewInfo.subresourceRange.aspectMask = bits;
 		}
 		break;
 	case VK_FORMAT_D32_SFLOAT:
+		if (bits & VK_IMAGE_ASPECT_DEPTH_BIT)
+		{
+			_imgViewInfo.subresourceRange.aspectMask = bits;
+		}
 		break;
 	case VK_FORMAT_D24_UNORM_S8_UINT:
+		if (bits & VK_IMAGE_ASPECT_DEPTH_BIT || bits & VK_IMAGE_ASPECT_STENCIL_BIT)
+		{
+			_imgViewInfo.subresourceRange.aspectMask = bits;
+		}
 		break;
 	default:
 		break;
