@@ -26,6 +26,11 @@ PhysicalDevice::PhysicalDevice(VkInstance instance, VkSurfaceKHR surface)
     }
 }
 
+QueueFamilyIndices PhysicalDevice::getQueueFamilyIndices() const
+{
+    return _indices;
+}
+
 bool PhysicalDevice::isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface) {
     _indices = findQueueFamilies(device, surface);
 

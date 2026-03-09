@@ -1,5 +1,7 @@
 #include "Instance.h"
 
+#include <stdexcept>
+
 Instance::Instance(
 	const std::string& applicationName, 
 	bool enableValidationLayers)

@@ -40,3 +40,18 @@ Device::Device(const PhysicalDevice& physicalDevice)
     vkGetDeviceQueue(_device, physicalDevice._indices.graphicsFamily.value(), 0, &_graphicsQueue);
     vkGetDeviceQueue(_device, physicalDevice._indices.presentFamily.value(), 0, &_presentQueue);
 }
+
+VkDevice Device::getDevice() const
+{
+    return _device;
+}
+
+VkQueue Device::getGraphicsQueue() const
+{
+    return _graphicsQueue;
+}
+
+VkQueue Device::getPresentQueue() const
+{
+    return _presentQueue;
+}

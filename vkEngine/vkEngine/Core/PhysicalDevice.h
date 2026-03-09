@@ -35,6 +35,10 @@ public:
     PhysicalDevice& operator=(PhysicalDevice&& other) noexcept = default;
     ~PhysicalDevice() = default;
 
+public:
+
+    QueueFamilyIndices getQueueFamilyIndices() const;
+
 private:
 
     friend class Device;

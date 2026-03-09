@@ -14,7 +14,17 @@ public:
     Device& operator=(Device&& other) noexcept = default;
     ~Device() = default;
 
+public:
+
+    VkDevice getDevice() const;
+
+    VkQueue getGraphicsQueue() const;
+
+    VkQueue getPresentQueue() const;
+
 private:
+
+    friend class Swapchain;
 
     VkDevice _device;
 
