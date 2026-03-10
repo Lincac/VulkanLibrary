@@ -103,6 +103,11 @@ VkExtent2D Swapchain::getSwapChainExtent() const
     return _swapChainExtent;
 }
 
+uint32_t Swapchain::getImageCount() const
+{
+    return static_cast<uint32_t>(_swapChainImages.size());
+}
+
 void Swapchain::setRenderPass(const Device& logicalDevice, VkRenderPass renderPass)
 {
     _swapChainFramebuffers.resize(_swapChainImageViews.size());
@@ -127,18 +132,27 @@ void Swapchain::setRenderPass(const Device& logicalDevice, VkRenderPass renderPa
     }
 }
 
-void Swapchain::resetSwapChain(const Device& logicalDevice)
+void Swapchain::resetSwapChain(
+    const PhysicalDevice& physicalDevice,
+    const Device& logicalDevice,
+    VkSurfaceKHR surface,
+    GLFWwindow* window)
 {
     for (auto framebuffer : _swapChainFramebuffers) {
         vkDestroyFramebuffer(logicalDevice.getDevice(), framebuffer, nullptr);
     }
+    _swapChainFramebuffers.clear();
 
     for (auto imageView : _swapChainImageViews) {
         vkDestroyImageView(logicalDevice.getDevice(), imageView, nullptr);
     }
+    _swapChainImageViews.clear();
+    _swapChainImages.clear();
 
     vkDestroySwapchainKHR(logicalDevice.getDevice(), _swapChain, nullptr);
+    _swapChain = VK_NULL_HANDLE;
 
+    initSwapChain(physicalDevice, logicalDevice, surface, window);
 }
 
 void Swapchain::initSwapChain(

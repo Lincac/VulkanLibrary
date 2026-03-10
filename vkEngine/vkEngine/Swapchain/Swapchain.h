@@ -28,9 +28,15 @@ public:
 
     VkExtent2D getSwapChainExtent() const;
 
+    uint32_t getImageCount() const;
+
     void setRenderPass(const Device& logicalDevice, VkRenderPass renderPass);
 
-    void resetSwapChain(const Device& logicalDevice);
+    void resetSwapChain(
+        const PhysicalDevice& physicalDevice,
+        const Device& logicalDevice,
+        VkSurfaceKHR surface,
+        GLFWwindow* window);
 
 private:
 

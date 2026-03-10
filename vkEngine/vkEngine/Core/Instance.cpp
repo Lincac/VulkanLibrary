@@ -7,6 +7,10 @@ Instance::Instance(
 	bool enableValidationLayers)
     : _enableValidationLayers(enableValidationLayers)
 {
+    if (volkInitialize() != VK_SUCCESS) {
+        throw std::runtime_error("failed to initialize Vulkan loader (volk)!");
+    }
+
     if (_enableValidationLayers && !checkValidationLayerSupport()) {
         throw std::runtime_error("validation layers requested, but not available!");
     }
@@ -46,6 +50,8 @@ Instance::Instance(
     if (vkCreateInstance(&createInfo, nullptr, &_instance) != VK_SUCCESS) {
         throw std::runtime_error("failed to create instance!");
     }
+
+    volkLoadInstance(_instance);
 
     setupDebugMessenger();
 }

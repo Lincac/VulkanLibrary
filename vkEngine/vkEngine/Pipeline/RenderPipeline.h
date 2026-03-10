@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "Device.h"
+#include "ShaderModule.h"
 
 class RenderPipeline
 {
@@ -18,7 +19,8 @@ public:
 	RenderPipeline& operator=(RenderPipeline&& other) noexcept;
 	~RenderPipeline();
 
-	void setShaderStages(const std::vector<VkPipelineShaderStageCreateInfo>& stages);
+	void addShader(ShaderModule& shader);
+
 	void setVertexInputState(const VkPipelineVertexInputStateCreateInfo& state);
 	void setInputAssemblyState(const VkPipelineInputAssemblyStateCreateInfo& state);
 	void setViewportState(const VkPipelineViewportStateCreateInfo& state);
@@ -48,6 +50,7 @@ private:
 
 	VkGraphicsPipelineCreateInfo _pipelineInfo;
 	VkPipeline _pipeline;
+	VkPipelineLayout _pipelineLayout;
 	VkDevice _device;
 	VkPipelineCache _pipelineCache;
 
@@ -56,10 +59,14 @@ private:
 	VkPipelineVertexInputStateCreateInfo _vertexInputState;
 	VkPipelineInputAssemblyStateCreateInfo _inputAssemblyState;
 	VkPipelineViewportStateCreateInfo _viewportState;
+	VkViewport _viewport;
+	VkRect2D _scissor;
 	VkPipelineRasterizationStateCreateInfo _rasterizationState;
 	VkPipelineMultisampleStateCreateInfo _multisampleState;
 	VkPipelineDepthStencilStateCreateInfo _depthStencilState;
+	VkPipelineColorBlendAttachmentState _colorBlendAttachment;
 	VkPipelineColorBlendStateCreateInfo _colorBlendState;
+	std::vector<VkDynamicState> _dynamicStates;
 	VkPipelineDynamicStateCreateInfo _dynamicState;
 
 	bool _useDepthStencilState;

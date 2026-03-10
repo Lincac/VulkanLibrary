@@ -21,21 +21,40 @@ RenderPipeline::RenderPipeline()
 	_vertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	_inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 	_viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	_viewport = {};
+	_scissor = {};
 	_rasterizationState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	_multisampleState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	_depthStencilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	_colorBlendAttachment = {};
 	_colorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	_dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 	_dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 
 	// Set commonly expected defaults to avoid invalid unset fields.
 	_inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	_inputAssemblyState.primitiveRestartEnable = VK_FALSE;
+	_viewportState.viewportCount = 1;
+	_viewportState.scissorCount = 1;
+	_viewportState.pViewports = &_viewport;
+	_viewportState.pScissors = &_scissor;
 	_rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
 	_rasterizationState.cullMode = VK_CULL_MODE_NONE;
 	_rasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	_rasterizationState.lineWidth = 1.0f;
 	_multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	_colorBlendAttachment.blendEnable = VK_FALSE;
+	_colorBlendAttachment.colorWriteMask =
+		VK_COLOR_COMPONENT_R_BIT |
+		VK_COLOR_COMPONENT_G_BIT |
+		VK_COLOR_COMPONENT_B_BIT |
+		VK_COLOR_COMPONENT_A_BIT;
 	_colorBlendState.logicOpEnable = VK_FALSE;
+	_colorBlendState.attachmentCount = 1;
+	_colorBlendState.pAttachments = &_colorBlendAttachment;
+	_dynamicState.dynamicStateCount = static_cast<uint32_t>(_dynamicStates.size());
+	_dynamicState.pDynamicStates = _dynamicStates.data();
+	_useDynamicState = true;
 
 	refreshPipelineInfoPointers();
 }
@@ -49,10 +68,14 @@ RenderPipeline::RenderPipeline(RenderPipeline&& other) noexcept
 	, _vertexInputState(other._vertexInputState)
 	, _inputAssemblyState(other._inputAssemblyState)
 	, _viewportState(other._viewportState)
+	, _viewport(other._viewport)
+	, _scissor(other._scissor)
 	, _rasterizationState(other._rasterizationState)
 	, _multisampleState(other._multisampleState)
 	, _depthStencilState(other._depthStencilState)
+	, _colorBlendAttachment(other._colorBlendAttachment)
 	, _colorBlendState(other._colorBlendState)
+	, _dynamicStates(std::move(other._dynamicStates))
 	, _dynamicState(other._dynamicState)
 	, _useDepthStencilState(other._useDepthStencilState)
 	, _useDynamicState(other._useDynamicState)
@@ -79,10 +102,14 @@ RenderPipeline& RenderPipeline::operator=(RenderPipeline&& other) noexcept
 		_vertexInputState = other._vertexInputState;
 		_inputAssemblyState = other._inputAssemblyState;
 		_viewportState = other._viewportState;
+		_viewport = other._viewport;
+		_scissor = other._scissor;
 		_rasterizationState = other._rasterizationState;
 		_multisampleState = other._multisampleState;
 		_depthStencilState = other._depthStencilState;
+		_colorBlendAttachment = other._colorBlendAttachment;
 		_colorBlendState = other._colorBlendState;
+		_dynamicStates = std::move(other._dynamicStates);
 		_dynamicState = other._dynamicState;
 		_useDepthStencilState = other._useDepthStencilState;
 		_useDynamicState = other._useDynamicState;
@@ -104,9 +131,16 @@ RenderPipeline::~RenderPipeline()
 	destroy();
 }
 
-void RenderPipeline::setShaderStages(const std::vector<VkPipelineShaderStageCreateInfo>& stages)
+void RenderPipeline::addShader(ShaderModule& shader)
 {
-	_shaderStages = stages;
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = shader.getStage();
+	vertShaderStageInfo.module = shader.getModule();
+	vertShaderStageInfo.pName = "main";
+
+	_shaderStages.push_back(vertShaderStageInfo);
+
 	refreshPipelineInfoPointers();
 }
 
@@ -126,6 +160,7 @@ void RenderPipeline::setViewportState(const VkPipelineViewportStateCreateInfo& s
 {
 	_viewportState = state;
 	_viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	refreshPipelineInfoPointers();
 }
 
 void RenderPipeline::setRasterizationState(const VkPipelineRasterizationStateCreateInfo& state)
@@ -158,6 +193,7 @@ void RenderPipeline::setColorBlendState(const VkPipelineColorBlendStateCreateInf
 {
 	_colorBlendState = state;
 	_colorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	refreshPipelineInfoPointers();
 }
 
 void RenderPipeline::setDynamicState(const VkPipelineDynamicStateCreateInfo& state)
@@ -203,6 +239,17 @@ void RenderPipeline::setPipelineCache(VkPipelineCache cache)
 
 void RenderPipeline::create(const Device& logicalDevice)
 {
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutInfo.setLayoutCount = 0;
+	pipelineLayoutInfo.pushConstantRangeCount = 0;
+
+	if (vkCreatePipelineLayout(logicalDevice.getDevice(), &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create pipeline layout!");
+	}
+
+	_pipelineInfo.layout = _pipelineLayout;
+
 	if (_shaderStages.empty()) {
 		throw std::runtime_error("graphics pipeline requires at least one shader stage");
 	}
@@ -242,6 +289,26 @@ const VkGraphicsPipelineCreateInfo& RenderPipeline::getCreateInfo() const
 
 void RenderPipeline::refreshPipelineInfoPointers()
 {
+	if (_viewportState.viewportCount == 0) {
+		_viewportState.viewportCount = 1;
+	}
+	if (_viewportState.scissorCount == 0) {
+		_viewportState.scissorCount = 1;
+	}
+	_viewportState.pViewports = &_viewport;
+	_viewportState.pScissors = &_scissor;
+
+	if (_colorBlendState.attachmentCount == 0) {
+		_colorBlendState.attachmentCount = 1;
+	}
+	_colorBlendState.pAttachments = &_colorBlendAttachment;
+
+	if (_dynamicStates.empty()) {
+		_dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	}
+	_dynamicState.dynamicStateCount = static_cast<uint32_t>(_dynamicStates.size());
+	_dynamicState.pDynamicStates = _dynamicStates.data();
+
 	_pipelineInfo.stageCount = static_cast<uint32_t>(_shaderStages.size());
 	_pipelineInfo.pStages = _shaderStages.empty() ? nullptr : _shaderStages.data();
 

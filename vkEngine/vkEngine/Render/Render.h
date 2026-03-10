@@ -18,13 +18,19 @@ public:
 
 public:
 
-	void drawFrame(GLFWwindow* window);
+	void drawFrame();
+
+	Device* getDevice() const;
+
+	RenderPipeline* getRenderPipeline() const;
 
 private:
 
+	void recreateRenderFinishedSemaphores();
+
 	void initSyncObjects();
 
-	void recreateSwapChain(GLFWwindow* window);
+	void recreateSwapChain();
 
 	void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
@@ -45,6 +51,8 @@ private:
 	CommandPool* _commandPool;
 
 	VkSurfaceKHR _surface;
+
+	GLFWwindow* _window;
 
 	std::vector<VkSemaphore> _imageAvailableSemaphores;
 	std::vector<VkSemaphore> _renderFinishedSemaphores;
