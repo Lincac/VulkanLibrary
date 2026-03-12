@@ -1,9 +1,5 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <volk/volk.h>
-
 #include "Device.h"
 
 enum class ShaderType
@@ -18,25 +14,38 @@ class ShaderModule
 {
 public:
 
-	ShaderModule(const Device& logicalDevice, const std::string& spirvPath, ShaderType shaderType);
+	ShaderModule();
 
-	ShaderModule(const ShaderModule&) = delete;
-	ShaderModule& operator=(const ShaderModule&) = delete;
-	ShaderModule(ShaderModule&& other) noexcept;
-	ShaderModule& operator=(ShaderModule&& other) noexcept;
-	~ShaderModule();
+public:
+
+	void setDependice(Device* logicalDevice);
+
+	void setShaderType(ShaderType type);
+
+	void setFilePath(const std::string& path);
+
+	int create();
 
 	VkShaderModule getModule() const;
+
 	VkShaderStageFlagBits getStage() const;
+
 	VkPipelineShaderStageCreateInfo getStageCreateInfo(const char* entryPoint = "main") const;
 
 private:
 
 	static std::vector<char> readSpirvFile(const std::string& spirvPath);
-	static VkShaderStageFlagBits toVkShaderStage(ShaderType shaderType);
-	void destroy();
 
-	VkDevice _device;
+	static VkShaderStageFlagBits toVkShaderStage(ShaderType shaderType);
+
+private:
+
+	Device* _logicalDevice;
+
+private:
+
+	std::string _path;
+
 	VkShaderModule _module;
 	VkShaderStageFlagBits _stage;
 };

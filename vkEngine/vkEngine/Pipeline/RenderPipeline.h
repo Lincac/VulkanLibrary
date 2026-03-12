@@ -1,10 +1,5 @@
 #pragma once
 
-#include <cstdint>
-#include <volk/volk.h>
-#include <vector>
-
-#include "Device.h"
 #include "ShaderModule.h"
 
 class RenderPipeline
@@ -13,11 +8,9 @@ public:
 
 	RenderPipeline();
 
-	RenderPipeline(const RenderPipeline&) = delete;
-	RenderPipeline& operator=(const RenderPipeline&) = delete;
-	RenderPipeline(RenderPipeline&& other) noexcept;
-	RenderPipeline& operator=(RenderPipeline&& other) noexcept;
-	~RenderPipeline();
+public:
+
+	void setDependice(Device* logicalDevice);
 
 	void addShader(ShaderModule& shader);
 
@@ -39,14 +32,16 @@ public:
 	void setPipelineCache(VkPipelineCache cache);
 
 	void create(const Device& logicalDevice);
-	void destroy();
 
 	VkPipeline getPipeline() const;
+
 	const VkGraphicsPipelineCreateInfo& getCreateInfo() const;
 
 private:
 
 	void refreshPipelineInfoPointers();
+
+private:
 
 	VkGraphicsPipelineCreateInfo _pipelineInfo;
 	VkPipeline _pipeline;

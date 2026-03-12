@@ -8,13 +8,21 @@ class CommandPool
 {
 public:
 
-	CommandPool(const PhysicalDevice& physicalDevice, const Device& logicalDevice);
+	CommandPool();
+
+	void setDependice(Device* logicalDevice);
+
+	int create();
 
 public:
 
 	VkCommandBuffer getCommandBuffer(uint32_t index);
 
 	VkCommandBuffer* getCommandBuffers();
+
+private:
+
+	Device* _logicalDevice;
 
 private:
 

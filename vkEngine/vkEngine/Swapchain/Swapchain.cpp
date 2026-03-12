@@ -2,85 +2,35 @@
 
 #include <stdexcept>
 
-Swapchain::Swapchain(
-    const PhysicalDevice& physicalDevice, 
-    const Device& logicalDevice, 
-    VkSurfaceKHR surface,
-    GLFWwindow* window)
+Swapchain::Swapchain()
 {
-    SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice._physicalDevice, surface);
+    _logicalDevice = nullptr;
+    _window = nullptr;
 
-    VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
-    VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities, window);
+    _swapChain = VK_NULL_HANDLE;
+}
 
-    uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
-    if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
-        imageCount = swapChainSupport.capabilities.maxImageCount;
+void Swapchain::setDependice(Device* logicalDevice, GLFWwindow* window)
+{
+    if (logicalDevice == nullptr || window == nullptr)
+    {
+        return;
     }
 
-    VkSwapchainCreateInfoKHR createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = surface;
+    _logicalDevice = logicalDevice;
+    _window = window;
+}
 
-    createInfo.minImageCount = imageCount;
-    createInfo.imageFormat = surfaceFormat.format;
-    createInfo.imageColorSpace = surfaceFormat.colorSpace;
-    createInfo.imageExtent = extent;
-    createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    uint32_t queueFamilyIndices[] = { 
-        physicalDevice._indices.graphicsFamily.value(), 
-        physicalDevice._indices.presentFamily.value() };
-
-    if (physicalDevice._indices.graphicsFamily != physicalDevice._indices.presentFamily) {
-        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        createInfo.queueFamilyIndexCount = 2;
-        createInfo.pQueueFamilyIndices = queueFamilyIndices;
-    }
-    else {
-        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+int Swapchain::create()
+{
+    if (_logicalDevice == nullptr || _window == nullptr)
+    {
+        return -1;
     }
 
-    createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    createInfo.presentMode = presentMode;
-    createInfo.clipped = VK_TRUE;
+    initSwapChain();
 
-    if (vkCreateSwapchainKHR(logicalDevice._device, &createInfo, nullptr, &_swapChain) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create swap chain!");
-    }
-
-    vkGetSwapchainImagesKHR(logicalDevice._device, _swapChain, &imageCount, nullptr);
-    _swapChainImages.resize(imageCount);
-    vkGetSwapchainImagesKHR(logicalDevice._device, _swapChain, &imageCount, _swapChainImages.data());
-
-    _swapChainImageFormat = surfaceFormat.format;
-    _swapChainExtent = extent;
-
-    _swapChainImageViews.resize(_swapChainImages.size());
-
-    for (size_t i = 0; i < _swapChainImages.size(); i++) {
-        VkImageViewCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = _swapChainImages[i];
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = _swapChainImageFormat;
-        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        createInfo.subresourceRange.baseMipLevel = 0;
-        createInfo.subresourceRange.levelCount = 1;
-        createInfo.subresourceRange.baseArrayLayer = 0;
-        createInfo.subresourceRange.layerCount = 1;
-
-        if (vkCreateImageView(logicalDevice._device, &createInfo, nullptr, &_swapChainImageViews[i]) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create image views!");
-        }
-    }
+    return 0;
 }
 
 VkFormat Swapchain::getSwapChainImageFormat() const
@@ -108,7 +58,12 @@ uint32_t Swapchain::getImageCount() const
     return static_cast<uint32_t>(_swapChainImages.size());
 }
 
-void Swapchain::setRenderPass(const Device& logicalDevice, VkRenderPass renderPass)
+const Device* Swapchain::getDevice() const
+{
+    return _logicalDevice;
+}
+
+void Swapchain::setRenderPass(VkRenderPass renderPass)
 {
     _swapChainFramebuffers.resize(_swapChainImageViews.size());
 
@@ -126,46 +81,38 @@ void Swapchain::setRenderPass(const Device& logicalDevice, VkRenderPass renderPa
         framebufferInfo.height = _swapChainExtent.height;
         framebufferInfo.layers = 1;
 
-        if (vkCreateFramebuffer(logicalDevice.getDevice(), &framebufferInfo, nullptr, &_swapChainFramebuffers[i]) != VK_SUCCESS) {
+        if (vkCreateFramebuffer(_logicalDevice->getDevice(), &framebufferInfo, nullptr, &_swapChainFramebuffers[i]) != VK_SUCCESS) {
             throw std::runtime_error("failed to create framebuffer!");
         }
     }
 }
 
-void Swapchain::resetSwapChain(
-    const PhysicalDevice& physicalDevice,
-    const Device& logicalDevice,
-    VkSurfaceKHR surface,
-    GLFWwindow* window)
+void Swapchain::resetSwapChain()
 {
     for (auto framebuffer : _swapChainFramebuffers) {
-        vkDestroyFramebuffer(logicalDevice.getDevice(), framebuffer, nullptr);
+        vkDestroyFramebuffer(_logicalDevice->getDevice(), framebuffer, nullptr);
     }
     _swapChainFramebuffers.clear();
 
     for (auto imageView : _swapChainImageViews) {
-        vkDestroyImageView(logicalDevice.getDevice(), imageView, nullptr);
+        vkDestroyImageView(_logicalDevice->getDevice(), imageView, nullptr);
     }
     _swapChainImageViews.clear();
     _swapChainImages.clear();
 
-    vkDestroySwapchainKHR(logicalDevice.getDevice(), _swapChain, nullptr);
+    vkDestroySwapchainKHR(_logicalDevice->getDevice(), _swapChain, nullptr);
     _swapChain = VK_NULL_HANDLE;
 
-    initSwapChain(physicalDevice, logicalDevice, surface, window);
+    initSwapChain();
 }
 
-void Swapchain::initSwapChain(
-    const PhysicalDevice& physicalDevice,
-    const Device& logicalDevice,
-    VkSurfaceKHR surface,
-    GLFWwindow* window)
+void Swapchain::initSwapChain()
 {
-    SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice._physicalDevice, surface);
+    SwapChainSupportDetails swapChainSupport = querySwapChainSupport();
 
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities, window);
+    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
 
     uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
     if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
@@ -174,7 +121,7 @@ void Swapchain::initSwapChain(
 
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = surface;
+    createInfo.surface = _logicalDevice->getPhysicalDevice()->getSurface();
 
     createInfo.minImageCount = imageCount;
     createInfo.imageFormat = surfaceFormat.format;
@@ -183,11 +130,13 @@ void Swapchain::initSwapChain(
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-    uint32_t queueFamilyIndices[] = {
-        physicalDevice._indices.graphicsFamily.value(),
-        physicalDevice._indices.presentFamily.value() };
+    auto indices = _logicalDevice->getPhysicalDevice()->getQueueFamilyIndices();
 
-    if (physicalDevice._indices.graphicsFamily != physicalDevice._indices.presentFamily) {
+    uint32_t queueFamilyIndices[] = {
+        indices.graphicsFamily.value(),
+        indices.presentFamily.value() };
+
+    if (indices.graphicsFamily != indices.presentFamily) {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
         createInfo.pQueueFamilyIndices = queueFamilyIndices;
@@ -201,13 +150,13 @@ void Swapchain::initSwapChain(
     createInfo.presentMode = presentMode;
     createInfo.clipped = VK_TRUE;
 
-    if (vkCreateSwapchainKHR(logicalDevice._device, &createInfo, nullptr, &_swapChain) != VK_SUCCESS) {
+    if (vkCreateSwapchainKHR(_logicalDevice->getDevice(), &createInfo, nullptr, &_swapChain) != VK_SUCCESS) {
         throw std::runtime_error("failed to create swap chain!");
     }
 
-    vkGetSwapchainImagesKHR(logicalDevice._device, _swapChain, &imageCount, nullptr);
+    vkGetSwapchainImagesKHR(_logicalDevice->getDevice(), _swapChain, &imageCount, nullptr);
     _swapChainImages.resize(imageCount);
-    vkGetSwapchainImagesKHR(logicalDevice._device, _swapChain, &imageCount, _swapChainImages.data());
+    vkGetSwapchainImagesKHR(_logicalDevice->getDevice(), _swapChain, &imageCount, _swapChainImages.data());
 
     _swapChainImageFormat = surfaceFormat.format;
     _swapChainExtent = extent;
@@ -230,31 +179,33 @@ void Swapchain::initSwapChain(
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.layerCount = 1;
 
-        if (vkCreateImageView(logicalDevice._device, &createInfo, nullptr, &_swapChainImageViews[i]) != VK_SUCCESS) {
+        if (vkCreateImageView(_logicalDevice->getDevice(), &createInfo, nullptr, &_swapChainImageViews[i]) != VK_SUCCESS) {
             throw std::runtime_error("failed to create image views!");
         }
     }
 }
 
-SwapChainSupportDetails Swapchain::querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) {
+SwapChainSupportDetails Swapchain::querySwapChainSupport() {
+    auto physicalDevice = _logicalDevice->getPhysicalDevice();
+
     SwapChainSupportDetails details;
 
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice->getPhysicalDevice(), physicalDevice->getSurface(), &details.capabilities);
 
     uint32_t formatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice->getPhysicalDevice(), physicalDevice->getSurface(), &formatCount, nullptr);
 
     if (formatCount != 0) {
         details.formats.resize(formatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
+        vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice->getPhysicalDevice(), physicalDevice->getSurface(), &formatCount, details.formats.data());
     }
 
     uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice->getPhysicalDevice(), physicalDevice->getSurface(), &presentModeCount, nullptr);
 
     if (presentModeCount != 0) {
         details.presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
+        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice->getPhysicalDevice(), physicalDevice->getSurface(), &presentModeCount, details.presentModes.data());
     }
 
     return details;
@@ -281,13 +232,13 @@ VkPresentModeKHR Swapchain::chooseSwapPresentMode(const std::vector<VkPresentMod
 }
 
 #include <algorithm>
-VkExtent2D Swapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, GLFWwindow* window) {
+VkExtent2D Swapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         return capabilities.currentExtent;
     }
     else {
         int width, height;
-        glfwGetFramebufferSize(window, &width, &height);
+        glfwGetFramebufferSize(_window, &width, &height);
 
         VkExtent2D actualExtent = {
             static_cast<uint32_t>(width),

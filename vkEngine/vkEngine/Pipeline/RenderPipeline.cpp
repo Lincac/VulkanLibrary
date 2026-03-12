@@ -59,78 +59,6 @@ RenderPipeline::RenderPipeline()
 	refreshPipelineInfoPointers();
 }
 
-RenderPipeline::RenderPipeline(RenderPipeline&& other) noexcept
-	: _pipelineInfo(other._pipelineInfo)
-	, _pipeline(other._pipeline)
-	, _device(other._device)
-	, _pipelineCache(other._pipelineCache)
-	, _shaderStages(std::move(other._shaderStages))
-	, _vertexInputState(other._vertexInputState)
-	, _inputAssemblyState(other._inputAssemblyState)
-	, _viewportState(other._viewportState)
-	, _viewport(other._viewport)
-	, _scissor(other._scissor)
-	, _rasterizationState(other._rasterizationState)
-	, _multisampleState(other._multisampleState)
-	, _depthStencilState(other._depthStencilState)
-	, _colorBlendAttachment(other._colorBlendAttachment)
-	, _colorBlendState(other._colorBlendState)
-	, _dynamicStates(std::move(other._dynamicStates))
-	, _dynamicState(other._dynamicState)
-	, _useDepthStencilState(other._useDepthStencilState)
-	, _useDynamicState(other._useDynamicState)
-{
-	other._pipeline = VK_NULL_HANDLE;
-	other._device = VK_NULL_HANDLE;
-	other._pipelineCache = VK_NULL_HANDLE;
-	other._useDepthStencilState = false;
-	other._useDynamicState = false;
-	other.refreshPipelineInfoPointers();
-	refreshPipelineInfoPointers();
-}
-
-RenderPipeline& RenderPipeline::operator=(RenderPipeline&& other) noexcept
-{
-	if (this != &other) {
-		destroy();
-
-		_pipelineInfo = other._pipelineInfo;
-		_pipeline = other._pipeline;
-		_device = other._device;
-		_pipelineCache = other._pipelineCache;
-		_shaderStages = std::move(other._shaderStages);
-		_vertexInputState = other._vertexInputState;
-		_inputAssemblyState = other._inputAssemblyState;
-		_viewportState = other._viewportState;
-		_viewport = other._viewport;
-		_scissor = other._scissor;
-		_rasterizationState = other._rasterizationState;
-		_multisampleState = other._multisampleState;
-		_depthStencilState = other._depthStencilState;
-		_colorBlendAttachment = other._colorBlendAttachment;
-		_colorBlendState = other._colorBlendState;
-		_dynamicStates = std::move(other._dynamicStates);
-		_dynamicState = other._dynamicState;
-		_useDepthStencilState = other._useDepthStencilState;
-		_useDynamicState = other._useDynamicState;
-
-		other._pipeline = VK_NULL_HANDLE;
-		other._device = VK_NULL_HANDLE;
-		other._pipelineCache = VK_NULL_HANDLE;
-		other._useDepthStencilState = false;
-		other._useDynamicState = false;
-
-		other.refreshPipelineInfoPointers();
-		refreshPipelineInfoPointers();
-	}
-	return *this;
-}
-
-RenderPipeline::~RenderPipeline()
-{
-	destroy();
-}
-
 void RenderPipeline::addShader(ShaderModule& shader)
 {
 	VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
@@ -266,14 +194,6 @@ void RenderPipeline::create(const Device& logicalDevice)
 	refreshPipelineInfoPointers();
 	if (vkCreateGraphicsPipelines(_device, _pipelineCache, 1, &_pipelineInfo, nullptr, &_pipeline) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create graphics pipeline");
-	}
-}
-
-void RenderPipeline::destroy()
-{
-	if (_pipeline != VK_NULL_HANDLE && _device != VK_NULL_HANDLE) {
-		vkDestroyPipeline(_device, _pipeline, nullptr);
-		_pipeline = VK_NULL_HANDLE;
 	}
 }
 

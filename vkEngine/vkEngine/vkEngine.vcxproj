@@ -21,6 +21,7 @@
     <ClInclude Include="Resource\Image2D.h" />
     <ClInclude Include="Render\Render.h" />
     <ClInclude Include="Swapchain\Swapchain.h" />
+    <ClInclude Include="Resource\DataBuffer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Resource\CommandPool.cpp" />
@@ -33,6 +34,7 @@
     <ClCompile Include="Resource\Image2D.cpp" />
     <ClCompile Include="Render\Render.cpp" />
     <ClCompile Include="Swapchain\Swapchain.cpp" />
+    <ClCompile Include="Resource\DataBuffer.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

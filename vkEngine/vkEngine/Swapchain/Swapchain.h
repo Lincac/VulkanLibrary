@@ -5,20 +5,16 @@
 
 #include "Device.h"
 
-#include <vector>
-
 class Swapchain
 {
 public:
-    Swapchain(
-        const PhysicalDevice& physicalDevice, 
-        const Device& logicalDevice, 
-        VkSurfaceKHR surface,
-        GLFWwindow* window);
-    ~Swapchain();
+    Swapchain();
 
-    Swapchain(const Swapchain&) = delete;
-    Swapchain& operator=(const Swapchain&) = delete;
+public:
+
+    void setDependice(Device* logicalDevice, GLFWwindow* window);
+
+    int create();
 
     VkFormat getSwapChainImageFormat() const;
 
@@ -30,29 +26,28 @@ public:
 
     uint32_t getImageCount() const;
 
-    void setRenderPass(const Device& logicalDevice, VkRenderPass renderPass);
+    const Device* getDevice() const;
 
-    void resetSwapChain(
-        const PhysicalDevice& physicalDevice,
-        const Device& logicalDevice,
-        VkSurfaceKHR surface,
-        GLFWwindow* window);
+    void setRenderPass(VkRenderPass renderPass);
+
+    void resetSwapChain();
 
 private:
 
-    void initSwapChain(
-        const PhysicalDevice& physicalDevice,
-        const Device& logicalDevice,
-        VkSurfaceKHR surface,
-        GLFWwindow* window);
+    void initSwapChain();
 
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
+    SwapChainSupportDetails querySwapChainSupport();
 
     VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 
-    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, GLFWwindow* window);
+    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+
+private:
+
+    Device* _logicalDevice;
+    GLFWwindow* _window;
 
 private:
 

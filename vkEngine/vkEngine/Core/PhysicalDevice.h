@@ -1,9 +1,8 @@
 #pragma once
 
-#include <vector>
 #include <optional>
 
-#include <volk/volk.h>
+#include "Instance.h"
 
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
@@ -20,37 +19,40 @@ struct SwapChainSupportDetails {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-class Device;
-class Swapchain;
-
 class PhysicalDevice
 {
 public:
 
-	PhysicalDevice(VkInstance instance, VkSurfaceKHR surface);
-
-    PhysicalDevice(const PhysicalDevice&) = delete;
-    PhysicalDevice& operator=(const PhysicalDevice&) = delete;
-    PhysicalDevice(PhysicalDevice&& other) noexcept = default;
-    PhysicalDevice& operator=(PhysicalDevice&& other) noexcept = default;
-    ~PhysicalDevice() = default;
+	PhysicalDevice();
 
 public:
 
+    void setDependice(Instance* instance, VkSurfaceKHR surface);
+
+    int create();
+
     QueueFamilyIndices getQueueFamilyIndices() const;
+
+    VkPhysicalDevice getPhysicalDevice() const;
+
+    VkSurfaceKHR getSurface() const;
+
+    const std::vector<const char*> getDeviceExtensions() const;
 
 private:
 
-    friend class Device;
-    friend class Swapchain;
+    bool isDeviceSuitable(VkPhysicalDevice device);
 
-    bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface);
-
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
+    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+
+private:
+
+    Instance* _instance;
+    VkSurfaceKHR _surface;
 
 private:
 

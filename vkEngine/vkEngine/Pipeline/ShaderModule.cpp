@@ -3,14 +3,44 @@
 #include <fstream>
 #include <stdexcept>
 
-ShaderModule::ShaderModule(const Device& logicalDevice, const std::string& spirvPath, ShaderType shaderType)
-	: _device(logicalDevice.getDevice())
-	, _module(VK_NULL_HANDLE)
-	, _stage(toVkShaderStage(shaderType))
+ShaderModule::ShaderModule()
 {
-	const std::vector<char> code = readSpirvFile(spirvPath);
+	_logicalDevice = nullptr;
+	_path = "";
+
+	_module = VK_NULL_HANDLE;
+}
+
+void ShaderModule::setDependice(Device* logicalDevice)
+{
+	if (logicalDevice == nullptr)
+	{
+		return;
+	}
+
+	_logicalDevice = logicalDevice;
+}
+
+void ShaderModule::setShaderType(ShaderType type)
+{
+	_stage = toVkShaderStage(type);
+}
+
+void ShaderModule::setFilePath(const std::string& path)
+{
+	_path = path;
+}
+
+int ShaderModule::create()
+{
+	if (_logicalDevice == nullptr || _path == "")
+	{
+		return -1;
+	}
+
+	const std::vector<char> code = readSpirvFile(_path);
 	if (code.empty()) {
-		throw std::runtime_error("SPIR-V file is empty: " + spirvPath);
+		throw std::runtime_error("SPIR-V file is empty: " + _path);
 	}
 
 	VkShaderModuleCreateInfo createInfo{};
@@ -18,38 +48,11 @@ ShaderModule::ShaderModule(const Device& logicalDevice, const std::string& spirv
 	createInfo.codeSize = code.size();
 	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
-	if (vkCreateShaderModule(_device, &createInfo, nullptr, &_module) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create shader module: " + spirvPath);
+	if (vkCreateShaderModule(_logicalDevice->getDevice(), &createInfo, nullptr, &_module) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create shader module: " + _path);
 	}
-}
 
-ShaderModule::ShaderModule(ShaderModule&& other) noexcept
-	: _device(other._device)
-	, _module(other._module)
-	, _stage(other._stage)
-{
-	other._device = VK_NULL_HANDLE;
-	other._module = VK_NULL_HANDLE;
-}
-
-ShaderModule& ShaderModule::operator=(ShaderModule&& other) noexcept
-{
-	if (this != &other) {
-		destroy();
-
-		_device = other._device;
-		_module = other._module;
-		_stage = other._stage;
-
-		other._device = VK_NULL_HANDLE;
-		other._module = VK_NULL_HANDLE;
-	}
-	return *this;
-}
-
-ShaderModule::~ShaderModule()
-{
-	destroy();
+	return 0;
 }
 
 VkShaderModule ShaderModule::getModule() const
@@ -107,13 +110,5 @@ VkShaderStageFlagBits ShaderModule::toVkShaderStage(ShaderType shaderType)
 		return VK_SHADER_STAGE_COMPUTE_BIT;
 	default:
 		throw std::runtime_error("unsupported shader type");
-	}
-}
-
-void ShaderModule::destroy()
-{
-	if (_module != VK_NULL_HANDLE && _device != VK_NULL_HANDLE) {
-		vkDestroyShaderModule(_device, _module, nullptr);
-		_module = VK_NULL_HANDLE;
 	}
 }

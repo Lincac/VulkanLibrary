@@ -2,10 +2,19 @@
 
 #include <stdexcept>
 
-Instance::Instance(
-	const std::string& applicationName, 
-	bool enableValidationLayers)
-    : _enableValidationLayers(enableValidationLayers)
+Instance::Instance()
+{
+    _applicationName = "vkEngine";
+    
+    _enableValidationLayers = true;
+}
+
+void Instance::setApplicationName(const std::string& appName)
+{
+    _applicationName = appName;
+}
+
+int Instance::create()
 {
     if (volkInitialize() != VK_SUCCESS) {
         throw std::runtime_error("failed to initialize Vulkan loader (volk)!");
@@ -17,7 +26,7 @@ Instance::Instance(
 
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = applicationName.c_str();
+    appInfo.pApplicationName = _applicationName.c_str();
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "vkEngine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -54,6 +63,8 @@ Instance::Instance(
     volkLoadInstance(_instance);
 
     setupDebugMessenger();
+
+    return 0;
 }
 
 VkInstance Instance::getInstance() const noexcept

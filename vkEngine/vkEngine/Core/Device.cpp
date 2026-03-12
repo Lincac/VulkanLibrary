@@ -3,12 +3,39 @@
 #include <set>
 #include <stdexcept>
 
-Device::Device(const PhysicalDevice& physicalDevice)
+Device::Device()
 {
+    _physicalDevice = nullptr;
+
+    _device = VK_NULL_HANDLE;
+
+    _graphicsQueue = VK_NULL_HANDLE;
+    _presentQueue = VK_NULL_HANDLE;
+}
+
+void Device::setDependice(PhysicalDevice* physicalDevice)
+{
+    if (physicalDevice == nullptr)
+    {
+        return;
+    }
+
+    _physicalDevice = physicalDevice;
+}
+
+int Device::create()
+{
+    if (_physicalDevice == nullptr)
+    {
+        return -1;
+    }
+
+    auto indices = _physicalDevice->getQueueFamilyIndices();
+
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    std::set<uint32_t> uniqueQueueFamilies = { 
-        physicalDevice._indices.graphicsFamily.value(), 
-        physicalDevice._indices.presentFamily.value() };
+    std::set<uint32_t> uniqueQueueFamilies = {
+        indices.graphicsFamily.value(),
+        indices.presentFamily.value() };
 
     float queuePriority = 1.0f;
     for (uint32_t queueFamily : uniqueQueueFamilies) {
@@ -30,20 +57,27 @@ Device::Device(const PhysicalDevice& physicalDevice)
 
     createInfo.pEnabledFeatures = &deviceFeatures;
 
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(physicalDevice._deviceExtensions.size());
-    createInfo.ppEnabledExtensionNames = physicalDevice._deviceExtensions.data();
+    auto deviceExtensions = _physicalDevice->getDeviceExtensions();
 
-    if (vkCreateDevice(physicalDevice._physicalDevice, &createInfo, nullptr, &_device) != VK_SUCCESS) {
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+
+    if (vkCreateDevice(_physicalDevice->getPhysicalDevice(), &createInfo, nullptr, &_device) != VK_SUCCESS) {
         throw std::runtime_error("failed to create logical device!");
     }
 
-    vkGetDeviceQueue(_device, physicalDevice._indices.graphicsFamily.value(), 0, &_graphicsQueue);
-    vkGetDeviceQueue(_device, physicalDevice._indices.presentFamily.value(), 0, &_presentQueue);
+    vkGetDeviceQueue(_device, indices.graphicsFamily.value(), 0, &_graphicsQueue);
+    vkGetDeviceQueue(_device, indices.presentFamily.value(), 0, &_presentQueue);
 }
 
 VkDevice Device::getDevice() const
 {
     return _device;
+}
+
+PhysicalDevice* Device::getPhysicalDevice() const
+{
+    return _physicalDevice;
 }
 
 VkQueue Device::getGraphicsQueue() const

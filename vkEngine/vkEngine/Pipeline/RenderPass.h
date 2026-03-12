@@ -6,11 +6,19 @@ class RenderPass
 {
 public:
 
-	RenderPass(const Device& logicalDevice, const Swapchain& swapchain);
+	RenderPass();
 
 public:
 
+	void setDependice(Swapchain* swapchain);
+
+	int create();
+
 	VkRenderPass getRenderPass() const;
+
+private:
+
+	Swapchain* _swapchain;
 
 private:
 

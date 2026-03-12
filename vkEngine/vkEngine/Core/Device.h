@@ -6,17 +6,17 @@ class Device
 {
 public:
 
-    Device(const PhysicalDevice& physicalDevice);
-
-    Device(const Device&) = delete;
-    Device& operator=(const Device&) = delete;
-    Device(Device&& other) noexcept = default;
-    Device& operator=(Device&& other) noexcept = default;
-    ~Device() = default;
+    Device();
 
 public:
 
+    void setDependice(PhysicalDevice* physicalDevice);
+
+    int create();
+
     VkDevice getDevice() const;
+
+    PhysicalDevice* getPhysicalDevice() const;
 
     VkQueue getGraphicsQueue() const;
 
@@ -24,7 +24,9 @@ public:
 
 private:
 
-    friend class Swapchain;
+    PhysicalDevice* _physicalDevice;
+
+private:
 
     VkDevice _device;
 

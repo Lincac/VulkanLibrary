@@ -11,6 +11,7 @@
     <ClInclude Include="Pipeline\RenderPass.h" />
     <ClInclude Include="Pipeline\RenderPipeline.h" />
     <ClInclude Include="Resource\CommandPool.h" />
+    <ClInclude Include="Resource\DataBuffer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Swapchain\Swapchain.cpp" />
@@ -23,5 +24,6 @@
     <ClCompile Include="Pipeline\RenderPass.cpp" />
     <ClCompile Include="Pipeline\RenderPipeline.cpp" />
     <ClCompile Include="Resource\CommandPool.cpp" />
+    <ClCompile Include="Resource\DataBuffer.cpp" />
   </ItemGroup>
 </Project>

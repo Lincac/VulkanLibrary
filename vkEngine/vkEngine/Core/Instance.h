@@ -9,15 +9,11 @@ class Instance
 {
 public:
 
-    Instance(
-        const std::string& applicationName,
-        bool enableValidationLayers = true);
+    Instance();
 
-    Instance(const Instance&) = delete;
-    Instance& operator=(const Instance&) = delete;
-    Instance(Instance&& other) noexcept = default;
-    Instance& operator=(Instance&& other) noexcept = default;
-    ~Instance() = default;
+    void setApplicationName(const std::string& appName);
+
+    int create();
 
     VkInstance getInstance() const noexcept;
 
@@ -32,6 +28,8 @@ private:
     void setupDebugMessenger();
 
 private:
+
+    std::string _applicationName;
 
     bool _enableValidationLayers;
     const std::vector<const char*> _validationLayers = {

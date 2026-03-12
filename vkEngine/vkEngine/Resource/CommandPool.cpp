@@ -2,16 +2,38 @@
 
 #include <stdexcept>
 
-CommandPool::CommandPool(const PhysicalDevice& physicalDevice, const Device& logicalDevice)
+CommandPool::CommandPool()
 {
-    QueueFamilyIndices queueFamilyIndices = physicalDevice.getQueueFamilyIndices();
+    _logicalDevice = nullptr;
+
+    _commandPool = VK_NULL_HANDLE;
+}
+
+void CommandPool::setDependice(Device* logicalDevice)
+{
+    if (logicalDevice == nullptr)
+    {
+        return;
+    }
+
+    _logicalDevice = logicalDevice;
+}
+
+int CommandPool::create()
+{
+    if (_logicalDevice == nullptr)
+    {
+        return -1;
+    }
+
+    auto queueFamilyIndices = _logicalDevice->getPhysicalDevice()->getQueueFamilyIndices();
 
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
 
-    if (vkCreateCommandPool(logicalDevice.getDevice(), &poolInfo, nullptr, &_commandPool) != VK_SUCCESS) {
+    if (vkCreateCommandPool(_logicalDevice->getDevice(), &poolInfo, nullptr, &_commandPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create command pool!");
     }
 
@@ -23,9 +45,11 @@ CommandPool::CommandPool(const PhysicalDevice& physicalDevice, const Device& log
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = (uint32_t)_commandBuffers.size();
 
-    if (vkAllocateCommandBuffers(logicalDevice.getDevice(), &allocInfo, _commandBuffers.data()) != VK_SUCCESS) {
+    if (vkAllocateCommandBuffers(_logicalDevice->getDevice(), &allocInfo, _commandBuffers.data()) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate command buffers!");
     }
+
+    return 0;
 }
 
 VkCommandBuffer CommandPool::getCommandBuffer(uint32_t index)
