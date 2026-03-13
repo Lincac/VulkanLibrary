@@ -1,40 +1,16 @@
-#include "PhysicalDevice.h"
+#include "vkEngine.h"
 
-#include <stdexcept>
-
-PhysicalDevice::PhysicalDevice()
+void vkEngine::initPhysicalDevice()
 {
-    _instance = nullptr;
-    _surface = VK_NULL_HANDLE;
-}
-
-void PhysicalDevice::setDependice(Instance* instance, VkSurfaceKHR surface)
-{
-    if (instance == nullptr || surface == VK_NULL_HANDLE)
-    {
-        return;
-    }
-
-    _instance = instance;
-    _surface = surface;
-}
-
-int PhysicalDevice::create()
-{
-    if (_instance == nullptr || _surface == VK_NULL_HANDLE)
-    {
-        return -1;
-    }
-
     uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(_instance->getInstance(), &deviceCount, nullptr);
+    vkEnumeratePhysicalDevices(_instance, &deviceCount, nullptr);
 
     if (deviceCount == 0) {
         throw std::runtime_error("failed to find GPUs with Vulkan support!");
     }
 
     std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(_instance->getInstance(), &deviceCount, devices.data());
+    vkEnumeratePhysicalDevices(_instance, &deviceCount, devices.data());
 
     for (const auto& device : devices) {
         if (isDeviceSuitable(device)) {
@@ -46,32 +22,10 @@ int PhysicalDevice::create()
     if (_physicalDevice == VK_NULL_HANDLE) {
         throw std::runtime_error("failed to find a suitable GPU!");
     }
-
-    return 0;
 }
 
-QueueFamilyIndices PhysicalDevice::getQueueFamilyIndices() const
-{
-    return _indices;
-}
-
-VkPhysicalDevice PhysicalDevice::getPhysicalDevice() const
-{
-    return _physicalDevice;
-}
-
-VkSurfaceKHR PhysicalDevice::getSurface() const
-{
-    return _surface;
-}
-
-const std::vector<const char*> PhysicalDevice::getDeviceExtensions() const
-{
-    return _deviceExtensions;
-}
-
-bool PhysicalDevice::isDeviceSuitable(VkPhysicalDevice device) {
-    _indices = findQueueFamilies(device);
+bool vkEngine::isDeviceSuitable(VkPhysicalDevice device) {
+    auto indices = findQueueFamilies(device);
 
     bool extensionsSupported = checkDeviceExtensionSupport(device);
 
@@ -84,10 +38,10 @@ bool PhysicalDevice::isDeviceSuitable(VkPhysicalDevice device) {
     VkPhysicalDeviceFeatures supportedFeatures;
     vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
 
-    return _indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
+    return indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
 }
 
-QueueFamilyIndices PhysicalDevice::findQueueFamilies(VkPhysicalDevice device) {
+QueueFamilyIndices vkEngine::findQueueFamilies(VkPhysicalDevice device) {
     QueueFamilyIndices indices;
 
     uint32_t queueFamilyCount = 0;
@@ -120,7 +74,7 @@ QueueFamilyIndices PhysicalDevice::findQueueFamilies(VkPhysicalDevice device) {
 }
 
 #include <set>
-bool PhysicalDevice::checkDeviceExtensionSupport(VkPhysicalDevice device) {
+bool vkEngine::checkDeviceExtensionSupport(VkPhysicalDevice device) {
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 
@@ -136,7 +90,7 @@ bool PhysicalDevice::checkDeviceExtensionSupport(VkPhysicalDevice device) {
     return requiredExtensions.empty();
 }
 
-SwapChainSupportDetails PhysicalDevice::querySwapChainSupport(VkPhysicalDevice device) {
+SwapChainSupportDetails vkEngine::querySwapChainSupport(VkPhysicalDevice device) {
     SwapChainSupportDetails details;
 
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, _surface, &details.capabilities);

@@ -1,29 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClInclude Include="Swapchain\Swapchain.h" />
-    <ClInclude Include="Render\Render.h" />
-    <ClInclude Include="Resource\Image2D.h" />
-    <ClInclude Include="Pipeline\ShaderModule.h" />
-    <ClInclude Include="Core\Instance.h" />
-    <ClInclude Include="Core\Device.h" />
-    <ClInclude Include="Core\PhysicalDevice.h" />
-    <ClInclude Include="Pipeline\RenderPass.h" />
-    <ClInclude Include="Pipeline\RenderPipeline.h" />
-    <ClInclude Include="Resource\CommandPool.h" />
-    <ClInclude Include="Resource\DataBuffer.h" />
+    <ClInclude Include="Actor.h" />
+    <ClInclude Include="Render.h" />
+    <ClInclude Include="vkEngine.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Swapchain\Swapchain.cpp" />
-    <ClCompile Include="Render\Render.cpp" />
-    <ClCompile Include="Resource\Image2D.cpp" />
-    <ClCompile Include="Pipeline\ShaderModule.cpp" />
-    <ClCompile Include="Core\Instance.cpp" />
-    <ClCompile Include="Core\Device.cpp" />
-    <ClCompile Include="Core\PhysicalDevice.cpp" />
-    <ClCompile Include="Pipeline\RenderPass.cpp" />
-    <ClCompile Include="Pipeline\RenderPipeline.cpp" />
-    <ClCompile Include="Resource\CommandPool.cpp" />
-    <ClCompile Include="Resource\DataBuffer.cpp" />
+    <ClCompile Include="Actor.cpp" />
+    <ClCompile Include="Render.cpp" />
+    <ClCompile Include="vkEngine.cpp" />
+    <ClCompile Include="vkEngine_InstanceHelp.cpp" />
+    <ClCompile Include="vkEngine_PhysicalDeviceHelp.cpp" />
+    <ClCompile Include="vkEngine_LogicalDeviceHelp.cpp" />
+    <ClCompile Include="vkEngine_SwapchainHelp.cpp" />
+    <ClCompile Include="vkEngine_OpaqueRenderPassHelp.cpp" />
+    <ClCompile Include="vkEngine_ShaderHelp.cpp" />
+    <ClCompile Include="vkEngine_CommandPoolHelp.cpp" />
   </ItemGroup>
 </Project>

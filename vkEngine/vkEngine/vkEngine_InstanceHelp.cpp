@@ -1,20 +1,6 @@
-#include "Instance.h"
+#include "vkEngine.h"
 
-#include <stdexcept>
-
-Instance::Instance()
-{
-    _applicationName = "vkEngine";
-    
-    _enableValidationLayers = true;
-}
-
-void Instance::setApplicationName(const std::string& appName)
-{
-    _applicationName = appName;
-}
-
-int Instance::create()
+void vkEngine::initInstance()
 {
     if (volkInitialize() != VK_SUCCESS) {
         throw std::runtime_error("failed to initialize Vulkan loader (volk)!");
@@ -63,16 +49,9 @@ int Instance::create()
     volkLoadInstance(_instance);
 
     setupDebugMessenger();
-
-    return 0;
 }
 
-VkInstance Instance::getInstance() const noexcept
-{
-    return _instance;
-}
-
-bool Instance::checkValidationLayerSupport()
+bool vkEngine::checkValidationLayerSupport()
 {
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
@@ -98,8 +77,7 @@ bool Instance::checkValidationLayerSupport()
     return true;
 }
 
-#include <glfw/glfw3.h>
-std::vector<const char*> Instance::getRequiredExtensions()
+std::vector<const char*> vkEngine::getRequiredExtensions()
 {
     uint32_t glfwExtensionCount = 0;
     const char** glfwExtensions;
@@ -114,7 +92,6 @@ std::vector<const char*> Instance::getRequiredExtensions()
     return extensions;
 }
 
-#include <iostream>
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -126,7 +103,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     return VK_FALSE;
 }
 
-void Instance::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
+void vkEngine::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
 {
     createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -149,7 +126,7 @@ VkResult CreateDebugUtilsMessengerEXT(
     }
 }
 
-void Instance::setupDebugMessenger() {
+void vkEngine::setupDebugMessenger() {
     if (!_enableValidationLayers) return;
 
     VkDebugUtilsMessengerCreateInfoEXT createInfo;
