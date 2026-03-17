@@ -2,18 +2,19 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClInclude Include="Actor.h" />
+    <ClInclude Include="Loader.h" />
     <ClInclude Include="Render.h" />
     <ClInclude Include="vkEngine.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Actor.cpp" />
+    <ClCompile Include="Loader.cpp" />
     <ClCompile Include="Render.cpp" />
     <ClCompile Include="vkEngine.cpp" />
     <ClCompile Include="vkEngine_InstanceHelp.cpp" />
     <ClCompile Include="vkEngine_PhysicalDeviceHelp.cpp" />
     <ClCompile Include="vkEngine_LogicalDeviceHelp.cpp" />
     <ClCompile Include="vkEngine_SwapchainHelp.cpp" />
-    <ClCompile Include="vkEngine_OpaqueRenderPassHelp.cpp" />
     <ClCompile Include="vkEngine_ShaderHelp.cpp" />
     <ClCompile Include="vkEngine_CommandPoolHelp.cpp" />
   </ItemGroup>

@@ -1,5 +1,6 @@
 #include "vkEngine.h"
 
+#include <fstream>
 #include <stdexcept>
 
 vkEngine::vkEngine(const std::string& appName, GLFWwindow* window)

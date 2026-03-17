@@ -39,6 +39,9 @@ enum ShaderType
 
 struct Vertex {
     glm::vec3 position;
+    glm::vec3 normal;
+    glm::vec3 tangent;
+    glm::vec2 uv;
 
     static VkVertexInputBindingDescription getBindingDescription() {
         VkVertexInputBindingDescription bindingDescription{};
@@ -49,13 +52,28 @@ struct Vertex {
         return bindingDescription;
     }
 
-    static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
-        std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+    static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions() {
+        std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions{};
 
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
         attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
         attributeDescriptions[0].offset = offsetof(Vertex, position);
+
+        attributeDescriptions[1].binding = 0;
+        attributeDescriptions[1].location = 1;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].offset = offsetof(Vertex, normal);
+
+        attributeDescriptions[2].binding = 0;
+        attributeDescriptions[2].location = 2;
+        attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[2].offset = offsetof(Vertex, tangent);
+
+        attributeDescriptions[3].binding = 0;
+        attributeDescriptions[3].location = 3;
+        attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[3].offset = offsetof(Vertex, uv);
 
         return attributeDescriptions;
     }
@@ -159,6 +177,8 @@ private:
 
 #pragma region 着色器相关
 
+public:
+
     VkShaderModule createShader(const std::string& path, ShaderType type);
 
     std::vector<char> readSpirvFile(const std::string& spirvPath);
@@ -169,10 +189,14 @@ private:
 
 #pragma region 命令、内存、纹理创建等
 
+private:
+
     void initCommandPool();
 
+public:
+
     template<typename T>
-    void createVKBuffer(T* data, unsigned int size);
+    void createVKBuffer(T* data, uint32_t size);
 
     void createVKBuffer(
         VkDeviceSize size,
@@ -237,7 +261,7 @@ private:
 };
 
 template<typename T>
-inline void vkEngine::createVKBuffer(T* data, unsigned int size)
+inline void vkEngine::createVKBuffer(T* data, uint32_t size)
 {
     VkDeviceSize bufferSize = sizeof(T) * size;
 

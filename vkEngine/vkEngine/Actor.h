@@ -1,45 +1,81 @@
 #pragma once
 
 #include "vkEngine.h"
+#include "Loader.h"
+
+struct Materials
+{
+    glm::vec4       baseColorFactor = glm::vec4(1);   // rgb: baseColor, a: alpha
+    float           metallicFactor;
+    float           roughnessFactor;
+    float           normalScaleFactor;
+    float           occlusionStrengthFactor;
+    glm::vec3       emissiveFactor;
+    float           alphaCutoffFactor;       // for mask
+};
 
 class Actor
 {
 public:
-    Actor() = default;
 
-    Actor& setVertexShader(const std::string& shaderPath);
-    Actor& setFragmentShader(const std::string& shaderPath);
-    Actor& setVertexInput(
-        const std::vector<VkVertexInputBindingDescription>& bindings,
-        const std::vector<VkVertexInputAttributeDescription>& attributes);
-    Actor& setVertexBuffer(VkBuffer vertexBuffer, VkDeviceSize offset = 0);
-    Actor& setIndexBuffer(VkBuffer indexBuffer, uint32_t indexCount, VkIndexType indexType = VK_INDEX_TYPE_UINT32);
-    Actor& setDrawParams(uint32_t vertexCount, uint32_t instanceCount = 1);
+    Actor();
+    ~Actor();
 
-    const std::string& getVertexShader() const noexcept;
-    const std::string& getFragmentShader() const noexcept;
-    const std::vector<VkVertexInputBindingDescription>& getBindings() const noexcept;
-    const std::vector<VkVertexInputAttributeDescription>& getAttributes() const noexcept;
-    VkBuffer getVertexBuffer() const noexcept;
-    VkDeviceSize getVertexOffset() const noexcept;
-    VkBuffer getIndexBuffer() const noexcept;
-    uint32_t getIndexCount() const noexcept;
-    VkIndexType getIndexType() const noexcept;
-    bool useIndexedDraw() const noexcept;
-    uint32_t getVertexCount() const noexcept;
-    uint32_t getInstanceCount() const noexcept;
+    void init(vkEngine* engine);
+
+    void setInputData(const LoadedModel& data);
+
+    void setTransformMatrix(const glm::mat4& matrix);
+
+    VkDescriptorSet getMaterialDescriptorSet();
+
+    void draw(VkCommandBuffer command);
+
+public:
+
+    void setBaseColor(const glm::vec4& color);
+
+    void setMetallic(float factor);
+
+    void setRoughness(float factor);
+
+    void setNormalScale(float factor);
+
+    void setOcclusionStrength(float factor);
+
+    void setEmissive(const glm::vec3& factor);
+
+    void setAlphaCutoff(float factor);
 
 private:
-    std::string _vertexShaderPath;
-    std::string _fragmentShaderPath;
-    std::vector<VkVertexInputBindingDescription> _bindings;
-    std::vector<VkVertexInputAttributeDescription> _attributes;
-    VkBuffer _vertexBuffer = VK_NULL_HANDLE;
-    VkDeviceSize _vertexOffset = 0;
-    VkBuffer _indexBuffer = VK_NULL_HANDLE;
-    uint32_t _indexCount = 0;
-    VkIndexType _indexType = VK_INDEX_TYPE_UINT32;
-    bool _useIndexedDraw = false;
-    uint32_t _vertexCount = 3;
-    uint32_t _instanceCount = 1;
+
+    void initVertexData();
+    void initMaterialDescriptorSet();
+    void releaseResources();
+
+private:
+
+    vkEngine* _engine;
+
+private:
+
+    bool _updateMaterials;
+    Materials _materials;
+    VkBuffer _materialsBuffer;
+    VkDeviceMemory _materialsBufferMemory;
+    VkDescriptorPool _materialsDescriptorPool;
+    VkDescriptorSetLayout _materialsDescriptorSetLayout;
+    VkDescriptorSet _materialsDescriptorSet;
+
+    glm::mat4 _matrix;
+
+    std::vector<float> _vertices;
+    std::vector<uint16_t> _indices;
+
+    VkBuffer _vertexBuffer;
+    VkDeviceMemory _vertexBufferMemory;
+
+    VkBuffer _indexBuffer;
+    VkDeviceMemory _indexBufferMemory;
+
 };
