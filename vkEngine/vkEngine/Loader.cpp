@@ -6,7 +6,9 @@
 
 #include <filesystem>
 #include <limits>
+#include <optional>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace
@@ -91,7 +93,17 @@ namespace
         return textures;
     }
 
-    LoadedMesh processMesh(const aiMesh* mesh, const aiScene* scene, const std::filesystem::path& baseDir)
+    struct LoadContext
+    {
+        const aiScene* scene = nullptr;
+        const std::filesystem::path* baseDir = nullptr;
+        std::vector<std::optional<MaterialTextureSet>> materialTextureCache{};
+        bool hasVertex = false;
+        glm::vec3 minPos = glm::vec3(std::numeric_limits<float>::max());
+        glm::vec3 maxPos = glm::vec3(std::numeric_limits<float>::lowest());
+    };
+
+    LoadedMesh processMesh(const aiMesh* mesh, LoadContext& context)
     {
         LoadedMesh loadedMesh{};
         loadedMesh.name = mesh->mName.C_Str();
@@ -102,6 +114,9 @@ namespace
 
             const aiVector3D& position = mesh->mVertices[i];
             vertex.position = glm::vec3(position.x, position.y, position.z);
+            context.minPos = glm::min(context.minPos, vertex.position);
+            context.maxPos = glm::max(context.maxPos, vertex.position);
+            context.hasVertex = true;
 
             if (mesh->HasNormals()) {
                 const aiVector3D& normal = mesh->mNormals[i];
@@ -120,7 +135,7 @@ namespace
                 vertex.uv = glm::vec2(uv.x, uv.y);
             }
 
-            loadedMesh.vertices.push_back(vertex);
+            loadedMesh.vertices.push_back(std::move(vertex));
         }
 
         loadedMesh.indices.reserve(mesh->mNumFaces * 3);
@@ -131,8 +146,14 @@ namespace
             }
         }
 
-        if (mesh->mMaterialIndex < scene->mNumMaterials) {
-            loadedMesh.textures = extractMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], baseDir);
+        if (mesh->mMaterialIndex < context.scene->mNumMaterials) {
+            auto& cacheEntry = context.materialTextureCache[mesh->mMaterialIndex];
+            if (!cacheEntry.has_value()) {
+                cacheEntry = extractMaterialTextures(
+                    context.scene->mMaterials[mesh->mMaterialIndex],
+                    *context.baseDir);
+            }
+            loadedMesh.textures = *cacheEntry;
         }
 
         return loadedMesh;
@@ -140,39 +161,26 @@ namespace
 
     void processNode(
         const aiNode* node,
-        const aiScene* scene,
-        const std::filesystem::path& baseDir,
+        LoadContext& context,
         LoadedModel& outputModel)
     {
         for (uint32_t i = 0; i < node->mNumMeshes; ++i) {
-            const aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-            outputModel.meshes.push_back(processMesh(mesh, scene, baseDir));
+            const aiMesh* mesh = context.scene->mMeshes[node->mMeshes[i]];
+            outputModel.meshes.push_back(processMesh(mesh, context));
         }
 
         for (uint32_t i = 0; i < node->mNumChildren; ++i) {
-            processNode(node->mChildren[i], scene, baseDir, outputModel);
+            processNode(node->mChildren[i], context, outputModel);
         }
     }
 
-    void centerModelAtOrigin(LoadedModel& model)
+    void centerModelAtOrigin(LoadedModel& model, const LoadContext& context)
     {
-        bool hasVertex = false;
-        glm::vec3 minPos(std::numeric_limits<float>::max());
-        glm::vec3 maxPos(std::numeric_limits<float>::lowest());
-
-        for (const auto& mesh : model.meshes) {
-            for (const auto& vertex : mesh.vertices) {
-                minPos = glm::min(minPos, vertex.position);
-                maxPos = glm::max(maxPos, vertex.position);
-                hasVertex = true;
-            }
-        }
-
-        if (!hasVertex) {
+        if (!context.hasVertex) {
             return;
         }
 
-        const glm::vec3 center = (minPos + maxPos) * 0.5f;
+        const glm::vec3 center = (context.minPos + context.maxPos) * 0.5f;
         for (auto& mesh : model.meshes) {
             for (auto& vertex : mesh.vertices) {
                 vertex.position -= center;
@@ -203,8 +211,14 @@ LoadedModel Loader::loadModel(const std::string& modelPath)
     LoadedModel model{};
     model.sourcePath = toForwardSlash(path.lexically_normal().string());
     model.baseDirectory = toForwardSlash(baseDir.lexically_normal().string());
+    model.meshes.reserve(scene->mNumMeshes);
 
-    processNode(scene->mRootNode, scene, baseDir, model);
-    centerModelAtOrigin(model);
+    LoadContext context{};
+    context.scene = scene;
+    context.baseDir = &baseDir;
+    context.materialTextureCache.resize(scene->mNumMaterials);
+
+    processNode(scene->mRootNode, context, model);
+    centerModelAtOrigin(model, context);
     return model;
 }
