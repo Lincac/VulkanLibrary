@@ -42,5 +42,6 @@ struct LoadedModel
 class Loader
 {
 public:
+    // Loaded vertices are translated so the model AABB center is at world origin.
     static LoadedModel loadModel(const std::string& modelPath);
 };

@@ -1,11 +1,12 @@
 #include "Actor.h"
 
-#include <limits>
+#include <cstring>
 #include <stdexcept>
 #include <vector>
 
 Actor::Actor()
-	: _vertexBuffer(VK_NULL_HANDLE),
+	: _engine(nullptr),
+	_vertexBuffer(VK_NULL_HANDLE),
 	_vertexBufferMemory(VK_NULL_HANDLE),
 	_indexBuffer(VK_NULL_HANDLE),
 	_indexBufferMemory(VK_NULL_HANDLE),
@@ -15,7 +16,15 @@ Actor::Actor()
 	_materialsDescriptorSetLayout(VK_NULL_HANDLE),
 	_materialsDescriptorSet(VK_NULL_HANDLE)
 {
-	_updateMaterials = false;
+	_updateMaterials = true;
+	_materials.baseColorFactor = glm::vec4(1.0f);
+	_materials.metallicFactor = 0.0f;
+	_materials.roughnessFactor = 1.0f;
+	_materials.normalScaleFactor = 1.0f;
+	_materials.occlusionStrengthFactor = 1.0f;
+	_materials.emissiveFactor = glm::vec3(0.0f);
+	_materials.alphaCutoffFactor = 0.5f;
+	_matrix = glm::mat4(1);
 }
 
 Actor::~Actor()
@@ -25,6 +34,13 @@ Actor::~Actor()
 
 void Actor::init(vkEngine* engine)
 {
+	if (engine == nullptr)
+	{
+		return;
+	}
+
+	_engine = engine;
+
 	initVertexData();
 	initMaterialDescriptorSet();
 }
@@ -59,10 +75,7 @@ void Actor::setInputData(const LoadedModel& data)
 
 		for (uint32_t localIndex : mesh.indices) {
 			const uint32_t globalIndex = vertexBase + localIndex;
-			if (globalIndex > std::numeric_limits<uint16_t>::max()) {
-				throw std::runtime_error("model index exceeds uint16 range");
-			}
-			_indices.push_back(static_cast<uint16_t>(globalIndex));
+			_indices.push_back(globalIndex);
 		}
 
 		vertexBase += static_cast<uint32_t>(mesh.vertices.size());
@@ -74,8 +87,23 @@ void Actor::setTransformMatrix(const glm::mat4& matrix)
 	_matrix = matrix;
 }
 
+const glm::mat4 Actor::getTransformMatrix()
+{
+	return _matrix;
+}
+
+VkDescriptorSetLayout Actor::getMaterialDescriptorSetLayout() const
+{
+	return _materialsDescriptorSetLayout;
+}
+
 VkDescriptorSet Actor::getMaterialDescriptorSet()
 {
+	if (_engine == nullptr)
+	{
+		return VK_NULL_HANDLE;
+	}
+
 	if (!_updateMaterials)
 	{
 		return _materialsDescriptorSet;
@@ -85,17 +113,22 @@ VkDescriptorSet Actor::getMaterialDescriptorSet()
 	vkMapMemory(_engine->getLogicalDevice(), _materialsBufferMemory, 0, sizeof(Materials), 0, &data);
 	memcpy(data, &_materials, sizeof(Materials));
 	vkUnmapMemory(_engine->getLogicalDevice(), _materialsBufferMemory);
+	_updateMaterials = false;
 
 	return _materialsDescriptorSet;
 }
 
-void Actor::draw(VkCommandBuffer command)
+void Actor::draw(VkCommandBuffer command, VkPipelineLayout pipelineLayout, VkDescriptorSet cameraDescriptorSet)
 {
+	VkDescriptorSet materialDescriptorSet = getMaterialDescriptorSet();
+	VkDescriptorSet descriptorSets[] = { cameraDescriptorSet, materialDescriptorSet };
+	vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 2, descriptorSets, 0, nullptr);
+
 	VkBuffer vertexBuffers[] = { _vertexBuffer };
 	VkDeviceSize offsets[] = { 0 };
 	vkCmdBindVertexBuffers(command, 0, 1, vertexBuffers, offsets);
 
-	vkCmdBindIndexBuffer(command, _indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+	vkCmdBindIndexBuffer(command, _indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 	vkCmdDrawIndexed(command, _indices.size(), 1, 0, 0, 0);
 }
 
@@ -189,7 +222,7 @@ void Actor::initVertexData()
 
 	VkBuffer indexStagingBuffer = VK_NULL_HANDLE;
 	VkDeviceMemory indexStagingMemory = VK_NULL_HANDLE;
-	const VkDeviceSize indexBufferSize = sizeof(uint16_t) * _indices.size();
+	const VkDeviceSize indexBufferSize = sizeof(uint32_t) * _indices.size();
 	_engine->createVKBuffer(
 		indexBufferSize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -243,10 +276,10 @@ void Actor::initMaterialDescriptorSet()
 	vkBindBufferMemory(_engine->getLogicalDevice(), _materialsBuffer, _materialsBufferMemory, 0);
 
 	VkDescriptorSetLayoutBinding uboBinding{};
-	uboBinding.binding = 0; // ??? shader ?? binding=0
+	uboBinding.binding = 0;
 	uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	uboBinding.descriptorCount = 1;
-	uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	VkDescriptorSetLayoutCreateInfo layoutInfo{};
 	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -257,13 +290,13 @@ void Actor::initMaterialDescriptorSet()
 
 	VkDescriptorPoolSize poolSize{};
 	poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSize.descriptorCount = 10; // ????
+	poolSize.descriptorCount = 1;
 
 	VkDescriptorPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolInfo.poolSizeCount = 1;
 	poolInfo.pPoolSizes = &poolSize;
-	poolInfo.maxSets = 10;
+	poolInfo.maxSets = 1;
 
 	vkCreateDescriptorPool(_engine->getLogicalDevice(), &poolInfo, nullptr, &_materialsDescriptorPool);
 
@@ -283,7 +316,7 @@ void Actor::initMaterialDescriptorSet()
 	VkWriteDescriptorSet write{};
 	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	write.dstSet = _materialsDescriptorSet;
-	write.dstBinding = 0; // ??? shader binding=0
+	write.dstBinding = 0;
 	write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	write.descriptorCount = 1;
 	write.pBufferInfo = &descriptorBufferInfo;

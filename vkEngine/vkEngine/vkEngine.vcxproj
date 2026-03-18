@@ -12,12 +12,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Actor.h" />
+    <ClInclude Include="Camera.h" />
     <ClInclude Include="Loader.h" />
     <ClInclude Include="Render.h" />
     <ClInclude Include="vkEngine.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Actor.cpp" />
+    <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Loader.cpp" />
     <ClCompile Include="Render.cpp" />
     <ClCompile Include="vkEngine.cpp" />
@@ -75,6 +77,12 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PostBuildEvent>
+      <Command>if not exist "$(ProjectDir)..\Dependence\shader\bin" mkdir "$(ProjectDir)..\Dependence\shader\bin"
+for /R "$(ProjectDir)..\Dependence\shader" %%F in (*.vert *.frag *.comp *.geom *.tesc *.tese) do (
+if /I not "%%~dpF"=="$(ProjectDir)..\Dependence\shader\bin\" "$(VULKAN_SDK)\Bin\glslc.exe" "%%F" -o "$(ProjectDir)..\Dependence\shader\bin\%%~nxF.spv"
+)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -92,6 +100,12 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PostBuildEvent>
+      <Command>if not exist "$(ProjectDir)..\Dependence\shader\bin" mkdir "$(ProjectDir)..\Dependence\shader\bin"
+for /R "$(ProjectDir)..\Dependence\shader" %%F in (*.vert *.frag *.comp *.geom *.tesc *.tese) do (
+if /I not "%%~dpF"=="$(ProjectDir)..\Dependence\shader\bin\" "$(VULKAN_SDK)\Bin\glslc.exe" "%%F" -o "$(ProjectDir)..\Dependence\shader\bin\%%~nxF.spv"
+)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,5 +1,6 @@
 #pragma once
 
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLFW_INCLUDE_VULKAN
 #include <glfw/glfw3.h>
 #include <volk/volk.h>
@@ -84,6 +85,10 @@ class vkEngine
 public:
 
     vkEngine(const std::string& appName, GLFWwindow* window);
+    ~vkEngine();
+
+    vkEngine(const vkEngine&) = delete;
+    vkEngine& operator=(const vkEngine&) = delete;
 
     int init();
 
@@ -107,7 +112,9 @@ public:
 
     VkImageView getSwapChainImageView(uint32_t index) const noexcept;
 
-    VkCommandBuffer getCommandBuffer(uint32_t frame);
+    const VkCommandBuffer getCommandBuffer(uint32_t frame);
+
+    VkCommandBuffer* getCommandBuffers();
 
     VkQueue getGraphicsQueue() const noexcept;
 
@@ -115,13 +122,9 @@ public:
 
     VkExtent2D getSwapChainExtent() const noexcept;
 
-    VkFramebuffer getFramebuffer(uint32_t frame) const noexcept;
-
     void resetSwapChain();
 
 private:
-
-#pragma region vk 句柄创建辅助接口
 
     void initInstance();
 
@@ -133,10 +136,6 @@ private:
 
     void setupDebugMessenger();
 
-#pragma endregion
-
-#pragma region vk 物理设备创建辅助接口
-
     void initPhysicalDevice();
 
     bool isDeviceSuitable(VkPhysicalDevice device);
@@ -147,17 +146,11 @@ private:
 
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
 
-#pragma endregion
-
-#pragma region vk 逻辑设备创建辅助接口
-
     void initLogicalDevice();
 
-#pragma endregion
-
-#pragma region vk 交换链创建辅助接口
-
     void initSwapChain();
+
+    void cleanupSwapChain();
 
     SwapChainSupportDetails querySwapChainSupport();
 
@@ -167,16 +160,6 @@ private:
 
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 
-#pragma endregion
-
-#pragma region forward 渲染流
-
-    void initOpaqueRenderPass();
-
-#pragma endregion
-
-#pragma region 着色器相关
-
 public:
 
     VkShaderModule createShader(const std::string& path, ShaderType type);
@@ -185,18 +168,11 @@ public:
 
     VkShaderStageFlagBits toVkShaderStage(ShaderType shaderType);
 
-#pragma endregion
-
-#pragma region 命令、内存、纹理创建等
-
 private:
 
     void initCommandPool();
 
 public:
-
-    template<typename T>
-    void createVKBuffer(T* data, uint32_t size);
 
     void createVKBuffer(
         VkDeviceSize size,
@@ -208,8 +184,6 @@ public:
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-
-#pragma endregion
 
 private:
 
@@ -245,9 +219,7 @@ private:
     //
     VkSwapchainKHR _swapChain;
     std::vector<VkImage> _swapChainImages;
-
     std::vector<VkImageView> _swapChainImageViews;
-    std::vector<VkFramebuffer> _swapChainFramebuffers;
 
     VkFormat _swapChainImageFormat;
     VkExtent2D _swapChainExtent;
@@ -259,33 +231,3 @@ private:
     VkCommandPool _commandPool;
     std::vector<VkCommandBuffer> _commandBuffers;
 };
-
-template<typename T>
-inline void vkEngine::createVKBuffer(T* data, uint32_t size)
-{
-    VkDeviceSize bufferSize = sizeof(T) * size;
-
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    createBuffer(bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        stagingBuffer,
-        stagingBufferMemory);
-
-    void* tempData;
-    vkMapMemory(_logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &tempData);
-    memcpy(tempData, _data.data(), (size_t)bufferSize);
-    vkUnmapMemory(_logicalDevice, stagingBufferMemory);
-
-    createBuffer(bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        _buffer,
-        _deviceMemory);
-
-    copyBuffer(stagingBuffer, _buffer, bufferSize);
-
-    vkDestroyBuffer(_logicalDevice, stagingBuffer, nullptr);
-    vkFreeMemory(_logicalDevice, stagingBufferMemory, nullptr);
-}

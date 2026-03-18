@@ -3,6 +3,20 @@
 #include <fstream>
 #include <stdexcept>
 
+namespace {
+void DestroyDebugUtilsMessengerEXT(
+    VkInstance instance,
+    VkDebugUtilsMessengerEXT debugMessenger,
+    const VkAllocationCallbacks* pAllocator)
+{
+    auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+        vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
+    if (func != nullptr) {
+        func(instance, debugMessenger, pAllocator);
+    }
+}
+}
+
 vkEngine::vkEngine(const std::string& appName, GLFWwindow* window)
 	: 
     _applicationName(appName),
@@ -21,6 +35,40 @@ vkEngine::vkEngine(const std::string& appName, GLFWwindow* window)
     _opaqueRenderPass(VK_NULL_HANDLE),
     _commandPool(VK_NULL_HANDLE)
 {
+}
+
+vkEngine::~vkEngine()
+{
+    if (_logicalDevice != VK_NULL_HANDLE) {
+        vkDeviceWaitIdle(_logicalDevice);
+    }
+
+    cleanupSwapChain();
+
+    if (_commandPool != VK_NULL_HANDLE && _logicalDevice != VK_NULL_HANDLE) {
+        vkDestroyCommandPool(_logicalDevice, _commandPool, nullptr);
+        _commandPool = VK_NULL_HANDLE;
+    }
+
+    if (_logicalDevice != VK_NULL_HANDLE) {
+        vkDestroyDevice(_logicalDevice, nullptr);
+        _logicalDevice = VK_NULL_HANDLE;
+    }
+
+    if (_surface != VK_NULL_HANDLE && _instance != VK_NULL_HANDLE) {
+        vkDestroySurfaceKHR(_instance, _surface, nullptr);
+        _surface = VK_NULL_HANDLE;
+    }
+
+    if (_debugMessenger != VK_NULL_HANDLE && _instance != VK_NULL_HANDLE) {
+        DestroyDebugUtilsMessengerEXT(_instance, _debugMessenger, nullptr);
+        _debugMessenger = VK_NULL_HANDLE;
+    }
+
+    if (_instance != VK_NULL_HANDLE) {
+        vkDestroyInstance(_instance, nullptr);
+        _instance = VK_NULL_HANDLE;
+    }
 }
 
 int vkEngine::init()
@@ -90,9 +138,17 @@ VkImageView vkEngine::getSwapChainImageView(uint32_t index) const noexcept
     return _swapChainImageViews[index];
 }
 
-VkCommandBuffer vkEngine::getCommandBuffer(uint32_t frame)
+const VkCommandBuffer vkEngine::getCommandBuffer(uint32_t frame)
 {
+    if (frame >= _commandBuffers.size()) {
+        return VK_NULL_HANDLE;
+    }
     return _commandBuffers[frame];
+}
+
+VkCommandBuffer* vkEngine::getCommandBuffers()
+{
+    return _commandBuffers.data();
 }
 
 VkQueue vkEngine::getGraphicsQueue() const noexcept
@@ -108,12 +164,4 @@ VkQueue vkEngine::getPresentQueue() const noexcept
 VkExtent2D vkEngine::getSwapChainExtent() const noexcept
 {
     return _swapChainExtent;
-}
-
-VkFramebuffer vkEngine::getFramebuffer(uint32_t frame) const noexcept
-{
-    if (frame >= _swapChainFramebuffers.size()) {
-        return VK_NULL_HANDLE;
-    }
-    return _swapChainFramebuffers[frame];
 }

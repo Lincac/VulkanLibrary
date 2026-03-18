@@ -1,5 +1,7 @@
 #include "vkEngine.h"
 
+#include <cstring>
+
 void vkEngine::initInstance()
 {
     if (volkInitialize() != VK_SUCCESS) {

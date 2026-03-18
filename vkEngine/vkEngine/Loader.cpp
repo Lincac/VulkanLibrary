@@ -5,6 +5,7 @@
 #include <assimp/scene.h>
 
 #include <filesystem>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -152,6 +153,32 @@ namespace
             processNode(node->mChildren[i], scene, baseDir, outputModel);
         }
     }
+
+    void centerModelAtOrigin(LoadedModel& model)
+    {
+        bool hasVertex = false;
+        glm::vec3 minPos(std::numeric_limits<float>::max());
+        glm::vec3 maxPos(std::numeric_limits<float>::lowest());
+
+        for (const auto& mesh : model.meshes) {
+            for (const auto& vertex : mesh.vertices) {
+                minPos = glm::min(minPos, vertex.position);
+                maxPos = glm::max(maxPos, vertex.position);
+                hasVertex = true;
+            }
+        }
+
+        if (!hasVertex) {
+            return;
+        }
+
+        const glm::vec3 center = (minPos + maxPos) * 0.5f;
+        for (auto& mesh : model.meshes) {
+            for (auto& vertex : mesh.vertices) {
+                vertex.position -= center;
+            }
+        }
+    }
 }
 
 LoadedModel Loader::loadModel(const std::string& modelPath)
@@ -178,5 +205,6 @@ LoadedModel Loader::loadModel(const std::string& modelPath)
     model.baseDirectory = toForwardSlash(baseDir.lexically_normal().string());
 
     processNode(scene->mRootNode, scene, baseDir, model);
+    centerModelAtOrigin(model);
     return model;
 }

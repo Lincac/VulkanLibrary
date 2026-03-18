@@ -4,6 +4,7 @@
 
 VkShaderModule vkEngine::createShader(const std::string& path, ShaderType type)
 {
+	(void)type;
 	VkShaderModule shader = VK_NULL_HANDLE;
 
 	const std::vector<char> code = readSpirvFile(path);

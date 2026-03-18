@@ -1,5 +1,8 @@
 #include "vkEngine.h"
 
+#include <algorithm>
+#include <limits>
+
 void vkEngine::initSwapChain()
 {
     SwapChainSupportDetails swapChainSupport = querySwapChainSupport();
@@ -79,21 +82,34 @@ void vkEngine::initSwapChain()
     }
 }
 
-void vkEngine::resetSwapChain()
+void vkEngine::cleanupSwapChain()
 {
-    for (auto framebuffer : _swapChainFramebuffers) {
-        vkDestroyFramebuffer(_logicalDevice, framebuffer, nullptr);
-    }
-    _swapChainFramebuffers.clear();
-
     for (auto imageView : _swapChainImageViews) {
-        vkDestroyImageView(_logicalDevice, imageView, nullptr);
+        if (imageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(_logicalDevice, imageView, nullptr);
+        }
     }
     _swapChainImageViews.clear();
     _swapChainImages.clear();
 
-    vkDestroySwapchainKHR(_logicalDevice, _swapChain, nullptr);
-    _swapChain = VK_NULL_HANDLE;
+    if (_swapChain != VK_NULL_HANDLE) {
+        vkDestroySwapchainKHR(_logicalDevice, _swapChain, nullptr);
+        _swapChain = VK_NULL_HANDLE;
+    }
+}
+
+void vkEngine::resetSwapChain()
+{
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(_window, &width, &height);
+    while (width == 0 || height == 0) {
+        glfwGetFramebufferSize(_window, &width, &height);
+        glfwWaitEvents();
+    }
+
+    vkDeviceWaitIdle(_logicalDevice);
+
+    cleanupSwapChain();
 
     initSwapChain();
 }
@@ -142,7 +158,6 @@ VkPresentModeKHR vkEngine::chooseSwapPresentMode(const std::vector<VkPresentMode
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-#include <algorithm>
 VkExtent2D vkEngine::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         return capabilities.currentExtent;

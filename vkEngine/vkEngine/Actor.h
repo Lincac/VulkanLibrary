@@ -27,9 +27,13 @@ public:
 
     void setTransformMatrix(const glm::mat4& matrix);
 
+    const glm::mat4 getTransformMatrix();
+
+    VkDescriptorSetLayout getMaterialDescriptorSetLayout() const;
+
     VkDescriptorSet getMaterialDescriptorSet();
 
-    void draw(VkCommandBuffer command);
+    void draw(VkCommandBuffer command, VkPipelineLayout pipelineLayout, VkDescriptorSet cameraDescriptorSet);
 
 public:
 
@@ -70,7 +74,7 @@ private:
     glm::mat4 _matrix;
 
     std::vector<float> _vertices;
-    std::vector<uint16_t> _indices;
+    std::vector<uint32_t> _indices;
 
     VkBuffer _vertexBuffer;
     VkDeviceMemory _vertexBufferMemory;

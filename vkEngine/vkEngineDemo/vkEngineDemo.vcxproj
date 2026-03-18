@@ -104,7 +104,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
-      <AdditionalIncludeDirectories>../vkEngine/Pipeline;../vkEngine/Swapchain;../vkEngine/Resource;../vkEngine/Render;../vkEngine/Core;../Dependence/include;$(VULKAN_SDK)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../vkEngine;../Dependence/include;$(VULKAN_SDK)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -112,6 +112,10 @@
       <AdditionalLibraryDirectories>../Dependence/lib/$(Configuration)/;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>volk.lib;glfw.lib;assimp-vc143-mtd.lib;zlibstaticd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>if not exist "$(ProjectDir)..\x64\$(Configuration)" mkdir "$(ProjectDir)..\x64\$(Configuration)"
+xcopy /Y /I /E "$(ProjectDir)..\Dependence\bin\$(Configuration)\*" "$(ProjectDir)..\x64\$(Configuration)\"</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -123,7 +127,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
-      <AdditionalIncludeDirectories>../vkEngine/Pipeline;../vkEngine/Swapchain;../vkEngine/Resource;../vkEngine/Render;../vkEngine/Core;../Dependence/include;$(VULKAN_SDK)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../vkEngine;../Dependence/include;$(VULKAN_SDK)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -131,6 +135,10 @@
       <AdditionalLibraryDirectories>../Dependence/lib/$(Configuration)/;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>volk.lib;glfw.lib;assimp-vc143-mt.lib;zlibstatic.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>if not exist "$(ProjectDir)..\x64\$(Configuration)" mkdir "$(ProjectDir)..\x64\$(Configuration)"
+xcopy /Y /I /E "$(ProjectDir)..\Dependence\bin\$(Configuration)\*" "$(ProjectDir)..\x64\$(Configuration)\"</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />

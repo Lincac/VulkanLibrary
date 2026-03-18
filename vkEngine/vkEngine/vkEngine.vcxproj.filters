@@ -5,6 +5,7 @@
     <ClInclude Include="Loader.h" />
     <ClInclude Include="Render.h" />
     <ClInclude Include="vkEngine.h" />
+    <ClInclude Include="Camera.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Actor.cpp" />
@@ -17,5 +18,6 @@
     <ClCompile Include="vkEngine_SwapchainHelp.cpp" />
     <ClCompile Include="vkEngine_ShaderHelp.cpp" />
     <ClCompile Include="vkEngine_CommandPoolHelp.cpp" />
+    <ClCompile Include="Camera.cpp" />
   </ItemGroup>
 </Project>
