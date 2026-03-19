@@ -185,6 +185,11 @@ public:
 
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
+    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates,
+        VkImageTiling tiling, VkFormatFeatureFlags features);
+
+    VkFormat findDepthFormat();
+
 private:
 
     std::string _applicationName;

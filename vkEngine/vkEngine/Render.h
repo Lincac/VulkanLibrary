@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Actor.h"
+#include "Render_Opaque.h"
 #include "Camera.h"
 
 class Render
@@ -17,47 +17,33 @@ public:
     void draw();
 
 private:
-
-    void drawOpaqueCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
-
-private:
     
-    void initOpaqueRenderPass();
-
-    void initOpaquePipeline();
-    void initCameraDescriptorResources();
-    void initOpaqueFramebuffers();
-    void cleanupOpaqueFramebuffers();
-    void recreateSwapChainResources();
+    void initSceneDescriptorResources();
 
     void initSyncObjects();
 
+    void recreateSwapChainResources();
+
     void cleanupSyncObjects();
 
-    void cleanupOpaquePipelineResources();
-    void cleanupCameraDescriptorResources();
-
-    void cleanupActorRefs();
+    void cleanupSceneDescriptorResources();
 
 private:
 
     vkEngine* _engine = nullptr;
 
+    Render_Opaque* _opaqueRender;
+
     Camera* _camera;
 
-    VkPipelineLayout _opaquePipelineLayout = VK_NULL_HANDLE;
-    VkRenderPass _opaqueRenderPass = VK_NULL_HANDLE;
-    VkPipeline _opaquePipeline = VK_NULL_HANDLE;
-    VkDescriptorSetLayout _cameraDescriptorSetLayout = VK_NULL_HANDLE;
-    VkDescriptorSetLayout _materialDescriptorSetLayout = VK_NULL_HANDLE;
-    VkDescriptorPool _cameraDescriptorPool = VK_NULL_HANDLE;
-    std::vector<VkDescriptorSet> _cameraDescriptorSets;
-    std::vector<VkBuffer> _cameraUniformBuffers;
-    std::vector<VkDeviceMemory> _cameraUniformBuffersMemory;
-    std::vector<void*> _cameraUniformBuffersMapped;
-    std::vector<VkFramebuffer> _opaqueFramebuffers;
+    VkDescriptorSetLayout _sceneDescSetLayout = VK_NULL_HANDLE;
 
-    std::vector<Actor*> _opaqueActors;
+    VkDescriptorPool _sceneDescPool = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSet> _sceneDescSets;
+
+    std::vector<VkBuffer> _sceneUniformBuffers;
+    std::vector<VkDeviceMemory> _sceneUniformBuffersMemory;
+    std::vector<void*> _sceneUniformBuffersMapped;
 
     std::vector<VkSemaphore> _imageAvailableSemaphores;
     std::vector<VkSemaphore> _renderFinishedSemaphores;

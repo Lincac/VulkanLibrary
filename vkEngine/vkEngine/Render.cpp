@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 #include <cstring>
+#include "Render_Opaque.h"
 
 struct UniformBufferObject {
     alignas(16) glm::mat4 model;
@@ -22,11 +23,25 @@ Render::Render(const std::string& appName, GLFWwindow* window)
     _camera = new Camera(glm::vec3(0, 0, 3));
     _camera->SetResolution(extent.width, extent.height);
 
-    initOpaqueRenderPass();
-    initOpaquePipeline();
-    initOpaqueFramebuffers();
+    VkDescriptorSetLayoutBinding uboBinding{};
+    uboBinding.binding = 0;
+    uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboBinding.descriptorCount = 1;
+    uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutCreateInfo cameraLayoutInfo{};
+    cameraLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    cameraLayoutInfo.bindingCount = 1;
+    cameraLayoutInfo.pBindings = &uboBinding;
+
+    if (vkCreateDescriptorSetLayout(_engine->getLogicalDevice(), &cameraLayoutInfo, nullptr, &_sceneDescSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create camera descriptor set layout!");
+    }
+
     initSyncObjects();
-    initCameraDescriptorResources();
+    initSceneDescriptorResources();
+
+    _opaqueRender = new Render_Opaque(_engine, _sceneDescSetLayout);
 }
 
 Render::~Render()
@@ -40,10 +55,11 @@ Render::~Render()
         vkDeviceWaitIdle(device);
     }
 
-    cleanupCameraDescriptorResources();
+    cleanupSceneDescriptorResources();
     cleanupSyncObjects();
-    cleanupOpaquePipelineResources();
-    cleanupActorRefs();
+
+    delete _opaqueRender;
+    _opaqueRender = nullptr;
 
     delete _camera;
     _camera = nullptr;
@@ -54,14 +70,7 @@ Render::~Render()
 
 void Render::addActor(Actor* actor)
 {
-    if (actor == nullptr)
-    {
-        return;
-    }
-
-    actor->init(_engine);
-
-    _opaqueActors.push_back(actor);
+    _opaqueRender->addActor(actor);
 }
 
 Camera* Render::getCamera()
@@ -90,7 +99,7 @@ void Render::draw()
     vkResetFences(_engine->getLogicalDevice(), 1, &_inFlightFences[_currentFrame]);
     vkResetCommandBuffer(commandBuffer, /*VkCommandBufferResetFlagBits*/ 0);
 
-    drawOpaqueCommandBuffer(commandBuffer, imageIndex);
+    _opaqueRender->draw(commandBuffer, _sceneDescSets[_currentFrame], imageIndex);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -137,276 +146,22 @@ void Render::draw()
     _currentFrame = (_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void Render::drawOpaqueCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
-{
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-        throw std::runtime_error("failed to begin recording command buffer!");
-    }
-
-    auto swapChainExtent = _engine->getSwapChainExtent();
-    if (imageIndex >= _opaqueFramebuffers.size()) {
-        throw std::runtime_error("swapchain image index out of opaque framebuffer range");
-    }
-
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = _opaqueRenderPass;
-    renderPassInfo.framebuffer = _opaqueFramebuffers[imageIndex];
-    renderPassInfo.renderArea.offset = { 0, 0 };
-    renderPassInfo.renderArea.extent = swapChainExtent;
-
-    VkClearValue clearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };
-    renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clearColor;
-
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _opaquePipeline);
-
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float)swapChainExtent.width;
-    viewport.height = (float)swapChainExtent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-    VkRect2D scissor{};
-    scissor.offset = { 0, 0 };
-    scissor.extent = swapChainExtent;
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-    for (const auto& actor : _opaqueActors)
-    {
-        UniformBufferObject ubo{};
-        ubo.model = actor->getTransformMatrix();
-        ubo.view = _camera->GetViewMatrix();
-        ubo.proj = _camera->GetProjectionMatrix(CameraType::PerspectiveAsym);
-        ubo.cameraPos = glm::vec4(_camera->GetPosition(), 1.0f);
-        ubo.lightDir = glm::vec4(glm::normalize(glm::vec3(0.4f, 0.7f, 0.2f)), 0.0f);
-        ubo.lightColor = glm::vec4(1.6f, 1.6f, 1.6f, 1.0f);
-        memcpy(_cameraUniformBuffersMapped[_currentFrame], &ubo, sizeof(ubo));
-
-        actor->draw(commandBuffer, _opaquePipelineLayout, _cameraDescriptorSets[_currentFrame]);
-    }
-
-    vkCmdEndRenderPass(commandBuffer);
-
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("failed to record command buffer!");
-    }
-}
-
-void Render::initOpaqueRenderPass()
-{
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = _engine->getSwapChainImageFormat();
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    if (vkCreateRenderPass(_engine->getLogicalDevice(), &renderPassInfo, nullptr, &_opaqueRenderPass) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create render pass!");
-    }
-}
-
-void Render::initOpaquePipeline()
-{
-    VkShaderModule vertShaderModule = _engine->createShader("../Dependence/shader/bin/OpaqueShader.vert.spv", Vertex);
-    VkShaderModule fragShaderModule = _engine->createShader("../Dependence/shader/bin/OpaqueShader.frag.spv", Fragment);
-
-    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
-    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vertShaderStageInfo.module = vertShaderModule;
-    vertShaderStageInfo.pName = "main";
-
-    VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
-    fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    fragShaderStageInfo.module = fragShaderModule;
-    fragShaderStageInfo.pName = "main";
-
-    VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
-
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-
-    auto bindingDescription = Vertex::getBindingDescription();
-    auto attributeDescriptions = Vertex::getAttributeDescriptions();
-
-    vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
-
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-    VkPipelineViewportStateCreateInfo viewportState{};
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.scissorCount = 1;
-
-    VkPipelineRasterizationStateCreateInfo rasterizer{};
-    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE;
-    rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-    rasterizer.depthBiasEnable = VK_FALSE;
-
-    VkPipelineMultisampleStateCreateInfo multisampling{};
-    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
-
-    VkPipelineColorBlendStateCreateInfo colorBlending{};
-    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlending.logicOpEnable = VK_FALSE;
-    colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &colorBlendAttachment;
-    colorBlending.blendConstants[0] = 0.0f;
-    colorBlending.blendConstants[1] = 0.0f;
-    colorBlending.blendConstants[2] = 0.0f;
-    colorBlending.blendConstants[3] = 0.0f;
-
-    std::vector<VkDynamicState> dynamicStates = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR
-    };
-    VkPipelineDynamicStateCreateInfo dynamicState{};
-    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
-    dynamicState.pDynamicStates = dynamicStates.data();
-
-    if (_cameraDescriptorSetLayout == VK_NULL_HANDLE) {
-        VkDescriptorSetLayoutBinding cameraUboBinding{};
-        cameraUboBinding.binding = 0;
-        cameraUboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        cameraUboBinding.descriptorCount = 1;
-        cameraUboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        VkDescriptorSetLayoutCreateInfo cameraLayoutInfo{};
-        cameraLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        cameraLayoutInfo.bindingCount = 1;
-        cameraLayoutInfo.pBindings = &cameraUboBinding;
-
-        if (vkCreateDescriptorSetLayout(_engine->getLogicalDevice(), &cameraLayoutInfo, nullptr, &_cameraDescriptorSetLayout) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create camera descriptor set layout!");
-        }
-    }
-
-    if (_materialDescriptorSetLayout == VK_NULL_HANDLE) {
-        VkDescriptorSetLayoutBinding materialUboBinding{};
-        materialUboBinding.binding = 0;
-        materialUboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        materialUboBinding.descriptorCount = 1;
-        materialUboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        VkDescriptorSetLayoutCreateInfo materialLayoutInfo{};
-        materialLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        materialLayoutInfo.bindingCount = 1;
-        materialLayoutInfo.pBindings = &materialUboBinding;
-
-        if (vkCreateDescriptorSetLayout(_engine->getLogicalDevice(), &materialLayoutInfo, nullptr, &_materialDescriptorSetLayout) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create material descriptor set layout!");
-        }
-    }
-
-    VkDescriptorSetLayout setLayouts[] = { _cameraDescriptorSetLayout, _materialDescriptorSetLayout };
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 2;
-    pipelineLayoutInfo.pSetLayouts = setLayouts;
-    pipelineLayoutInfo.pushConstantRangeCount = 0;
-
-    if (vkCreatePipelineLayout(_engine->getLogicalDevice(), &pipelineLayoutInfo, nullptr, &_opaquePipelineLayout) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create pipeline layout!");
-    }
-
-    VkGraphicsPipelineCreateInfo pipelineInfo{};
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStages;
-    pipelineInfo.pVertexInputState = &vertexInputInfo;
-    pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState = &viewportState;
-    pipelineInfo.pRasterizationState = &rasterizer;
-    pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = &dynamicState;
-    pipelineInfo.layout = _opaquePipelineLayout;
-    pipelineInfo.renderPass = _opaqueRenderPass;
-    pipelineInfo.subpass = 0;
-    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-
-    if (vkCreateGraphicsPipelines(_engine->getLogicalDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_opaquePipeline) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create graphics pipeline!");
-    }
-
-    vkDestroyShaderModule(_engine->getLogicalDevice(), fragShaderModule, nullptr);
-    vkDestroyShaderModule(_engine->getLogicalDevice(), vertShaderModule, nullptr);
-}
-
-void Render::initCameraDescriptorResources()
+void Render::initSceneDescriptorResources()
 {
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
-    _cameraUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-    _cameraUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-    _cameraUniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
-    _cameraDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+    _sceneUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    _sceneUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+    _sceneUniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+    _sceneDescSets.resize(MAX_FRAMES_IN_FLIGHT);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         _engine->createVKBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            _cameraUniformBuffers[i], _cameraUniformBuffersMemory[i]);
+            _sceneUniformBuffers[i], _sceneUniformBuffersMemory[i]);
 
-        vkMapMemory(_engine->getLogicalDevice(), _cameraUniformBuffersMemory[i],
-            0, bufferSize, 0, &_cameraUniformBuffersMapped[i]);
+        vkMapMemory(_engine->getLogicalDevice(), _sceneUniformBuffersMemory[i],
+            0, bufferSize, 0, &_sceneUniformBuffersMapped[i]);
     }
 
     VkDescriptorPoolSize poolSize{};
@@ -419,61 +174,36 @@ void Render::initCameraDescriptorResources()
     poolInfo.pPoolSizes = &poolSize;
     poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
 
-    if (vkCreateDescriptorPool(_engine->getLogicalDevice(), &poolInfo, nullptr, &_cameraDescriptorPool) != VK_SUCCESS) {
+    if (vkCreateDescriptorPool(_engine->getLogicalDevice(), &poolInfo, nullptr, &_sceneDescPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create camera descriptor pool!");
     }
 
-    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, _cameraDescriptorSetLayout);
+    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, _sceneDescSetLayout);
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = _cameraDescriptorPool;
+    allocInfo.descriptorPool = _sceneDescPool;
     allocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
     allocInfo.pSetLayouts = layouts.data();
 
-    if (vkAllocateDescriptorSets(_engine->getLogicalDevice(), &allocInfo, _cameraDescriptorSets.data()) != VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(_engine->getLogicalDevice(), &allocInfo, _sceneDescSets.data()) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate camera descriptor sets!");
     }
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = _cameraUniformBuffers[i];
+        bufferInfo.buffer = _sceneUniformBuffers[i];
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(UniformBufferObject);
 
         VkWriteDescriptorSet write{};
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = _cameraDescriptorSets[i];
+        write.dstSet = _sceneDescSets[i];
         write.dstBinding = 0;
         write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         write.descriptorCount = 1;
         write.pBufferInfo = &bufferInfo;
 
         vkUpdateDescriptorSets(_engine->getLogicalDevice(), 1, &write, 0, nullptr);
-    }
-}
-
-void Render::initOpaqueFramebuffers()
-{
-    cleanupOpaqueFramebuffers();
-
-    const uint32_t imageCount = _engine->getSwapChainImageCount();
-    _opaqueFramebuffers.resize(imageCount, VK_NULL_HANDLE);
-
-    for (uint32_t i = 0; i < imageCount; ++i) {
-        VkImageView attachments[] = { _engine->getSwapChainImageView(i) };
-
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = _opaqueRenderPass;
-        framebufferInfo.attachmentCount = 1;
-        framebufferInfo.pAttachments = attachments;
-        framebufferInfo.width = _engine->getSwapChainExtent().width;
-        framebufferInfo.height = _engine->getSwapChainExtent().height;
-        framebufferInfo.layers = 1;
-
-        if (vkCreateFramebuffer(_engine->getLogicalDevice(), &framebufferInfo, nullptr, &_opaqueFramebuffers[i]) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create opaque framebuffer!");
-        }
     }
 }
 
@@ -529,42 +259,7 @@ void Render::cleanupSyncObjects()
     _imageAvailableSemaphores.clear();
 }
 
-void Render::cleanupOpaquePipelineResources()
-{
-    VkDevice device = _engine->getLogicalDevice();
-    if (device == VK_NULL_HANDLE) {
-        return;
-    }
-
-    cleanupOpaqueFramebuffers();
-
-    if (_opaquePipeline != VK_NULL_HANDLE) {
-        vkDestroyPipeline(device, _opaquePipeline, nullptr);
-        _opaquePipeline = VK_NULL_HANDLE;
-    }
-
-    if (_opaquePipelineLayout != VK_NULL_HANDLE) {
-        vkDestroyPipelineLayout(device, _opaquePipelineLayout, nullptr);
-        _opaquePipelineLayout = VK_NULL_HANDLE;
-    }
-
-    if (_opaqueRenderPass != VK_NULL_HANDLE) {
-        vkDestroyRenderPass(device, _opaqueRenderPass, nullptr);
-        _opaqueRenderPass = VK_NULL_HANDLE;
-    }
-
-    if (_materialDescriptorSetLayout != VK_NULL_HANDLE) {
-        vkDestroyDescriptorSetLayout(device, _materialDescriptorSetLayout, nullptr);
-        _materialDescriptorSetLayout = VK_NULL_HANDLE;
-    }
-
-    if (_cameraDescriptorSetLayout != VK_NULL_HANDLE) {
-        vkDestroyDescriptorSetLayout(device, _cameraDescriptorSetLayout, nullptr);
-        _cameraDescriptorSetLayout = VK_NULL_HANDLE;
-    }
-}
-
-void Render::cleanupCameraDescriptorResources()
+void Render::cleanupSceneDescriptorResources()
 {
     if (_engine == nullptr) {
         return;
@@ -575,55 +270,32 @@ void Render::cleanupCameraDescriptorResources()
         return;
     }
 
-    for (size_t i = 0; i < _cameraUniformBuffers.size(); ++i) {
-        if (_cameraUniformBuffersMapped[i] != nullptr) {
-            vkUnmapMemory(device, _cameraUniformBuffersMemory[i]);
-            _cameraUniformBuffersMapped[i] = nullptr;
+    for (size_t i = 0; i < _sceneUniformBuffers.size(); ++i) {
+        if (_sceneUniformBuffersMapped[i] != nullptr) {
+            vkUnmapMemory(device, _sceneUniformBuffersMemory[i]);
+            _sceneUniformBuffersMapped[i] = nullptr;
         }
-        if (_cameraUniformBuffers[i] != VK_NULL_HANDLE) {
-            vkDestroyBuffer(device, _cameraUniformBuffers[i], nullptr);
+        if (_sceneUniformBuffers[i] != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, _sceneUniformBuffers[i], nullptr);
         }
-        if (_cameraUniformBuffersMemory[i] != VK_NULL_HANDLE) {
-            vkFreeMemory(device, _cameraUniformBuffersMemory[i], nullptr);
+        if (_sceneUniformBuffersMemory[i] != VK_NULL_HANDLE) {
+            vkFreeMemory(device, _sceneUniformBuffersMemory[i], nullptr);
         }
     }
-    _cameraUniformBuffers.clear();
-    _cameraUniformBuffersMemory.clear();
-    _cameraUniformBuffersMapped.clear();
-    _cameraDescriptorSets.clear();
+    _sceneUniformBuffers.clear();
+    _sceneUniformBuffersMemory.clear();
+    _sceneUniformBuffersMapped.clear();
+    _sceneDescSets.clear();
 
-    if (_cameraDescriptorPool != VK_NULL_HANDLE) {
-        vkDestroyDescriptorPool(device, _cameraDescriptorPool, nullptr);
-        _cameraDescriptorPool = VK_NULL_HANDLE;
+    if (_sceneDescPool != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(device, _sceneDescPool, nullptr);
+        _sceneDescPool = VK_NULL_HANDLE;
     }
-}
-
-void Render::cleanupOpaqueFramebuffers()
-{
-    VkDevice device = _engine->getLogicalDevice();
-    if (device == VK_NULL_HANDLE) {
-        return;
-    }
-
-    for (auto framebuffer : _opaqueFramebuffers) {
-        if (framebuffer != VK_NULL_HANDLE) {
-            vkDestroyFramebuffer(device, framebuffer, nullptr);
-        }
-    }
-    _opaqueFramebuffers.clear();
 }
 
 void Render::recreateSwapChainResources()
 {
-    cleanupOpaquePipelineResources();
+    _opaqueRender->cleanup();
     _engine->resetSwapChain();
-    initOpaqueRenderPass();
-    initOpaquePipeline();
-    initOpaqueFramebuffers();
-}
-
-void Render::cleanupActorRefs()
-{
-    // Actor ownership is external; Render only stores non-owning pointers.
-    _opaqueActors.clear();
+    _opaqueRender->init();
 }

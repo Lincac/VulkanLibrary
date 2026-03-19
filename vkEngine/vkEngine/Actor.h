@@ -67,6 +67,7 @@ private:
     Materials _materials;
     VkBuffer _materialsBuffer;
     VkDeviceMemory _materialsBufferMemory;
+
     VkDescriptorPool _materialsDescriptorPool;
     VkDescriptorSetLayout _materialsDescriptorSetLayout;
     VkDescriptorSet _materialsDescriptorSet;
