@@ -5,13 +5,18 @@
 
 struct Materials
 {
-    glm::vec4       baseColorFactor = glm::vec4(1);   // rgb: baseColor, a: alpha
-    float           metallicFactor;
-    float           roughnessFactor;
-    float           normalScaleFactor;
-    float           occlusionStrengthFactor;
-    glm::vec3       emissiveFactor;
-    float           alphaCutoffFactor;       // for mask
+    glm::vec4 baseColor = glm::vec4(1);
+    float roughness = 0.1;
+    float subSurface = 0;
+    float sheen = 0;
+    float sheenTint = 0;
+
+    float metallic = 0;
+    float specular = 0;
+    float specularTint = 0;
+
+    float clearcoat = 0;
+    float clearcoatGloss = 0;
 };
 
 class Actor
@@ -25,6 +30,8 @@ public:
 
     void setInputData(const LoadedModel& data);
 
+    void setMaterial(const Materials& materials);
+
     void setTransformMatrix(const glm::mat4& matrix);
 
     const glm::mat4 getTransformMatrix();
@@ -34,22 +41,6 @@ public:
     VkDescriptorSet getMaterialDescriptorSet();
 
     void draw(VkCommandBuffer command, VkPipelineLayout pipelineLayout, VkDescriptorSet cameraDescriptorSet);
-
-public:
-
-    void setBaseColor(const glm::vec4& color);
-
-    void setMetallic(float factor);
-
-    void setRoughness(float factor);
-
-    void setNormalScale(float factor);
-
-    void setOcclusionStrength(float factor);
-
-    void setEmissive(const glm::vec3& factor);
-
-    void setAlphaCutoff(float factor);
 
 private:
 

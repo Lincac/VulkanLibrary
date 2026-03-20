@@ -17,13 +17,8 @@ Actor::Actor()
 	_materialsDescriptorSet(VK_NULL_HANDLE)
 {
 	_updateMaterials = true;
-	_materials.baseColorFactor = glm::vec4(1.0f);
-	_materials.metallicFactor = 0.0f;
-	_materials.roughnessFactor = 1.0f;
-	_materials.normalScaleFactor = 1.0f;
-	_materials.occlusionStrengthFactor = 1.0f;
-	_materials.emissiveFactor = glm::vec3(0.0f);
-	_materials.alphaCutoffFactor = 0.5f;
+	_materials.baseColor = glm::vec4(1.0f);
+
 	_matrix = glm::mat4(1);
 }
 
@@ -82,6 +77,12 @@ void Actor::setInputData(const LoadedModel& data)
 	}
 }
 
+void Actor::setMaterial(const Materials& materials)
+{
+	_updateMaterials = true;
+	_materials = materials;
+}
+
 void Actor::setTransformMatrix(const glm::mat4& matrix)
 {
 	_matrix = matrix;
@@ -130,48 +131,6 @@ void Actor::draw(VkCommandBuffer command, VkPipelineLayout pipelineLayout, VkDes
 
 	vkCmdBindIndexBuffer(command, _indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 	vkCmdDrawIndexed(command, _indices.size(), 1, 0, 0, 0);
-}
-
-void Actor::setBaseColor(const glm::vec4& color)
-{
-	_updateMaterials = true;
-	_materials.baseColorFactor = color;
-}
-
-void Actor::setMetallic(float factor)
-{
-	_updateMaterials = true;
-	_materials.metallicFactor = factor;
-}
-
-void Actor::setRoughness(float factor)
-{
-	_updateMaterials = true;
-	_materials.roughnessFactor = factor;
-}
-
-void Actor::setNormalScale(float factor)
-{
-	_updateMaterials = true;
-	_materials.normalScaleFactor = factor;
-}
-
-void Actor::setOcclusionStrength(float factor)
-{
-	_updateMaterials = true;
-	_materials.occlusionStrengthFactor = factor;
-}
-
-void Actor::setEmissive(const glm::vec3& factor)
-{
-	_updateMaterials = true;
-	_materials.emissiveFactor = factor;
-}
-
-void Actor::setAlphaCutoff(float factor)
-{
-	_updateMaterials = true;
-	_materials.alphaCutoffFactor = factor;
 }
 
 void Actor::initVertexData()
