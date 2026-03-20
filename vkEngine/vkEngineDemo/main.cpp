@@ -95,7 +95,7 @@ int main()
 	glfwSetCursorPosCallback(window, onCursorPos);
 
 	Actor actor;
-	actor.setInputData(Loader::loadModel("../Dependence/resource/obj/bunny.obj"));
+	actor.setInputData(Loader::loadModel("../Dependence/resource/obj/teapot.obj"));
 
 	render.addActor(&actor);
 

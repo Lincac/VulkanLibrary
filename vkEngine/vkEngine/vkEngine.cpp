@@ -81,6 +81,7 @@ int vkEngine::init()
     }
 
     initPhysicalDevice();
+
     initLogicalDevice();
 
     initSwapChain();
