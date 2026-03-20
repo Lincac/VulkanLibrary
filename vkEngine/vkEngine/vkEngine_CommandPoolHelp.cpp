@@ -136,7 +136,7 @@ VkFormat vkEngine::findDepthFormat()
 void vkEngine::createImage(uint32_t width, uint32_t height, 
     VkFormat format, VkImageTiling tiling, 
     VkImageUsageFlags usage, VkMemoryPropertyFlags properties, 
-    VkImage& image, VkDeviceMemory& imageMemory)
+    VkImage& image, VkDeviceMemory& imageMemory, VkSampleCountFlagBits samples)
 {
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -150,7 +150,7 @@ void vkEngine::createImage(uint32_t width, uint32_t height,
     imageInfo.tiling = tiling;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = usage;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.samples = samples;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     if (vkCreateImage(_logicalDevice, &imageInfo, nullptr, &image) != VK_SUCCESS) {

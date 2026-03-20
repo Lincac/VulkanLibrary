@@ -7,10 +7,12 @@ class Render
 {
 public:
 
-    Render(const std::string& appName, GLFWwindow* window);
+    Render(const std::string& appName, GLFWwindow* window, bool enableMSAA = true);
     ~Render();
 
     void addActor(Actor* actor);
+
+    void setMSAAEnabled(bool enableMSAA);
 
     Camera* getCamera();
 
@@ -68,4 +70,5 @@ private:
 
     uint32_t _currentFrame = 0;
     bool _framebufferResized = false;
+    bool _enableMSAA = true;
 };

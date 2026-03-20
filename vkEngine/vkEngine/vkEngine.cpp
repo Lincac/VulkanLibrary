@@ -32,6 +32,7 @@ vkEngine::vkEngine(const std::string& appName, GLFWwindow* window)
     _swapChain(VK_NULL_HANDLE),
     _swapChainImageFormat(VK_FORMAT_UNDEFINED),
     _swapChainExtent({ 0, 0 }),
+    _maxMsaaSamples(VK_SAMPLE_COUNT_1_BIT),
     _opaqueRenderPass(VK_NULL_HANDLE),
     _commandPool(VK_NULL_HANDLE)
 {
@@ -164,4 +165,9 @@ VkQueue vkEngine::getPresentQueue() const noexcept
 VkExtent2D vkEngine::getSwapChainExtent() const noexcept
 {
     return _swapChainExtent;
+}
+
+VkSampleCountFlagBits vkEngine::getMaxUsableSampleCount() const noexcept
+{
+    return _maxMsaaSamples;
 }

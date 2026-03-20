@@ -1,8 +1,9 @@
 #include "Render_Opaque.h"
 
-Render_Opaque::Render_Opaque(vkEngine* engine, VkDescriptorSetLayout sceneDescSetLayout)
-	: _engine(engine), _sceneDescSetLayout(sceneDescSetLayout)
+Render_Opaque::Render_Opaque(vkEngine* engine, VkDescriptorSetLayout sceneDescSetLayout, bool enableMSAA)
+	: _engine(engine), _sceneDescSetLayout(sceneDescSetLayout), _enableMSAA(enableMSAA)
 {
+    _msaaSamples = _enableMSAA ? _engine->getMaxUsableSampleCount() : VK_SAMPLE_COUNT_1_BIT;
     init();
 }
 
@@ -82,6 +83,27 @@ void Render_Opaque::cleanup()
         _depthImageMemory = VK_NULL_HANDLE;
     }
 
+    for (auto imageView : _msaaColorImageViews) {
+        if (imageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(device, imageView, nullptr);
+        }
+    }
+    _msaaColorImageViews.clear();
+
+    for (auto image : _msaaColorImages) {
+        if (image != VK_NULL_HANDLE) {
+            vkDestroyImage(device, image, nullptr);
+        }
+    }
+    _msaaColorImages.clear();
+
+    for (auto memory : _msaaColorImageMemories) {
+        if (memory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, memory, nullptr);
+        }
+    }
+    _msaaColorImageMemories.clear();
+
     for (auto imageView : _colorImageViews) {
         if (imageView != VK_NULL_HANDLE) {
             vkDestroyImageView(device, imageView, nullptr);
@@ -128,12 +150,23 @@ void Render_Opaque::draw(VkCommandBuffer commandBuffer, VkDescriptorSet sceneDes
     renderPassInfo.renderArea.offset = { 0, 0 };
     renderPassInfo.renderArea.extent = swapChainExtent;
 
-    std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
-    clearValues[1].depthStencil = { 1.0f, 0 };
+    std::array<VkClearValue, 3> clearValuesWithMsaa{};
+    clearValuesWithMsaa[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+    clearValuesWithMsaa[1].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+    clearValuesWithMsaa[2].depthStencil = { 1.0f, 0 };
 
-    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-    renderPassInfo.pClearValues = clearValues.data();
+    std::array<VkClearValue, 2> clearValuesNoMsaa{};
+    clearValuesNoMsaa[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+    clearValuesNoMsaa[1].depthStencil = { 1.0f, 0 };
+
+    if (_msaaSamples == VK_SAMPLE_COUNT_1_BIT) {
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValuesNoMsaa.size());
+        renderPassInfo.pClearValues = clearValuesNoMsaa.data();
+    }
+    else {
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValuesWithMsaa.size());
+        renderPassInfo.pClearValues = clearValuesWithMsaa.data();
+    }
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline);
@@ -164,21 +197,35 @@ void Render_Opaque::initRenderPass()
 {
     VkAttachmentDescription colorAttachment{};
     colorAttachment.format = _engine->getSwapChainImageFormat();
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.samples = _msaaSamples;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.storeOp = (_msaaSamples == VK_SAMPLE_COUNT_1_BIT) ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    colorAttachment.finalLayout = (_msaaSamples == VK_SAMPLE_COUNT_1_BIT) ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentDescription resolveAttachment{};
+    resolveAttachment.format = _engine->getSwapChainImageFormat();
+    resolveAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    resolveAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    resolveAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    resolveAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    resolveAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    resolveAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    resolveAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkAttachmentReference resolveAttachmentRef{};
+    resolveAttachmentRef.attachment = 1;
+    resolveAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
     VkAttachmentDescription depthAttachment{};
     depthAttachment.format = _engine->findDepthFormat();
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.samples = _msaaSamples;
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -187,7 +234,7 @@ void Render_Opaque::initRenderPass()
     depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference depthAttachmentRef{};
-    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.attachment = (_msaaSamples == VK_SAMPLE_COUNT_1_BIT) ? 1 : 2;
     depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
     VkSubpassDescription subpass{};
@@ -195,6 +242,9 @@ void Render_Opaque::initRenderPass()
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
+    if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT) {
+        subpass.pResolveAttachments = &resolveAttachmentRef;
+    }
 
     VkSubpassDependency dependencyIn{};
     dependencyIn.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -212,13 +262,19 @@ void Render_Opaque::initRenderPass()
     dependencyOut.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     dependencyOut.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
-    std::array<VkSubpassDependency, 2> dependencies = { dependencyIn, dependencyOut };
-
     VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-    renderPassInfo.pAttachments = attachments.data();
+    std::array<VkSubpassDependency, 2> dependencies = { dependencyIn, dependencyOut };
+    std::array<VkAttachmentDescription, 3> attachmentsWithMsaa = { colorAttachment, resolveAttachment, depthAttachment };
+    std::array<VkAttachmentDescription, 2> attachmentsNoMsaa = { colorAttachment, depthAttachment };
+    if (_msaaSamples == VK_SAMPLE_COUNT_1_BIT) {
+        renderPassInfo.attachmentCount = static_cast<uint32_t>(attachmentsNoMsaa.size());
+        renderPassInfo.pAttachments = attachmentsNoMsaa.data();
+    }
+    else {
+        renderPassInfo.attachmentCount = static_cast<uint32_t>(attachmentsWithMsaa.size());
+        renderPassInfo.pAttachments = attachmentsWithMsaa.data();
+    }
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
     renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
@@ -302,7 +358,7 @@ void Render_Opaque::initPipeline()
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.rasterizationSamples = _msaaSamples;
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -381,8 +437,22 @@ void Render_Opaque::initAttachment()
     _colorImages.resize(imageCount, VK_NULL_HANDLE);
     _colorImageMemories.resize(imageCount, VK_NULL_HANDLE);
     _colorImageViews.resize(imageCount, VK_NULL_HANDLE);
+    _msaaColorImages.resize(imageCount, VK_NULL_HANDLE);
+    _msaaColorImageMemories.resize(imageCount, VK_NULL_HANDLE);
+    _msaaColorImageViews.resize(imageCount, VK_NULL_HANDLE);
 
     for (uint32_t i = 0; i < imageCount; ++i) {
+        if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT) {
+            _engine->createImage(
+                extent.width, extent.height, colorFormat,
+                VK_IMAGE_TILING_OPTIMAL,
+                VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                _msaaColorImages[i], _msaaColorImageMemories[i], _msaaSamples);
+
+            _msaaColorImageViews[i] = _engine->createImageView(_msaaColorImages[i], colorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+        }
+
         _engine->createImage(
             extent.width, extent.height, colorFormat,
             VK_IMAGE_TILING_OPTIMAL,
@@ -397,7 +467,7 @@ void Render_Opaque::initAttachment()
 
     _engine->createImage(extent.width, extent.height, depthFormat, 
         VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _depthImage, _depthImageMemory);
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _depthImage, _depthImageMemory, _msaaSamples);
 
     _depthImageView = _engine->createImageView(_depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
@@ -408,19 +478,31 @@ void Render_Opaque::initFrameBuffers()
     _framebuffers.resize(imageCount, VK_NULL_HANDLE);
 
     for (uint32_t i = 0; i < imageCount; ++i) {
-        std::array<VkImageView, 2> attachments = {
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = _renderPass;
+        framebufferInfo.width = _engine->getSwapChainExtent().width;
+        framebufferInfo.height = _engine->getSwapChainExtent().height;
+        framebufferInfo.layers = 1;
+
+        std::array<VkImageView, 3> attachmentsWithMsaa = {
+            _msaaColorImageViews[i],
+            _colorImageViews[i],
+            _depthImageView
+        };
+        std::array<VkImageView, 2> attachmentsNoMsaa = {
             _colorImageViews[i],
             _depthImageView
         };
 
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = _renderPass;
-        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-        framebufferInfo.pAttachments = attachments.data();
-        framebufferInfo.width = _engine->getSwapChainExtent().width;
-        framebufferInfo.height = _engine->getSwapChainExtent().height;
-        framebufferInfo.layers = 1;
+        if (_msaaSamples == VK_SAMPLE_COUNT_1_BIT) {
+            framebufferInfo.attachmentCount = static_cast<uint32_t>(attachmentsNoMsaa.size());
+            framebufferInfo.pAttachments = attachmentsNoMsaa.data();
+        }
+        else {
+            framebufferInfo.attachmentCount = static_cast<uint32_t>(attachmentsWithMsaa.size());
+            framebufferInfo.pAttachments = attachmentsWithMsaa.data();
+        }
 
         if (vkCreateFramebuffer(_engine->getLogicalDevice(), &framebufferInfo, nullptr, &_framebuffers[i]) != VK_SUCCESS) {
             throw std::runtime_error("failed to create opaque framebuffer!");

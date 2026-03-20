@@ -22,6 +22,25 @@ void vkEngine::initPhysicalDevice()
     if (_physicalDevice == VK_NULL_HANDLE) {
         throw std::runtime_error("failed to find a suitable GPU!");
     }
+
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(_physicalDevice, &properties);
+    VkSampleCountFlags counts =
+        properties.limits.framebufferColorSampleCounts &
+        properties.limits.framebufferDepthSampleCounts;
+
+    if (counts & VK_SAMPLE_COUNT_8_BIT) {
+        _maxMsaaSamples = VK_SAMPLE_COUNT_8_BIT;
+    }
+    else if (counts & VK_SAMPLE_COUNT_4_BIT) {
+        _maxMsaaSamples = VK_SAMPLE_COUNT_4_BIT;
+    }
+    else if (counts & VK_SAMPLE_COUNT_2_BIT) {
+        _maxMsaaSamples = VK_SAMPLE_COUNT_2_BIT;
+    }
+    else {
+        _maxMsaaSamples = VK_SAMPLE_COUNT_1_BIT;
+    }
 }
 
 bool vkEngine::isDeviceSuitable(VkPhysicalDevice device) {

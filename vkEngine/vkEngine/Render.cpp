@@ -14,8 +14,9 @@ struct UniformBufferObject {
     alignas(16) glm::vec4 lightColor;
 };
 
-Render::Render(const std::string& appName, GLFWwindow* window)
+Render::Render(const std::string& appName, GLFWwindow* window, bool enableMSAA)
 {
+    _enableMSAA = enableMSAA;
     _engine = new vkEngine(appName, window);
     _engine->init();
 
@@ -42,7 +43,7 @@ Render::Render(const std::string& appName, GLFWwindow* window)
     initSyncObjects();
     initSceneDescriptorResources();
 
-    _opaqueRender = new Render_Opaque(_engine, _sceneDescSetLayout);
+    _opaqueRender = new Render_Opaque(_engine, _sceneDescSetLayout, _enableMSAA);
 
     initPostProcessResources();
 }
@@ -85,6 +86,31 @@ void Render::addActor(Actor* actor)
 Camera* Render::getCamera()
 {
     return _camera;
+}
+
+void Render::setMSAAEnabled(bool enableMSAA)
+{
+    if (_enableMSAA == enableMSAA) {
+        return;
+    }
+    if (_engine == nullptr) {
+        _enableMSAA = enableMSAA;
+        return;
+    }
+
+    VkDevice device = _engine->getLogicalDevice();
+    if (device != VK_NULL_HANDLE) {
+        vkDeviceWaitIdle(device);
+    }
+
+    _enableMSAA = enableMSAA;
+
+    delete _opaqueRender;
+    _opaqueRender = nullptr;
+    cleanupPostProcessResources();
+
+    _opaqueRender = new Render_Opaque(_engine, _sceneDescSetLayout, _enableMSAA);
+    initPostProcessResources();
 }
 
 void Render::draw()

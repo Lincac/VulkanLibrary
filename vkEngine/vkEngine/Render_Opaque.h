@@ -6,7 +6,7 @@ class Render_Opaque
 {
 public:
 
-	Render_Opaque(vkEngine* engine, VkDescriptorSetLayout sceneDescSetLayout);
+	Render_Opaque(vkEngine* engine, VkDescriptorSetLayout sceneDescSetLayout, bool enableMSAA = true);
 	~Render_Opaque();
 
 	void addActor(Actor* actor);
@@ -39,6 +39,13 @@ private:
 private:
 
 	std::vector<Actor*> _actors;
+
+    bool _enableMSAA = true;
+    VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    std::vector<VkImage> _msaaColorImages;
+    std::vector<VkDeviceMemory> _msaaColorImageMemories;
+    std::vector<VkImageView> _msaaColorImageViews;
 
 	std::vector<VkImage> _colorImages;
 	std::vector<VkDeviceMemory> _colorImageMemories;
