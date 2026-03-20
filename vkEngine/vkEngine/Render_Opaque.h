@@ -15,6 +15,8 @@ public:
 
 	void cleanup();
 
+	VkImageView getMainColorImageView(uint32_t idx);
+
 	void draw(VkCommandBuffer commandBuffer, VkDescriptorSet sceneDescSet, uint32_t imageIndex);
 
 private:
@@ -24,6 +26,8 @@ private:
 	void initMaterialDescriptorSetLayout();
 
 	void initPipeline();
+
+	void initAttachment();
 
 	void initFrameBuffers();
 
@@ -35,6 +39,14 @@ private:
 private:
 
 	std::vector<Actor*> _actors;
+
+	std::vector<VkImage> _colorImages;
+	std::vector<VkDeviceMemory> _colorImageMemories;
+	std::vector<VkImageView> _colorImageViews;
+
+	VkImage _depthImage;
+	VkDeviceMemory _depthImageMemory;
+	VkImageView _depthImageView;
 
 	VkRenderPass _renderPass = VK_NULL_HANDLE;
 	VkDescriptorSetLayout _materialDescriptorSetLayout = VK_NULL_HANDLE;

@@ -190,6 +190,13 @@ public:
 
     VkFormat findDepthFormat();
 
+    void createImage(uint32_t width, uint32_t height, VkFormat format,
+        VkImageTiling tiling, VkImageUsageFlags usage,
+        VkMemoryPropertyFlags properties, VkImage& image,
+        VkDeviceMemory& imageMemory);
+
+    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+
 private:
 
     std::string _applicationName;
