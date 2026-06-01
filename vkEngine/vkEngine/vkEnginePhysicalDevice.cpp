@@ -29,8 +29,15 @@ vkEnginePhysicalDevice::vkEnginePhysicalDevice(vkEngine &engine)
         throw std::runtime_error("failed to find a suitable GPU!");
     }
 
-    VkPhysicalDeviceProperties properties{};
-    vkGetPhysicalDeviceProperties(_physicalDevice, &properties);
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR
+    };
+    VkPhysicalDeviceProperties2 props2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+    props2.pNext = &rtProps;
+    vkGetPhysicalDeviceProperties2(_physicalDevice, &props2);
+
+    std::cerr << "shaderGroupHandleSize = " << rtProps.shaderGroupHandleSize << std::endl;
+    std::cerr << "shaderGroupBaseAlignment = " << rtProps.shaderGroupBaseAlignment << std::endl;
 }
 
 vkEnginePhysicalDevice::~vkEnginePhysicalDevice(){
@@ -48,14 +55,35 @@ VkPhysicalDevice &vkEnginePhysicalDevice::getVkPhysicalDevice()
 
 bool vkEnginePhysicalDevice::isDeviceSuitable(VkPhysicalDevice device)
 {
-    auto indices = findQueueFamilies(device);
+    if(!findQueueFamilies(device).isComplete()){
+        return false;
+    }
 
-    bool extensionsSupported = checkDeviceExtensionSupport(device);
+    if(!checkDeviceExtensionSupport(device)){
+        return false;
+    }
 
-    VkPhysicalDeviceFeatures supportedFeatures;
-    vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+    // 检查设备扩展支持
+    VkPhysicalDeviceBufferDeviceAddressFeatures bdaFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
+    // 光线追踪管道特性
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
+    // 加速结构特性
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR asFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
 
-    return indices.isComplete() && extensionsSupported && supportedFeatures.samplerAnisotropy;
+    // 设置特性链
+    rtFeatures.pNext = &bdaFeatures;
+    asFeatures.pNext = &rtFeatures;
+
+    // 创建物理设备特性2
+    VkPhysicalDeviceFeatures2 features2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    features2.pNext = &asFeatures;
+
+    // 获取物理设备特性2
+    vkGetPhysicalDeviceFeatures2(device, &features2);
+    
+    return asFeatures.accelerationStructure
+        && rtFeatures.rayTracingPipeline
+        && bdaFeatures.bufferDeviceAddress; 
 }
 
 QueueFamilyIndices vkEnginePhysicalDevice::findQueueFamilies(VkPhysicalDevice device)

@@ -14,7 +14,6 @@ struct QueueFamilyIndices {
 };
 
 class vkEngineLogicalDevice;
-class vkEngineSwapChain;
 class vkEngineCommandPool;
 
 /// @brief 物理设备类
@@ -37,7 +36,6 @@ public:
 
 private:
     friend class vkEngineLogicalDevice;
-    friend class vkEngineSwapChain;
     friend class vkEngineCommandPool;
 
     /// @brief 判断设备是否适合
@@ -63,6 +61,10 @@ private:
     vkEngine& _engine; // 引用成员必须在构造时绑定目标对象，只能通过初始化列表完成 // 引擎 
     
     VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;  // 物理设备
-    const std::vector<const char*> _deviceExtensions = { // 设备扩展名称 // 设备扩展
+    const std::vector<const char*> _deviceExtensions = { // 设备扩展名称 
+        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME, // 延迟主机操作扩展名称
+        VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME, // 加速结构扩展名称
+        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, // 光线追踪管道扩展名称
+        VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // 缓冲区设备地址扩展名称
     };
 };

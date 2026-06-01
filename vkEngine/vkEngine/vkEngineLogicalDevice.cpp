@@ -22,8 +22,19 @@ vkEngineLogicalDevice::vkEngineLogicalDevice(vkEnginePhysicalDevice& physicalDev
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
-    VkPhysicalDeviceFeatures deviceFeatures{};
-    deviceFeatures.samplerAnisotropy = VK_TRUE;
+    VkPhysicalDeviceBufferDeviceAddressFeatures bdaFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
+    bdaFeatures.bufferDeviceAddress = VK_TRUE;
+
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
+    rtFeatures.pNext = &bdaFeatures;
+    rtFeatures.rayTracingPipeline = VK_TRUE;
+
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR asFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+    asFeatures.pNext = &rtFeatures;
+    asFeatures.accelerationStructure = VK_TRUE;
+
+    VkPhysicalDeviceFeatures2 features2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    features2.pNext = &asFeatures;
 
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -31,7 +42,8 @@ vkEngineLogicalDevice::vkEngineLogicalDevice(vkEnginePhysicalDevice& physicalDev
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
-    createInfo.pEnabledFeatures = &deviceFeatures;
+    createInfo.pEnabledFeatures = nullptr;
+    createInfo.pNext = &features2;
 
     createInfo.enabledExtensionCount = static_cast<uint32_t>(_physicalDevice._deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = _physicalDevice._deviceExtensions.data();
@@ -41,6 +53,8 @@ vkEngineLogicalDevice::vkEngineLogicalDevice(vkEnginePhysicalDevice& physicalDev
     }
 
     vkGetDeviceQueue(_device, indices.graphicsFamily.value(), 0, &_graphicsQueue);
+
+    volkLoadDevice(_device);
 }
 
 vkEngineLogicalDevice::~vkEngineLogicalDevice()
