@@ -1,8 +1,5 @@
 ﻿#include "vkEngine.h"
 
-#include <stdexcept>
-#include <iostream>
-
 vkEngine::vkEngine(const std::string& applicationName, bool layerSupport)
     : _applicationName(applicationName)
 {

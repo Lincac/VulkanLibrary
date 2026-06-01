@@ -4,6 +4,9 @@
 #include <vector>
 #include <stdexcept>
 #include <optional>
+#include <iostream>
+#include <set>
+#include <functional>
 
 #include <glm/glm.hpp>
 
@@ -12,7 +15,7 @@
 /// @param typeFilter 类型过滤
 /// @param properties 内存属性
 /// @return 内存类型
-static uint32_t findMemoryType(VkPhysicalDevice physDev, uint32_t typeFilter, VkMemoryPropertyFlags properties)
+inline uint32_t findMemoryType(VkPhysicalDevice physDev, uint32_t typeFilter, VkMemoryPropertyFlags properties)
 {
     VkPhysicalDeviceMemoryProperties memProps{};
     vkGetPhysicalDeviceMemoryProperties(physDev, &memProps);
@@ -31,7 +34,7 @@ static uint32_t findMemoryType(VkPhysicalDevice physDev, uint32_t typeFilter, Vk
 /// @param image 图像
 /// @param oldLayout 旧布局
 /// @param newLayout 新布局
-void transitionImageLayout(VkCommandBuffer cmd, VkImage image,
+inline void transitionImageLayout(VkCommandBuffer cmd, VkImage image,
     VkImageLayout oldLayout, VkImageLayout newLayout)
 {
     VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };

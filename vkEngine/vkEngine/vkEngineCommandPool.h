@@ -11,6 +11,10 @@ public:
     vkEngineCommandPool(vkEngineLogicalDevice& device);
     ~vkEngineCommandPool();
 
+    /// @brief 提交一次命令
+    /// @param recordFunc 记录函数，参数为命令缓冲区
+    void submitOneTimeCommands(std::function<void(VkCommandBuffer)> recordFunc);
+
 private:
     vkEngineLogicalDevice& _device; // 逻辑设备
     

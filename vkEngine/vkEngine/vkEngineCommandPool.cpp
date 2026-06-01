@@ -1,7 +1,5 @@
 ﻿#include "vkEngineCommandPool.h"
 
-#include <stdexcept>
-
 vkEngineCommandPool::vkEngineCommandPool(vkEngineLogicalDevice& device)
     : _device(device)
 {
@@ -32,4 +30,38 @@ vkEngineCommandPool::vkEngineCommandPool(vkEngineLogicalDevice& device)
 
 vkEngineCommandPool::~vkEngineCommandPool()
 {
+}
+
+void vkEngineCommandPool::submitOneTimeCommands(std::function<void(VkCommandBuffer)> recordFunc)
+{
+    VkFenceCreateInfo fenceInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+    VkFence fence;
+    vkCreateFence(_device.getVkDevice(), &fenceInfo, nullptr, &fence);
+
+    VkCommandBufferAllocateInfo cmdAlloc{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+    cmdAlloc.commandPool = _commandPool;
+    cmdAlloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmdAlloc.commandBufferCount = 1;
+    
+    VkCommandBuffer cmd;
+    vkAllocateCommandBuffers(_device.getVkDevice(), &cmdAlloc, &cmd);
+
+    VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    
+    vkBeginCommandBuffer(cmd, &beginInfo);
+
+    recordFunc(cmd);
+
+    vkEndCommandBuffer(cmd);
+
+    VkSubmitInfo submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    submit.commandBufferCount = 1;
+    submit.pCommandBuffers = &cmd;
+    
+    vkQueueSubmit(_device.getGraphicsQueue(), 1, &submit, fence);
+    vkWaitForFences(_device.getVkDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
+
+    vkFreeCommandBuffers(_device.getVkDevice(), _commandPool, 1, &cmd);
+    vkDestroyFence(_device.getVkDevice(), fence, nullptr);
 }

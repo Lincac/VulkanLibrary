@@ -1,7 +1,5 @@
 ﻿#include "vkEnginePhysicalDevice.h"
 
-#include <iostream>
-
 vkEnginePhysicalDevice::vkEnginePhysicalDevice(vkEngine &engine)
     : _engine(engine){
     if(engine.getInstance() == VK_NULL_HANDLE){
@@ -144,7 +142,6 @@ QueueFamilyIndices vkEnginePhysicalDevice::findQueueFamilies(VkPhysicalDevice de
     return indices;
 }
 
-#include <set>
 bool vkEnginePhysicalDevice::checkDeviceExtensionSupport(VkPhysicalDevice device)
 {
     uint32_t extensionCount;

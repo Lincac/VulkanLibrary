@@ -1,8 +1,5 @@
 ﻿#include "vkEngineLogicalDevice.h"
 
-#include <set>
-#include <stdexcept>
-
 vkEngineLogicalDevice::vkEngineLogicalDevice(vkEnginePhysicalDevice& physicalDevice)
     : _physicalDevice(physicalDevice)
 {
