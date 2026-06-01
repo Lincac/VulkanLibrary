@@ -20,6 +20,10 @@ public:
     /// @return 逻辑设备
     VkDevice& getVkDevice();
 
+    /// @brief 获取图形队列
+    /// @return 图形队列
+    VkQueue& getGraphicsQueue();
+
 private:
     vkEnginePhysicalDevice& _physicalDevice; // 物理设备
 

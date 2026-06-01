@@ -70,3 +70,8 @@ VkDevice& vkEngineLogicalDevice::getVkDevice()
 {
     return _device;
 }
+
+VkQueue& vkEngineLogicalDevice::getGraphicsQueue()
+{
+    return _graphicsQueue;
+}

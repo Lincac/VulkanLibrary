@@ -1,9 +1,6 @@
 ﻿#pragma once
 
-#include <Volk/volk.h>
-
-#include <string>
-#include <vector>
+#include "vkEngineHelp.h"
 
 #define MAX_FRAMES_IN_FLIGHT 1
 

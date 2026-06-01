@@ -36,7 +36,9 @@ vkEnginePhysicalDevice::vkEnginePhysicalDevice(vkEngine &engine)
     props2.pNext = &rtProps;
     vkGetPhysicalDeviceProperties2(_physicalDevice, &props2);
 
+    // 每个 shader group 在 SBT 里占 32 字节（NVIDIA 常见值）。
     std::cerr << "shaderGroupHandleSize = " << rtProps.shaderGroupHandleSize << std::endl;
+    // SBT 起始地址需 64 字节对齐
     std::cerr << "shaderGroupBaseAlignment = " << rtProps.shaderGroupBaseAlignment << std::endl;
 }
 
@@ -51,6 +53,36 @@ vkEngine &vkEnginePhysicalDevice::getVkEngine()
 VkPhysicalDevice &vkEnginePhysicalDevice::getVkPhysicalDevice()
 {
     return _physicalDevice;
+}
+
+QueueFamilyIndices vkEnginePhysicalDevice::findQueueFamilies()
+{
+    if(_physicalDevice == VK_NULL_HANDLE){
+        std::cerr << "this physical device is nullptr" << std::endl;
+    }
+
+    QueueFamilyIndices indices;
+
+    uint32_t queueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(_physicalDevice, &queueFamilyCount, nullptr);
+
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(_physicalDevice, &queueFamilyCount, queueFamilies.data());
+
+    int i = 0;
+    for (const auto& queueFamily : queueFamilies) {
+        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+            indices.graphicsFamily = i;
+        }
+
+        if (indices.isComplete()) {
+            break;
+        }
+
+        i++;
+    }
+
+    return indices;
 }
 
 bool vkEnginePhysicalDevice::isDeviceSuitable(VkPhysicalDevice device)
@@ -95,36 +127,6 @@ QueueFamilyIndices vkEnginePhysicalDevice::findQueueFamilies(VkPhysicalDevice de
 
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
-
-    int i = 0;
-    for (const auto& queueFamily : queueFamilies) {
-        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            indices.graphicsFamily = i;
-        }
-
-        if (indices.isComplete()) {
-            break;
-        }
-
-        i++;
-    }
-
-    return indices;
-}
-
-QueueFamilyIndices vkEnginePhysicalDevice::findQueueFamilies()
-{
-    if(_physicalDevice == VK_NULL_HANDLE){
-        std::cerr << "this physical device is nullptr" << std::endl;
-    }
-
-    QueueFamilyIndices indices;
-
-    uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(_physicalDevice, &queueFamilyCount, nullptr);
-
-    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(_physicalDevice, &queueFamilyCount, queueFamilies.data());
 
     int i = 0;
     for (const auto& queueFamily : queueFamilies) {

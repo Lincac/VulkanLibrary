@@ -2,8 +2,6 @@
 
 #include "vkEngine.h"
 
-#include <optional>
-
 /// @brief 队列族索引
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily; // 图形队列族索引
@@ -34,6 +32,10 @@ public:
     /// @return 物理设备
     VkPhysicalDevice& getVkPhysicalDevice();
 
+    /// @brief 查找队列族索引(当前物理设备)
+    /// @return 队列族索引
+    QueueFamilyIndices findQueueFamilies();
+
 private:
     friend class vkEngineLogicalDevice;
     friend class vkEngineCommandPool;
@@ -47,10 +49,6 @@ private:
     /// @param device 设备
     /// @return 队列族索引
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
-
-    /// @brief 查找队列族索引(当前物理设备)
-    /// @return 队列族索引
-    QueueFamilyIndices findQueueFamilies();
 
     /// @brief 检查设备扩展支持
     /// @param device 设备

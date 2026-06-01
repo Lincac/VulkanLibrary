@@ -6,7 +6,6 @@ vkEngineCommandPool::vkEngineCommandPool(vkEngineLogicalDevice& device)
     : _device(device)
 {
     auto physicalDevice = _device.getVkPhysicalDevice();
-
     auto indices = physicalDevice.findQueueFamilies();
 
     VkCommandPoolCreateInfo poolInfo{};
