@@ -1,4 +1,4 @@
-#include "vkEnginePhysicalDevice.h"
+﻿#include "vkEnginePhysicalDevice.h"
 
 #include <iostream>
 
@@ -52,16 +52,10 @@ bool vkEnginePhysicalDevice::isDeviceSuitable(VkPhysicalDevice device)
 
     bool extensionsSupported = checkDeviceExtensionSupport(device);
 
-    bool swapChainAdequate = false;
-    if (extensionsSupported) {
-        SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
-        swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
-    }
-
     VkPhysicalDeviceFeatures supportedFeatures;
     vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
 
-    return indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
+    return indices.isComplete() && extensionsSupported && supportedFeatures.samplerAnisotropy;
 }
 
 QueueFamilyIndices vkEnginePhysicalDevice::findQueueFamilies(VkPhysicalDevice device)
@@ -78,13 +72,6 @@ QueueFamilyIndices vkEnginePhysicalDevice::findQueueFamilies(VkPhysicalDevice de
     for (const auto& queueFamily : queueFamilies) {
         if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             indices.graphicsFamily = i;
-        }
-
-        VkBool32 presentSupport = false;
-        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, _engine.getSurfaceKHR(), &presentSupport);
-
-        if (presentSupport) {
-            indices.presentFamily = i;
         }
 
         if (indices.isComplete()) {
@@ -117,13 +104,6 @@ QueueFamilyIndices vkEnginePhysicalDevice::findQueueFamilies()
             indices.graphicsFamily = i;
         }
 
-        VkBool32 presentSupport = false;
-        vkGetPhysicalDeviceSurfaceSupportKHR(_physicalDevice, i, _engine.getSurfaceKHR(), &presentSupport);
-
-        if (presentSupport) {
-            indices.presentFamily = i;
-        }
-
         if (indices.isComplete()) {
             break;
         }
@@ -150,58 +130,4 @@ bool vkEnginePhysicalDevice::checkDeviceExtensionSupport(VkPhysicalDevice device
     }
 
     return requiredExtensions.empty();
-}
-
-SwapChainSupportDetails vkEnginePhysicalDevice::querySwapChainSupport(VkPhysicalDevice device)
-{
-    SwapChainSupportDetails details;
-
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, _engine.getSurfaceKHR(), &details.capabilities);
-
-    uint32_t formatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, _engine.getSurfaceKHR(), &formatCount, nullptr);
-
-    if (formatCount != 0) {
-        details.formats.resize(formatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, _engine.getSurfaceKHR(), &formatCount, details.formats.data());
-    }
-
-    uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, _engine.getSurfaceKHR(), &presentModeCount, nullptr);
-
-    if (presentModeCount != 0) {
-        details.presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, _engine.getSurfaceKHR(), &presentModeCount, details.presentModes.data());
-    }
-
-    return details;
-}
-
-SwapChainSupportDetails vkEnginePhysicalDevice::querySwapChainSupport()
-{
-    if(_physicalDevice == VK_NULL_HANDLE){
-        std::cerr << "this physical device is nullptr" << std::endl;
-    }
-
-    SwapChainSupportDetails details;
-
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_physicalDevice, _engine.getSurfaceKHR(), &details.capabilities);
-
-    uint32_t formatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(_physicalDevice, _engine.getSurfaceKHR(), &formatCount, nullptr);
-
-    if (formatCount != 0) {
-        details.formats.resize(formatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(_physicalDevice, _engine.getSurfaceKHR(), &formatCount, details.formats.data());
-    }
-
-    uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(_physicalDevice, _engine.getSurfaceKHR(), &presentModeCount, nullptr);
-
-    if (presentModeCount != 0) {
-        details.presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(_physicalDevice, _engine.getSurfaceKHR(), &presentModeCount, details.presentModes.data());
-    }
-
-    return details;
 }

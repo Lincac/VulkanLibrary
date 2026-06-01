@@ -1,4 +1,4 @@
-#include "vkEngine.h"
+﻿#include "vkEngine.h"
 
 #include <stdexcept>
 #include <iostream>
@@ -19,7 +19,7 @@ vkEngine::vkEngine(const std::string& applicationName, bool layerSupport)
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0); // 应用程序版本
     appInfo.pEngineName = "vkEngine"; // 引擎名称
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0); // 引擎版本
-    appInfo.apiVersion = VK_API_VERSION_1_0; // API版本
+    appInfo.apiVersion = VK_API_VERSION_1_3; // API版本
 
     VkInstanceCreateInfo createInfo{}; // 实例创建信息
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO; // 结构体类型
@@ -60,11 +60,6 @@ VkInstance& vkEngine::getInstance()
     return _instance;
 }
 
-VkSurfaceKHR& vkEngine::getSurfaceKHR()
-{
-    return _surface;
-}
-
 void vkEngine::initInstance()
 {
     if (volkInitialize() != VK_SUCCESS) {
@@ -100,11 +95,7 @@ bool vkEngine::checkValidationLayerSupport()
 
 std::vector<const char *> vkEngine::getRequiredExtensions(bool layerSupport)
 {
-    uint32_t glfwExtensionCount = 0;
-    const char** glfwExtensions;
-    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount); // 获取glfw扩展
-
-    std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount); // 扩展名称
+    std::vector<const char*> extensions; // 扩展名称
 
     if (layerSupport) {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME); // 调试工具扩展名称

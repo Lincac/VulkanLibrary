@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "vkEngine.h"
 
@@ -7,10 +7,9 @@
 /// @brief 队列族索引
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily; // 图形队列族索引
-    std::optional<uint32_t> presentFamily; // 呈现队列族索引
 
     bool isComplete() { // 判断队列族索引是否完整
-        return graphicsFamily.has_value() && presentFamily.has_value();
+        return graphicsFamily.has_value();
     }
 };
 
@@ -37,7 +36,6 @@ public:
     VkPhysicalDevice& getVkPhysicalDevice();
 
 private:
-
     friend class vkEngineLogicalDevice;
     friend class vkEngineSwapChain;
     friend class vkEngineCommandPool;
@@ -52,6 +50,8 @@ private:
     /// @return 队列族索引
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 
+    /// @brief 查找队列族索引(当前物理设备)
+    /// @return 队列族索引
     QueueFamilyIndices findQueueFamilies();
 
     /// @brief 检查设备扩展支持
@@ -59,24 +59,10 @@ private:
     /// @return 是否支持
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 
-    /// @brief 查询交换链支持细节
-    /// @param device 设备
-    /// @return 交换链支持细节
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
-
-    /// @brief 查询交换链支持细节(当前物理设备)
-    /// @return 交换链支持细节
-    SwapChainSupportDetails querySwapChainSupport();
-
 private:
-    // 引擎 
-    vkEngine& _engine; // 引用成员必须在构造时绑定目标对象，只能通过初始化列表完成
-
-    // 物理设备
-    VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE; 
-
-    // 设备扩展
-    const std::vector<const char*> _deviceExtensions = { // 设备扩展名称
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME // 交换链扩展名称
+    vkEngine& _engine; // 引用成员必须在构造时绑定目标对象，只能通过初始化列表完成 // 引擎 
+    
+    VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;  // 物理设备
+    const std::vector<const char*> _deviceExtensions = { // 设备扩展名称 // 设备扩展
     };
 };

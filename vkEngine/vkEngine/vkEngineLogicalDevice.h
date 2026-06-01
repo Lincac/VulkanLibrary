@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "vkEnginePhysicalDevice.h"
 
@@ -21,13 +21,8 @@ public:
     VkDevice& getVkDevice();
 
 private:
-    // 物理设备
-    vkEnginePhysicalDevice& _physicalDevice;
+    vkEnginePhysicalDevice& _physicalDevice; // 物理设备
 
-    // 逻辑设备
-    VkDevice _device = VK_NULL_HANDLE;
-
-    // 队列
-    VkQueue _graphicsQueue = VK_NULL_HANDLE;
-    VkQueue _presentQueue = VK_NULL_HANDLE;
+    VkDevice _device = VK_NULL_HANDLE; // 逻辑设备
+    VkQueue _graphicsQueue = VK_NULL_HANDLE; // 队列
 };

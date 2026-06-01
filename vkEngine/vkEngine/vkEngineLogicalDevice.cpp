@@ -1,4 +1,4 @@
-#include "vkEngineLogicalDevice.h"
+﻿#include "vkEngineLogicalDevice.h"
 
 #include <set>
 #include <stdexcept>
@@ -10,8 +10,7 @@ vkEngineLogicalDevice::vkEngineLogicalDevice(vkEnginePhysicalDevice& physicalDev
 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
-        indices.graphicsFamily.value(),
-        indices.presentFamily.value() };
+        indices.graphicsFamily.value() };
 
     float queuePriority = 1.0f;
     for (uint32_t queueFamily : uniqueQueueFamilies) {
@@ -42,7 +41,6 @@ vkEngineLogicalDevice::vkEngineLogicalDevice(vkEnginePhysicalDevice& physicalDev
     }
 
     vkGetDeviceQueue(_device, indices.graphicsFamily.value(), 0, &_graphicsQueue);
-    vkGetDeviceQueue(_device, indices.presentFamily.value(), 0, &_presentQueue);
 }
 
 vkEngineLogicalDevice::~vkEngineLogicalDevice()
