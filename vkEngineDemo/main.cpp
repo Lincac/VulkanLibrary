@@ -48,8 +48,12 @@ int main(){
     vkEngineAccelerationStructure blas(logicalDevice, vkEngineAccelerationStructure::Type::BLAS);
     blas.setTriangleGeometry(vertexBuffer.getDeviceAddress(), 3);
     blas.build(commandPool);
-
     std::cout << "BLAS ready, address = " << blas.getDeviceAddress() << std::endl;
+
+    vkEngineAccelerationStructure tlas(logicalDevice, vkEngineAccelerationStructure::Type::TLAS);
+    tlas.setInstance(blas);   // 默认单位矩阵
+    tlas.build(commandPool);
+    std::cout << "TLAS ready, address = " << tlas.getDeviceAddress() << std::endl;
 
     std::cout << "storage image ready" << std::endl;
 

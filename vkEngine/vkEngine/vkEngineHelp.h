@@ -1,4 +1,6 @@
-﻿#include <Volk/volk.h>
+﻿#pragma once
+
+#include <Volk/volk.h>
 
 #include <string>
 #include <vector>
@@ -59,4 +61,15 @@ inline void transitionImageLayout(VkCommandBuffer cmd, VkImage image,
 
     vkCmdPipelineBarrier(cmd, srcStage, dstStage, 0,
         0, nullptr, 0, nullptr, 1, &barrier);
+}
+
+/// @brief 转换变换矩阵
+/// @param m 变换矩阵
+/// @return 变换矩阵
+inline VkTransformMatrixKHR toVkTransform(const glm::mat4& m) {
+    VkTransformMatrixKHR t{};
+    t.matrix[0][0] = m[0][0]; t.matrix[0][1] = m[1][0]; t.matrix[0][2] = m[2][0]; t.matrix[0][3] = m[3][0];
+    t.matrix[1][0] = m[0][1]; t.matrix[1][1] = m[1][1]; t.matrix[1][2] = m[2][1]; t.matrix[1][3] = m[3][1];
+    t.matrix[2][0] = m[0][2]; t.matrix[2][1] = m[1][2]; t.matrix[2][2] = m[2][2]; t.matrix[2][3] = m[3][2];
+    return t;
 }

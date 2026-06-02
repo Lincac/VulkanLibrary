@@ -27,6 +27,8 @@
  */
 
 /// @brief 加速结构体类
+/// BLAS = 几何体本身（你的 1 个三角形）
+/// TLAS = 场景实例列表（引用 BLAS + 变换矩阵）
 class vkEngineAccelerationStructure 
 {
 public:
@@ -43,6 +45,11 @@ public:
     /// @param vertexAddress 顶点地址
     /// @param vertexCount 顶点数量
     void setTriangleGeometry(VkDeviceAddress vertexAddress, uint32_t vertexCount);
+
+    /// @brief 设置实例
+    /// @param blas 底层加速结构
+    /// @param transform 变换矩阵
+    void setInstance(vkEngineAccelerationStructure& blas, const glm::mat4& transform = glm::mat4(1.0f));
 
     // 查询 size、创建 buffer、提交 build（一步完成）
     /// @brief 构建
@@ -63,10 +70,15 @@ private:
     Type _type; // 类型
 
     VkAccelerationStructureKHR _handle = VK_NULL_HANDLE; // 句柄
+
     std::shared_ptr<vkEngineBuffer> _asBuffer;      // 存 AS 本体
     std::shared_ptr<vkEngineBuffer> _scratchBuffer; // build 临时用，build 完可不管
 
     // BLAS 参数
     VkDeviceAddress _vertexAddress = 0; // 顶点地址
     uint32_t _vertexCount = 0; // 顶点数量
+
+    // TLAS 参数
+    std::shared_ptr<vkEngineBuffer> _instanceBuffer; // instance 数据 buffer
+    std::vector<VkAccelerationStructureInstanceKHR> _instances; // instance 列表
 };
