@@ -48,8 +48,28 @@ vkEngine::vkEngine(const std::string& applicationName, bool layerSupport)
     setupDebugMessenger(layerSupport);
 }
 
+void destroyDebugUtilsMessengerEXT(
+    VkInstance instance,
+    VkDebugUtilsMessengerEXT debugMessenger,
+    const VkAllocationCallbacks* pAllocator)
+{
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+    if (func != nullptr) {
+        func(instance, debugMessenger, pAllocator);
+    }
+}
+
 vkEngine::~vkEngine()
 {
+    if (_debugMessenger != VK_NULL_HANDLE) {
+        destroyDebugUtilsMessengerEXT(_instance, _debugMessenger, nullptr);
+        _debugMessenger = VK_NULL_HANDLE;
+    }
+
+    if (_instance != VK_NULL_HANDLE) {
+        vkDestroyInstance(_instance, nullptr);
+        _instance = VK_NULL_HANDLE;
+    }
 }
 
 VkInstance& vkEngine::getInstance()

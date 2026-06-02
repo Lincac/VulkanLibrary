@@ -20,13 +20,13 @@ class vkEnginePhysicalDevice
 public:
     /// @brief 构造函数
     /// @param engine 引擎
-    vkEnginePhysicalDevice(vkEngine& engine);
+    vkEnginePhysicalDevice(std::shared_ptr<vkEngine> engine);
 
     ~vkEnginePhysicalDevice();
 
     /// @brief 获取引擎
     /// @return 引擎
-    vkEngine& getVkEngine();
+    std::shared_ptr<vkEngine> getEngine();
 
     /// @brief 获取物理设备
     /// @return 物理设备
@@ -56,7 +56,7 @@ private:
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 
 private:
-    vkEngine& _engine; // 引用成员必须在构造时绑定目标对象，只能通过初始化列表完成 // 引擎 
+    std::shared_ptr<vkEngine> _engine; // 引用成员必须在构造时绑定目标对象，只能通过初始化列表完成 // 引擎 
     
     VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;  // 物理设备
     const std::vector<const char*> _deviceExtensions = { // 设备扩展名称 

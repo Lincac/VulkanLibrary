@@ -8,7 +8,7 @@ class vkEngineCommandPool
 public:
     /// @brief 构造函数
     /// @param device 逻辑设备
-    vkEngineCommandPool(vkEngineLogicalDevice& device);
+    vkEngineCommandPool(std::shared_ptr<vkEngineLogicalDevice> vice);
     ~vkEngineCommandPool();
 
     /// @brief 提交一次命令
@@ -16,8 +16,8 @@ public:
     void submitOneTimeCommands(std::function<void(VkCommandBuffer)> recordFunc);
 
 private:
-    vkEngineLogicalDevice& _device; // 逻辑设备
+    std::shared_ptr<vkEngineLogicalDevice> _device; // 逻辑设备
     
-    VkCommandPool _commandPool; // 命令池
+    VkCommandPool _commandPool = VK_NULL_HANDLE; // 命令池
     std::vector<VkCommandBuffer> _commandBuffers; // 命令缓冲区
 };

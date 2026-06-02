@@ -1,20 +1,21 @@
 ﻿#include "vkEnginePhysicalDevice.h"
 
-vkEnginePhysicalDevice::vkEnginePhysicalDevice(vkEngine &engine)
-    : _engine(engine){
-    if(engine.getInstance() == VK_NULL_HANDLE){
+vkEnginePhysicalDevice::vkEnginePhysicalDevice(std::shared_ptr<vkEngine> engine)
+    : _engine(engine)
+{
+    if(engine->getInstance() == VK_NULL_HANDLE){
         std::cerr << "vk instance is not create!" << std::endl;
     }
 
     uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(engine.getInstance(), &deviceCount, nullptr);
+    vkEnumeratePhysicalDevices(engine->getInstance(), &deviceCount, nullptr);
 
     if (deviceCount == 0) {
         throw std::runtime_error("failed to find GPUs with Vulkan support!");
     }
 
     std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(engine.getInstance(), &deviceCount, devices.data());
+    vkEnumeratePhysicalDevices(engine->getInstance(), &deviceCount, devices.data());
 
     for (const auto& device : devices) {
         if (isDeviceSuitable(device)) {
@@ -40,10 +41,12 @@ vkEnginePhysicalDevice::vkEnginePhysicalDevice(vkEngine &engine)
     std::cerr << "shaderGroupBaseAlignment = " << rtProps.shaderGroupBaseAlignment << std::endl;
 }
 
-vkEnginePhysicalDevice::~vkEnginePhysicalDevice(){
+vkEnginePhysicalDevice::~vkEnginePhysicalDevice()
+{
+    _physicalDevice = VK_NULL_HANDLE;
 }
 
-vkEngine &vkEnginePhysicalDevice::getVkEngine()
+std::shared_ptr<vkEngine> vkEnginePhysicalDevice::getEngine()
 {
     return _engine;
 }

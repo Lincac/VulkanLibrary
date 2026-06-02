@@ -8,7 +8,7 @@ class vkEngineBuffer
 public:
     /// @brief 构造函数
     /// @param device 逻辑设备
-    vkEngineBuffer(vkEngineLogicalDevice& device);
+    vkEngineBuffer(std::shared_ptr<vkEngineLogicalDevice> device);
     ~vkEngineBuffer();
 
     /// @brief 设置大小
@@ -30,7 +30,7 @@ public:
     /// @param commandPool 命令池
     /// @param data 数据
     /// @param size 大小
-    void upload(vkEngineCommandPool& commandPool, const void* data, VkDeviceSize size);  // staging → device local
+    void upload(std::shared_ptr<vkEngineCommandPool> mandPool, const void* data, VkDeviceSize size);  // staging → device local
 
     /// @brief 获取缓冲区
     /// @return 缓冲区
@@ -45,7 +45,7 @@ public:
     VkDeviceAddress getDeviceAddress();         // AS 必须用到
 
 private:
-    vkEngineLogicalDevice& _device; // 逻辑设备
+    std::shared_ptr<vkEngineLogicalDevice> _device; // 逻辑设备
 
     VkBuffer _buffer = VK_NULL_HANDLE; // 缓冲区（逻辑描述，没有实际存储）
     VkDeviceMemory _memory = VK_NULL_HANDLE; // 设备内存（实际内存）

@@ -1,9 +1,9 @@
 ﻿#include "vkEngineLogicalDevice.h"
 
-vkEngineLogicalDevice::vkEngineLogicalDevice(vkEnginePhysicalDevice& physicalDevice)
+vkEngineLogicalDevice::vkEngineLogicalDevice(std::shared_ptr<vkEnginePhysicalDevice> physicalDevice)
     : _physicalDevice(physicalDevice)
 {
-    auto indices = physicalDevice.findQueueFamilies();
+    auto indices = physicalDevice->findQueueFamilies();
 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
@@ -42,10 +42,10 @@ vkEngineLogicalDevice::vkEngineLogicalDevice(vkEnginePhysicalDevice& physicalDev
     createInfo.pEnabledFeatures = nullptr;
     createInfo.pNext = &features2;
 
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(_physicalDevice._deviceExtensions.size());
-    createInfo.ppEnabledExtensionNames = _physicalDevice._deviceExtensions.data();
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(_physicalDevice->_deviceExtensions.size());
+    createInfo.ppEnabledExtensionNames = _physicalDevice->_deviceExtensions.data();
 
-    if (vkCreateDevice(_physicalDevice._physicalDevice, &createInfo, nullptr, &_device) != VK_SUCCESS) {
+    if (vkCreateDevice(_physicalDevice->_physicalDevice, &createInfo, nullptr, &_device) != VK_SUCCESS) {
         throw std::runtime_error("failed to create logical device!");
     }
 
@@ -56,9 +56,15 @@ vkEngineLogicalDevice::vkEngineLogicalDevice(vkEnginePhysicalDevice& physicalDev
 
 vkEngineLogicalDevice::~vkEngineLogicalDevice()
 {
+    if (_device != VK_NULL_HANDLE) {
+        vkDestroyDevice(_device, nullptr);
+        _device = VK_NULL_HANDLE;
+    }
+
+    _graphicsQueue = VK_NULL_HANDLE;
 }
 
-vkEnginePhysicalDevice& vkEngineLogicalDevice::getVkPhysicalDevice()
+std::shared_ptr<vkEnginePhysicalDevice> vkEngineLogicalDevice::getPhysicalDevice()
 {
     return _physicalDevice;
 }

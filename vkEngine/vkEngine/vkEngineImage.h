@@ -8,7 +8,7 @@ public:
     /// @brief 构造函数
     /// @param device 逻辑设备
     /// @param resolution 分辨率
-    vkEngineImage(vkEngineLogicalDevice& device, glm::ivec2 resolution = glm::ivec2(1));
+    vkEngineImage(std::shared_ptr<vkEngineLogicalDevice> device, glm::ivec2 resolution = glm::ivec2(1));
     ~vkEngineImage(); 
 
     /// @brief 设置分辨率
@@ -39,7 +39,7 @@ public:
     VkDeviceMemory& getMemory();
 
 private:
-    vkEngineLogicalDevice& _device; // 逻辑设备
+    std::shared_ptr<vkEngineLogicalDevice> _device; // 逻辑设备
 
     glm::ivec2 _resolution; // 分辨率
     VkFormat _format; // 格式

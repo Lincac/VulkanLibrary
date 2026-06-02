@@ -1,12 +1,23 @@
 ﻿#include "vkEngineBuffer.h"
 
-vkEngineBuffer::vkEngineBuffer(vkEngineLogicalDevice &device)
+vkEngineBuffer::vkEngineBuffer(std::shared_ptr<vkEngineLogicalDevice> device)
     : _device(device)
 {
 }
 
 vkEngineBuffer::~vkEngineBuffer()
 {
+    auto device = _device->getVkDevice();
+
+    if (_buffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(device, _buffer, nullptr);
+        _buffer = VK_NULL_HANDLE;
+    }
+
+    if (_memory != VK_NULL_HANDLE) {
+        vkFreeMemory(device, _memory, nullptr);
+        _memory = VK_NULL_HANDLE;
+    }
 }
 
 void vkEngineBuffer::setSize(VkDeviceSize size)
@@ -30,8 +41,8 @@ void vkEngineBuffer::create()
         throw std::runtime_error("buffer size/usage not set!");
     }
 
-    auto physicalDevice = _device.getVkPhysicalDevice().getVkPhysicalDevice();
-    auto device = _device.getVkDevice();
+    auto physicalDevice = _device->getPhysicalDevice()->getVkPhysicalDevice();
+    auto device = _device->getVkDevice();
 
     VkBufferCreateInfo bufferInfo{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferInfo.size = _size;
@@ -67,14 +78,14 @@ void vkEngineBuffer::create()
     vkBindBufferMemory(device, _buffer, _memory, 0);    
 }
 
-void vkEngineBuffer::upload(vkEngineCommandPool& commandPool, const void *data, VkDeviceSize size)
+void vkEngineBuffer::upload(std::shared_ptr<vkEngineCommandPool> commandPool, const void *data, VkDeviceSize size)
 {
     if (size > _size) {
         throw std::runtime_error("upload size exceeds buffer size!");
     }
 
-    auto device = _device.getVkDevice();
-    auto physDev = _device.getVkPhysicalDevice().getVkPhysicalDevice();
+    auto device = _device->getVkDevice();
+    auto physDev = _device->getPhysicalDevice()->getVkPhysicalDevice();
 
     // --- 1. 创建 staging buffer ---
     VkBuffer stagingBuffer = VK_NULL_HANDLE;
@@ -106,7 +117,7 @@ void vkEngineBuffer::upload(vkEngineCommandPool& commandPool, const void *data, 
     vkUnmapMemory(device, stagingMemory);
 
     // --- 3. GPU copy ---
-    commandPool.submitOneTimeCommands([&](VkCommandBuffer cmd) {
+    commandPool->submitOneTimeCommands([&](VkCommandBuffer cmd) {
         VkBufferCopy copyRegion{};
         copyRegion.size = size;
         vkCmdCopyBuffer(cmd, stagingBuffer, _buffer, 1, &copyRegion);
@@ -132,5 +143,5 @@ VkDeviceAddress vkEngineBuffer::getDeviceAddress()
     VkBufferDeviceAddressInfo info{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
     info.buffer = _buffer;
 
-    return vkGetBufferDeviceAddress(_device.getVkDevice(), &info);
+    return vkGetBufferDeviceAddress(_device->getVkDevice(), &info);
 }

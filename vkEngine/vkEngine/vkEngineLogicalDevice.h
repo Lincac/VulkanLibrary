@@ -8,13 +8,13 @@ class vkEngineLogicalDevice
 public:
     /// @brief 构造函数
     /// @param physicalDevice 物理设备
-    vkEngineLogicalDevice(vkEnginePhysicalDevice& physicalDevice);
+    vkEngineLogicalDevice(std::shared_ptr<vkEnginePhysicalDevice> physicalDevice);
 
     ~vkEngineLogicalDevice();
 
     /// @brief 获取物理设备
     /// @return 物理设备
-    vkEnginePhysicalDevice& getVkPhysicalDevice();
+    std::shared_ptr<vkEnginePhysicalDevice> getPhysicalDevice();
 
     /// @brief 获取逻辑设备
     /// @return 逻辑设备
@@ -25,7 +25,7 @@ public:
     VkQueue& getGraphicsQueue();
 
 private:
-    vkEnginePhysicalDevice& _physicalDevice; // 物理设备
+    std::shared_ptr<vkEnginePhysicalDevice> _physicalDevice; // 物理设备
 
     VkDevice _device = VK_NULL_HANDLE; // 逻辑设备
     VkQueue _graphicsQueue = VK_NULL_HANDLE; // 队列
