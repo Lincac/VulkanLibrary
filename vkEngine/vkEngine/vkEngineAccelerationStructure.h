@@ -54,7 +54,7 @@ public:
     // 查询 size、创建 buffer、提交 build（一步完成）
     /// @brief 构建
     /// @param commandPool 命令池
-    void build(std::shared_ptr<vkEngineCommandPool> commandPool);
+    void build(vkEngineCommandPool& commandPool);
 
     /// @brief 获取句柄
     /// @return 句柄

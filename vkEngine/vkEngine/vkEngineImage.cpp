@@ -1,4 +1,11 @@
-﻿#include "vkEngineImage.h"
+﻿#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb/stb_image_write.h>
+
+#include "vkEngineImage.h"
+#include "vkEngineBuffer.h"
+#include "vkEngineHelp.h"
+
+#include <vector>
 
 vkEngineImage::vkEngineImage(std::shared_ptr<vkEngineLogicalDevice> device, glm::ivec2 resolution)
                              : _device(device)
@@ -95,4 +102,65 @@ VkImageView &vkEngineImage::getImageView()
 VkDeviceMemory &vkEngineImage::getMemory()
 {
     return _memory;
+}
+
+glm::ivec2 vkEngineImage::getResolution() const
+{
+    return _resolution;
+}
+
+void vkEngineImage::saveToPng(vkEngineCommandPool& commandPool, const std::string& filepath,
+    std::function<void(VkCommandBuffer)> beforeCopy)
+{
+    const uint32_t width = static_cast<uint32_t>(_resolution.x);
+    const uint32_t height = static_cast<uint32_t>(_resolution.y);
+    const VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * 4;
+
+    auto device = _device->getVkDevice();
+
+    vkEngineBuffer stagingBuffer(_device);
+    stagingBuffer.setSize(imageSize);
+    stagingBuffer.setUsage(VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    stagingBuffer.setMemoryProperties(
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    stagingBuffer.create();
+
+    commandPool.submitOneTimeCommands([&](VkCommandBuffer cmd) {
+        if (beforeCopy) {
+            beforeCopy(cmd);
+        }
+
+        VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+        barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = _image;
+        barrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
+        vkCmdPipelineBarrier(cmd,
+            VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+        VkBufferImageCopy region{};
+        region.imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+        region.imageExtent = { width, height, 1 };
+
+        vkCmdCopyImageToBuffer(cmd, _image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            stagingBuffer.getBuffer(), 1, &region);
+    });
+
+    void* mapped = nullptr;
+    vkMapMemory(device, stagingBuffer.getMemory(), 0, imageSize, 0, &mapped);
+
+    if (!stbi_write_png(filepath.c_str(), static_cast<int>(width), static_cast<int>(height),
+            4, mapped, static_cast<int>(width * 4))) {
+        vkUnmapMemory(device, stagingBuffer.getMemory());
+        throw std::runtime_error("failed to write png: " + filepath);
+    }
+
+    vkUnmapMemory(device, stagingBuffer.getMemory());
 }

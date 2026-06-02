@@ -1,6 +1,10 @@
 ﻿#pragma once
 
 #include "vkEngineLogicalDevice.h"
+#include "vkEngineCommandPool.h"
+
+#include <functional>
+#include <string>
 
 /// @brief 图像类
 class vkEngineImage {
@@ -37,6 +41,17 @@ public:
     /// @brief 获取设备内存
     /// @return 设备内存
     VkDeviceMemory& getMemory();
+
+    /// @brief 获取分辨率
+    /// @return 分辨率
+    glm::ivec2 getResolution() const;
+
+    /// @brief 读回 GPU 图像并保存为 PNG
+    /// @param commandPool 命令池
+    /// @param filepath 输出路径
+    /// @param beforeCopy 复制前在同一 command buffer 中执行的回调（如 trace rays）
+    void saveToPng(vkEngineCommandPool& commandPool, const std::string& filepath,
+        std::function<void(VkCommandBuffer)> beforeCopy = nullptr);
 
 private:
     std::shared_ptr<vkEngineLogicalDevice> _device; // 逻辑设备

@@ -31,6 +31,7 @@ target_compile_definitions(vkEngine
 target_link_libraries(vkEngine
     PUBLIC
         glm
+        stb
         glfw
         volk
         Vulkan::Vulkan

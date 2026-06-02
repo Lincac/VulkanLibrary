@@ -48,7 +48,7 @@ void vkEngineAccelerationStructure::setInstance(vkEngineAccelerationStructure& b
     _instances.push_back(instance);
 }
 
-void vkEngineAccelerationStructure::build(std::shared_ptr<vkEngineCommandPool> commandPool)
+void vkEngineAccelerationStructure::build(vkEngineCommandPool& commandPool)
 {
     VkAccelerationStructureGeometryKHR geometry{};
     geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -159,7 +159,7 @@ void vkEngineAccelerationStructure::build(std::shared_ptr<vkEngineCommandPool> c
 
     const VkAccelerationStructureBuildRangeInfoKHR* pRangeInfo = &rangeInfo;
 
-    commandPool->submitOneTimeCommands([&](VkCommandBuffer cmd) {
+    commandPool.submitOneTimeCommands([&](VkCommandBuffer cmd) {
         vkCmdBuildAccelerationStructuresKHR(cmd, 1, &buildInfo, &pRangeInfo);
     });
 }
