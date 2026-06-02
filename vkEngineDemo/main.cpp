@@ -1,5 +1,5 @@
-﻿#include "vkEngineBuffer.h"
-#include "vkEngineImage.h"
+﻿#include "vkEngineImage.h"
+#include "vkEngineAccelerationStructure.h"
 
 #include <iostream>
 
@@ -45,7 +45,14 @@ int main(){
     std::cout << "vertex buffer ready, address = "
             << vertexBuffer.getDeviceAddress() << std::endl;    
 
+    vkEngineAccelerationStructure blas(logicalDevice, vkEngineAccelerationStructure::Type::BLAS);
+    blas.setTriangleGeometry(vertexBuffer.getDeviceAddress(), 3);
+    blas.build(commandPool);
+
+    std::cout << "BLAS ready, address = " << blas.getDeviceAddress() << std::endl;
+
     std::cout << "storage image ready" << std::endl;
+
     std::cout << "vulkan is init" << std::endl;
 
     return 0;
