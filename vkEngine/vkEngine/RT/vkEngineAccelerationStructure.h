@@ -80,5 +80,5 @@ private:
 
     // TLAS 参数
     std::shared_ptr<vkEngineBuffer> _instanceBuffer; // instance 数据 buffer
-    std::vector<VkAccelerationStructureInstanceKHR> _instances; // instance 列表
+    std::vector<uint8_t> _instanceData; // GPU 侧 instance 原始数据（64 字节/个）
 };

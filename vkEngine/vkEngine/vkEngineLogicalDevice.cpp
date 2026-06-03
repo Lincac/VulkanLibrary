@@ -22,8 +22,12 @@ vkEngineLogicalDevice::vkEngineLogicalDevice(std::shared_ptr<vkEnginePhysicalDev
     VkPhysicalDeviceBufferDeviceAddressFeatures bdaFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
     bdaFeatures.bufferDeviceAddress = VK_TRUE;
 
+    VkPhysicalDeviceRayQueryFeaturesKHR rqFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR };
+    rqFeatures.pNext = &bdaFeatures;
+    rqFeatures.rayQuery = VK_TRUE;
+
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
-    rtFeatures.pNext = &bdaFeatures;
+    rtFeatures.pNext = &rqFeatures;
     rtFeatures.rayTracingPipeline = VK_TRUE;
 
     VkPhysicalDeviceAccelerationStructureFeaturesKHR asFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };

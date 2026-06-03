@@ -28,7 +28,11 @@ void vkEngineRTDescriptor::create()
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
     bindings[0].descriptorCount = 1;
-    bindings[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+    bindings[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR
+        | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
+        | VK_SHADER_STAGE_ANY_HIT_BIT_KHR
+        | VK_SHADER_STAGE_MISS_BIT_KHR
+        | VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
 
     bindings[1].binding = 1;
     bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;

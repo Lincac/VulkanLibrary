@@ -1,5 +1,21 @@
 ﻿#include "vkEngineAccelerationStructure.h"
 
+namespace {
+
+// 与 VkAccelerationStructureInstanceKHR 设备端布局一致（64 字节）
+struct DeviceAccelerationStructureInstance {
+    VkTransformMatrixKHR transform; // 变换矩阵
+    uint32_t instanceCustomIndexAndMask; // 实例自定义索引和掩码
+    uint32_t instanceShaderBindingTableRecordOffsetAndFlags; // 实例着色器绑定表记录偏移和标志
+    uint64_t accelerationStructureReference; // 加速结构体引用
+};
+
+// 断言 DeviceAccelerationStructureInstance 布局与 VkAccelerationStructureInstanceKHR 一致（64 字节）
+static_assert(sizeof(DeviceAccelerationStructureInstance) == 64,
+    "DeviceAccelerationStructureInstance layout mismatch");
+
+} // namespace
+
 vkEngineAccelerationStructure::vkEngineAccelerationStructure(std::shared_ptr<vkEngineLogicalDevice> device, Type type)
     : _device(device)
     , _type(type)
@@ -37,15 +53,15 @@ void vkEngineAccelerationStructure::setInstance(std::shared_ptr<vkEngineAccelera
         throw std::runtime_error("setInstance() requires a BLAS");
     }
 
-    VkAccelerationStructureInstanceKHR instance{};
+    DeviceAccelerationStructureInstance instance{};
     instance.transform = toVkTransform(transform);
-    instance.instanceCustomIndex = 0;
-    instance.mask = 0xFF;
-    instance.instanceShaderBindingTableRecordOffset = 0;
-    instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+    instance.instanceCustomIndexAndMask = (0xFFu << 24);
+    instance.instanceShaderBindingTableRecordOffsetAndFlags =
+        (static_cast<uint32_t>(VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR) << 24);
     instance.accelerationStructureReference = blas->getDeviceAddress();
 
-    _instances.push_back(instance);
+    const auto* bytes = reinterpret_cast<const uint8_t*>(&instance);
+    _instanceData.insert(_instanceData.end(), bytes, bytes + sizeof(instance));
 }
 
 void vkEngineAccelerationStructure::build(std::shared_ptr<vkEngineCommandPool> commandPool)
@@ -69,6 +85,8 @@ void vkEngineAccelerationStructure::build(std::shared_ptr<vkEngineCommandPool> c
         triangles.vertexStride = sizeof(float) * 3;
         triangles.maxVertex = _vertexCount - 1;
         triangles.indexType = VK_INDEX_TYPE_NONE_KHR;
+        triangles.indexData.deviceAddress = 0;
+        triangles.transformData.deviceAddress = 0;
 
         geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
         geometry.geometry.triangles = triangles;
@@ -77,12 +95,11 @@ void vkEngineAccelerationStructure::build(std::shared_ptr<vkEngineCommandPool> c
         maxPrimitiveCount = 1;
     }
     else {
-        if (_instances.empty()) {
+        if (_instanceData.empty()) {
             throw std::runtime_error("TLAS instances not set, call setInstance() first");
         }
 
-        const VkDeviceSize instanceBufferSize =
-            sizeof(VkAccelerationStructureInstanceKHR) * _instances.size();
+        const VkDeviceSize instanceBufferSize = _instanceData.size();
 
         _instanceBuffer->setSize(instanceBufferSize);
         _instanceBuffer->setUsage(
@@ -91,7 +108,7 @@ void vkEngineAccelerationStructure::build(std::shared_ptr<vkEngineCommandPool> c
             | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
         _instanceBuffer->setMemoryProperties(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         _instanceBuffer->create();
-        _instanceBuffer->upload(commandPool, _instances.data(), instanceBufferSize);
+        _instanceBuffer->upload(commandPool, _instanceData.data(), instanceBufferSize);
 
         VkAccelerationStructureGeometryInstancesDataKHR instances{};
         instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
@@ -102,7 +119,7 @@ void vkEngineAccelerationStructure::build(std::shared_ptr<vkEngineCommandPool> c
         geometry.geometry.instances = instances;
 
         asType = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-        maxPrimitiveCount = static_cast<uint32_t>(_instances.size());
+        maxPrimitiveCount = static_cast<uint32_t>(_instanceData.size() / sizeof(DeviceAccelerationStructureInstance));
     }
 
     VkAccelerationStructureBuildGeometryInfoKHR buildInfo{};

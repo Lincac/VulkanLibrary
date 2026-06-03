@@ -38,6 +38,7 @@ vkEnginePhysicalDevice::vkEnginePhysicalDevice(std::shared_ptr<vkEngine> engine)
     // 每个 shader group 在 SBT 里占 32 字节（NVIDIA 常见值）。
     std::cerr << "shaderGroupHandleSize = " << rtProps.shaderGroupHandleSize << std::endl;
     // SBT 起始地址需 64 字节对齐
+    std::cerr << "shaderGroupHandleAlignment = " << rtProps.shaderGroupHandleAlignment << std::endl;
     std::cerr << "shaderGroupBaseAlignment = " << rtProps.shaderGroupBaseAlignment << std::endl;
 }
 
@@ -97,14 +98,13 @@ bool vkEnginePhysicalDevice::isDeviceSuitable(VkPhysicalDevice device)
     }
 
     // 检查设备扩展支持
+    VkPhysicalDeviceRayQueryFeaturesKHR rqFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR };
     VkPhysicalDeviceBufferDeviceAddressFeatures bdaFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
-    // 光线追踪管道特性
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
-    // 加速结构特性
     VkPhysicalDeviceAccelerationStructureFeaturesKHR asFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
 
-    // 设置特性链
-    rtFeatures.pNext = &bdaFeatures;
+    rqFeatures.pNext = &bdaFeatures;
+    rtFeatures.pNext = &rqFeatures;
     asFeatures.pNext = &rtFeatures;
 
     // 创建物理设备特性2
@@ -116,6 +116,7 @@ bool vkEnginePhysicalDevice::isDeviceSuitable(VkPhysicalDevice device)
     
     return asFeatures.accelerationStructure
         && rtFeatures.rayTracingPipeline
+        && rqFeatures.rayQuery
         && bdaFeatures.bufferDeviceAddress; 
 }
 

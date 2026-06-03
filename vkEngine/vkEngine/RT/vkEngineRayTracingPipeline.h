@@ -77,7 +77,20 @@ private:
     VkPipeline _pipeline = VK_NULL_HANDLE; // 管线
     VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE; // 管线布局
 
-    std::shared_ptr<vkEngineBuffer> _sbtBuffer; // SBT buffer       
+    /* SBT 
+     *  Shader Binding Table（着色器绑定表）
+     * 一个 GPU Buffer，里面按固定格式存放 RayGen / Miss / HitGroup 等 shader 的句柄和参数，用来驱动光线追踪管线
+     * 
+     * RayGen → 发射光线
+     *  ↓
+     * TLAS → 找到击中的 instance
+     *  ↓
+     * SBT → 找到对应的 hit shader
+     *  ↓
+     * 执行 closest-hit / any-hit / intersection
+     */
+    std::vector<std::shared_ptr<vkEngineBuffer>> _sbtBuffers; // 各 shader group 独立 SBT buffer
+
     VkStridedDeviceAddressRegionKHR _raygenRegion{}; // raygen region
     VkStridedDeviceAddressRegionKHR _missRegion{}; // miss region
     VkStridedDeviceAddressRegionKHR _hitRegion{}; // hit region

@@ -86,6 +86,9 @@ inline VkTransformMatrixKHR toVkTransform(const glm::mat4& m)
     return t;
 }
 
+/// @brief 读取文件
+/// @param filename 文件名
+/// @return 文件内容
 inline std::vector<char> readFile(const std::string& filename) 
 {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
@@ -101,6 +104,9 @@ inline std::vector<char> readFile(const std::string& filename)
     return buffer;
 }
 
+/// @brief 解析路径
+/// @param relativePath 相对路径
+/// @return 绝对路径
 inline std::string resolvePathNextToExe(const std::string& relativePath)
 {
     std::ifstream direct(relativePath, std::ios::binary);
@@ -125,6 +131,9 @@ inline std::string resolvePathNextToExe(const std::string& relativePath)
     throw std::runtime_error("failed to resolve file path: " + relativePath);
 }
 
+/// @brief 获取可执行文件所在目录
+/// @param relativePath 相对路径
+/// @return 绝对路径
 inline std::string pathNextToExe(const std::string& relativePath)
 {
 #ifdef _WIN32
