@@ -34,9 +34,16 @@ private:
     std::shared_ptr<vkEngineLogicalDevice> _device; // 逻辑设备
 
     // 资源接口表的结构定义
+    /*
+    * 描述符集的模板/契约，告诉 Vulkan 和 shader：
+
+    * 有几个 binding（binding = 0, 1, 2...）
+    * 每个 binding 是什么类型（TLAS、Storage Image、Storage Buffer 等）
+    * 哪些 shader stage 可以访问
+    */
     VkDescriptorSetLayout _layout = VK_NULL_HANDLE; // 描述符集布局
 
     // 绑定资源
-    VkDescriptorPool _pool = VK_NULL_HANDLE; // 描述符池
-    VkDescriptorSet _set = VK_NULL_HANDLE; // 描述符集
+    VkDescriptorPool _pool = VK_NULL_HANDLE; // 	分配描述符集的内存池
+    VkDescriptorSet _set = VK_NULL_HANDLE; // 一组具体的描述符实例
 };

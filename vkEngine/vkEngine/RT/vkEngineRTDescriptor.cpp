@@ -131,7 +131,7 @@ void vkEngineRTDescriptor::setup(std::shared_ptr<vkEngineAccelerationStructure> 
     writeVertexBuffer.pBufferInfo = &vertexBufferInfo;
 
     VkWriteDescriptorSet writes[3] = { writeAS, writeImage, writeVertexBuffer };
-    vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
+    vkUpdateDescriptorSets(device, 3, writes, 0, nullptr); // 把 buffer/image/TLAS 指向 写进 descriptor set
 }
 
 VkDescriptorSetLayout& vkEngineRTDescriptor::getLayout()
