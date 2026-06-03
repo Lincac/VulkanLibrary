@@ -1,9 +1,10 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
 
-layout(location = 0) rayPayloadInEXT vec3 hitColor;
+#include "pathtrace.glsl"
 
-// 与 C++ ObjVertex 一致：pos[3] + normal[3]，共 24 字节（避免 std430 下 vec3 的 16 字节对齐）
+layout(location = 0) rayPayloadInEXT PathPayload payload;
+
 struct Vertex {
     float pos[3];
     float normal[3];
@@ -13,8 +14,6 @@ layout(set = 0, binding = 2, std430) readonly buffer VertexBuffer {
     Vertex vertices[];
 };
 
-// BLAS 为三角形
-// attrib 会自动被 Vulkan 填充为 barycentric 坐标
 hitAttributeEXT vec2 attribs;
 
 vec3 fetchNormal(uint index)
@@ -31,8 +30,13 @@ void main() {
         fetchNormal(base + 1) * barycentrics.y +
         fetchNormal(base + 2) * barycentrics.z);
 
-    const vec3 L = normalize(vec3(0.3, 0.7, 0.5));
-    const float diff = max(dot(N, L), 0.0);
+    const vec3 worldPos = gl_WorldRayOriginEXT + gl_HitTEXT * gl_WorldRayDirectionEXT;
+    const vec3 V = normalize(-gl_WorldRayDirectionEXT);
+    if (dot(N, V) < 0.0) {
+        N = -N;
+    }
 
-    hitColor = vec3(1.0, 0.2, 0.2) * (0.15 + 0.85 * diff);
+    payload.hitNormal = vec4(1.0, N.x, N.y, N.z);
+    payload.position = vec4(worldPos, 1.0);
+    payload.albedo = vec4(0.82, 0.67, 0.52, 1.0);
 }

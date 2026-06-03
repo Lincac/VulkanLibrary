@@ -1,39 +1,73 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
 
+#include "pathtrace.glsl"
+
 layout(set = 0, binding = 0) uniform accelerationStructureEXT tlas;
 layout(set = 0, binding = 1, rgba8) uniform writeonly image2D outputImage;
+layout(set = 0, binding = 3) uniform sampler2D environmentMap;
 
-// location 0：与 closest hit / miss 共享的 payload，traceRayEXT 最后一参须与此一致
-layout(location = 0) rayPayloadEXT vec3 hitColor;
+layout(location = 0) rayPayloadEXT PathPayload payload;
+
+vec3 tracePath(vec3 origin, vec3 direction, inout uint seed)
+{
+    vec3 radiance = vec3(0.0);
+    vec3 throughput = vec3(1.0);
+
+    for (uint bounce = 0u; bounce < MAX_BOUNCES; ++bounce) {
+        payload.hitNormal.x = 0.0;
+
+        traceRayEXT(
+            tlas,
+            gl_RayFlagsOpaqueEXT,
+            0xFF,
+            0,
+            0,
+            0,
+            origin,
+            0.001,
+            direction,
+            1000.0,
+            0);
+
+        if (payload.hitNormal.x < 0.5) {
+            radiance += throughput * sampleEnvironment(environmentMap, direction);
+            break;
+        }
+
+        const vec3 N = normalize(payload.hitNormal.yzw);
+        const vec3 albedo = payload.albedo.rgb;
+
+        if (bounce + 1u >= MAX_BOUNCES) {
+            break;
+        }
+
+        throughput *= albedo;
+        direction = sampleCosineHemisphere(N, seed);
+        origin = payload.position.xyz + N * 0.001;
+    }
+
+    return radiance;
+}
 
 void main() {
     const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
     const vec2 uv = pixelCenter / vec2(gl_LaunchSizeEXT.xy);
-    // Vulkan 帧缓冲 y=0 在顶部；NDC +Y 向上，需翻转 v
     vec2 ndc = vec2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
 
     const float aspect = float(gl_LaunchSizeEXT.x) / float(gl_LaunchSizeEXT.y);
-    vec3 origin = vec3(0.0, 0.0, 3.0);
-    vec3 direction = normalize(vec3(ndc.x * aspect, ndc.y, -1.0));
+    const vec3 camOrigin = vec3(0.0, 0.0, 2.0);
 
-    hitColor = vec3(0.1, 0.1, 0.2); // 默认背景色；未命中时 miss shader 也会写同色
+    uint seed = gl_LaunchIDEXT.x + gl_LaunchIDEXT.y * 1973u + 1u;
 
-    // traceRayEXT(acceleration, rayFlags, cullMask, sbtRecordOffset, sbtRecordStride,
-    //             missIndex, origin, Tmin, direction, Tmax, payload)
-    traceRayEXT(
-        tlas,                   // 顶层加速结构，射线与之求交
-        gl_RayFlagsOpaqueEXT,   // 按不透明处理，跳过 any-hit，直接走 closest hit
-        0xFF,                   // 射线剔除掩码；与实例 mask 按位与，非 0 才参与求交
-        0,                      // SBT hit 区记录偏移（多材质/多 hit group 时用）
-        0,                      // SBT hit 区记录步长（0 表示由管线/SBT 布局决定）
-        0,                      // miss SBT 区索引；未命中时执行第 0 个 miss shader
-        origin,                 // 世界空间光线起点
-        0.001,                  // Tmin：最近有效距离，略大于 0 避免自相交
-        direction,              // 世界空间光线方向
-        1000.0,                 // Tmax：最远有效距离，超出视为未命中
-        0                       // payload location，对应上方 hitColor
-    );
+    vec3 accumulated = vec3(0.0);
+    for (uint s = 0u; s < SAMPLES_PER_PIXEL; ++s) {
+        const vec2 jitter = vec2(rand01(seed), rand01(seed)) - 0.5;
+        const vec2 jitteredNdc = ndc + jitter * (2.0 / vec2(gl_LaunchSizeEXT.xy));
+        const vec3 direction = normalize(vec3(jitteredNdc.x * aspect, jitteredNdc.y, -1.0));
+        accumulated += tracePath(camOrigin, direction, seed);
+    }
 
-    imageStore(outputImage, ivec2(gl_LaunchIDEXT.xy), vec4(hitColor, 1.0));
+    accumulated /= float(SAMPLES_PER_PIXEL);
+    imageStore(outputImage, ivec2(gl_LaunchIDEXT.xy), vec4(toneMap(accumulated), 1.0));
 }

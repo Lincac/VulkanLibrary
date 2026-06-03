@@ -1,4 +1,5 @@
 ﻿#include "vkEngineImage.h"
+#include "vkEngineTexture.h"
 #include "vkEngineAccelerationStructure.h"
 #include "vkEngineRTDescriptor.h"
 #include "vkEngineRayTracingPipeline.h"
@@ -21,10 +22,14 @@ int main(){
     image->generate();
     std::cout << "storage image ready" << std::endl;
 
-    // 提交一次命令，将图像从 UNDEFINED 状态转换为 GENERAL 状态
     commandPool->submitOneTimeCommands([&](VkCommandBuffer cmd) {
         transitionImageLayout(cmd, image->getImage(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
     });
+
+    auto environmentMap = std::make_shared<vkEngineTexture>(logicalDevice);
+    environmentMap->loadHdr(commandPool, "hdr/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
+    std::cout << "environment HDR ready " << environmentMap->getResolution().x
+              << "x" << environmentMap->getResolution().y << std::endl;
 
     const ObjMesh mesh = loadObj("models/bunny.obj");
     std::cout << "loaded obj: " << mesh.triangleCount() << " triangles, "
@@ -52,13 +57,13 @@ int main(){
     std::cout << "BLAS ready, address = " << blas->getDeviceAddress() << std::endl;
 
     auto tlas = std::make_shared<vkEngineAccelerationStructure>(logicalDevice, vkEngineAccelerationStructure::Type::TLAS);
-    tlas->setInstance(blas);   // 默认单位矩阵
+    tlas->setInstance(blas);
     tlas->build(commandPool);
     std::cout << "TLAS ready, address = " << tlas->getDeviceAddress() << std::endl;
 
     vkEngineRTDescriptor descriptor(logicalDevice);
     descriptor.create();
-    descriptor.setup(tlas, image, vertexBuffer);
+    descriptor.setup(tlas, image, vertexBuffer, environmentMap);
     std::cout << "descriptor ready" << std::endl;
 
     vkEngineRayTracingPipeline rtPipeline(logicalDevice);
@@ -72,7 +77,7 @@ int main(){
     image->saveToPng(commandPool, outputPath, [&](VkCommandBuffer cmd) {
         rtPipeline.recordTrace(cmd, descriptor.getSet(), 800, 600, 1);
     });
-    std::cout << "trace rays done" << std::endl;
+    std::cout << "path trace done" << std::endl;
     std::cout << "saved " << outputPath << std::endl;
 
     return 0;

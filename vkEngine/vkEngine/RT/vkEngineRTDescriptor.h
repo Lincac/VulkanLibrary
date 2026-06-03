@@ -2,6 +2,7 @@
 
 #include "vkEngineAccelerationStructure.h"
 #include "vkEngineImage.h"
+#include "vkEngineTexture.h"
 
 /// @brief RT 描述符集（TLAS + Storage Image + Vertex Buffer）
 class vkEngineRTDescriptor
@@ -19,8 +20,9 @@ public:
     /// @param tlas 顶层加速结构
     /// @param image 输出 storage image
     /// @param vertexBuffer 顶点 buffer（pos + normal，供 closest hit 读取）
+    /// @param environmentMap 环境贴图
     void setup(std::shared_ptr<vkEngineAccelerationStructure> tlas, std::shared_ptr<vkEngineImage> image,
-        std::shared_ptr<vkEngineBuffer> vertexBuffer);
+        std::shared_ptr<vkEngineBuffer> vertexBuffer, std::shared_ptr<vkEngineTexture> environmentMap);
 
     /// @brief 获取描述符集布局
     /// @return 描述符集布局
