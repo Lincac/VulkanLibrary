@@ -3,6 +3,8 @@ set(VKENGINE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vkEngine")
 file(GLOB VKENGINE_SOURCES CONFIGURE_DEPENDS
     "${VKENGINE_SOURCE_DIR}/*.cpp"
     "${VKENGINE_SOURCE_DIR}/*.h"
+    "${VKENGINE_SOURCE_DIR}/RT/*.cpp"
+    "${VKENGINE_SOURCE_DIR}/RT/*.h"
 )
 
 add_library(vkEngine STATIC ${VKENGINE_SOURCES})
@@ -10,6 +12,7 @@ add_library(vkEngine STATIC ${VKENGINE_SOURCES})
 target_include_directories(vkEngine
     PUBLIC
         $<BUILD_INTERFACE:${VKENGINE_SOURCE_DIR}>
+        $<BUILD_INTERFACE:${VKENGINE_SOURCE_DIR}/RT>
 )
 
 get_filename_component(VULKAN_LIB_DIR "${Vulkan_LIBRARY}" DIRECTORY)

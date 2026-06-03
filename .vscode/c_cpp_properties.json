@@ -4,6 +4,7 @@
             "name": "Win32",
             "includePath": [
                 "${workspaceFolder}/vkEngine/vkEngine",
+                "${workspaceFolder}/vkEngine/vkEngine/RT",
                 "${workspaceFolder}/Dependence/include",
                 "${env:VULKAN_SDK}/Include"
             ],
