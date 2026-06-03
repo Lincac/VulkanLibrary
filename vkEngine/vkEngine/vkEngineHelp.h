@@ -151,6 +151,7 @@ inline std::string pathNextToExe(const std::string& relativePath)
 }
 
 /// @brief OBJ 顶点（pos 供 BLAS 读取，normal 供 closest hit 着色）
+/// @note GLSL 侧须用 float pos[3]/normal[3]（std430），勿用 vec3，避免 16 字节对齐导致 stride 不一致
 struct ObjVertex {
     float pos[3];
     float normal[3];
