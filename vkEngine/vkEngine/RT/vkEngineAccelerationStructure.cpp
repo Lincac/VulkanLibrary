@@ -33,7 +33,8 @@ vkEngineAccelerationStructure::~vkEngineAccelerationStructure()
     }
 }
 
-void vkEngineAccelerationStructure::setTriangleGeometry(VkDeviceAddress vertexAddress, uint32_t vertexCount)
+void vkEngineAccelerationStructure::setTriangleGeometry(VkDeviceAddress vertexAddress, uint32_t vertexCount,
+    uint32_t vertexStride)
 {
     if (_type != Type::BLAS) {
         throw std::runtime_error("setTriangleGeometry() is only valid for BLAS");
@@ -41,6 +42,7 @@ void vkEngineAccelerationStructure::setTriangleGeometry(VkDeviceAddress vertexAd
 
     _vertexAddress = vertexAddress;
     _vertexCount = vertexCount;
+    _vertexStride = vertexStride;
 }
 
 void vkEngineAccelerationStructure::setInstance(std::shared_ptr<vkEngineAccelerationStructure> blas, const glm::mat4& transform)
@@ -85,7 +87,7 @@ void vkEngineAccelerationStructure::build(std::shared_ptr<vkEngineCommandPool> c
         triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
         triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
         triangles.vertexData.deviceAddress = _vertexAddress;
-        triangles.vertexStride = sizeof(float) * 3;
+        triangles.vertexStride = _vertexStride;
         triangles.maxVertex = _vertexCount - 1;
         triangles.indexType = VK_INDEX_TYPE_NONE_KHR;
         triangles.indexData.deviceAddress = 0;

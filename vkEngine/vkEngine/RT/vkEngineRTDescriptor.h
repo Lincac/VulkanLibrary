@@ -3,7 +3,7 @@
 #include "vkEngineAccelerationStructure.h"
 #include "vkEngineImage.h"
 
-/// @brief RT 描述符集（TLAS + Storage Image）
+/// @brief RT 描述符集（TLAS + Storage Image + Vertex Buffer）
 class vkEngineRTDescriptor
 {
 public:
@@ -15,10 +15,12 @@ public:
     /// @brief 创建 layout 与 pool
     void create();
 
-    /// @brief 分配 set 并写入 TLAS / 输出图
+    /// @brief 分配 set 并写入 TLAS / 输出图 / 顶点 buffer
     /// @param tlas 顶层加速结构
     /// @param image 输出 storage image
-    void setup(std::shared_ptr<vkEngineAccelerationStructure> tlas, std::shared_ptr<vkEngineImage> image);
+    /// @param vertexBuffer 顶点 buffer（pos + normal，供 closest hit 读取）
+    void setup(std::shared_ptr<vkEngineAccelerationStructure> tlas, std::shared_ptr<vkEngineImage> image,
+        std::shared_ptr<vkEngineBuffer> vertexBuffer);
 
     /// @brief 获取描述符集布局
     /// @return 描述符集布局
@@ -31,7 +33,10 @@ public:
 private:
     std::shared_ptr<vkEngineLogicalDevice> _device; // 逻辑设备
 
+    // 资源接口表的结构定义
     VkDescriptorSetLayout _layout = VK_NULL_HANDLE; // 描述符集布局
+
+    // 绑定资源
     VkDescriptorPool _pool = VK_NULL_HANDLE; // 描述符池
     VkDescriptorSet _set = VK_NULL_HANDLE; // 描述符集
 };

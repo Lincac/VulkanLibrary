@@ -24,7 +24,7 @@ void vkEngineRTDescriptor::create()
 {
     auto device = _device->getVkDevice();
 
-    VkDescriptorSetLayoutBinding bindings[2]{};
+    VkDescriptorSetLayoutBinding bindings[3]{};
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
     bindings[0].descriptorCount = 1;
@@ -39,24 +39,31 @@ void vkEngineRTDescriptor::create()
     bindings[1].descriptorCount = 1;
     bindings[1].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
+    bindings[2].binding = 2;
+    bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    bindings[2].descriptorCount = 1;
+    bindings[2].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 2;
+    layoutInfo.bindingCount = 3;
     layoutInfo.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &_layout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor set layout!");
     }
 
-    VkDescriptorPoolSize poolSizes[2]{};
+    VkDescriptorPoolSize poolSizes[3]{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
     poolSizes[0].descriptorCount = 1;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     poolSizes[1].descriptorCount = 1;
+    poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[2].descriptorCount = 1;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 2;
+    poolInfo.poolSizeCount = 3;
     poolInfo.pPoolSizes = poolSizes;
     poolInfo.maxSets = 1;
 
@@ -65,7 +72,8 @@ void vkEngineRTDescriptor::create()
     }
 }
 
-void vkEngineRTDescriptor::setup(std::shared_ptr<vkEngineAccelerationStructure> tlas, std::shared_ptr<vkEngineImage> image)
+void vkEngineRTDescriptor::setup(std::shared_ptr<vkEngineAccelerationStructure> tlas, std::shared_ptr<vkEngineImage> image,
+    std::shared_ptr<vkEngineBuffer> vertexBuffer)
 {
     if (_layout == VK_NULL_HANDLE || _pool == VK_NULL_HANDLE) {
         throw std::runtime_error("descriptor layout/pool not created, call create() first");
@@ -109,8 +117,21 @@ void vkEngineRTDescriptor::setup(std::shared_ptr<vkEngineAccelerationStructure> 
     writeImage.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     writeImage.pImageInfo = &imageInfo;
 
-    VkWriteDescriptorSet writes[2] = { writeAS, writeImage };
-    vkUpdateDescriptorSets(device, 2, writes, 0, nullptr);
+    VkDescriptorBufferInfo vertexBufferInfo{};
+    vertexBufferInfo.buffer = vertexBuffer->getBuffer();
+    vertexBufferInfo.offset = 0;
+    vertexBufferInfo.range = VK_WHOLE_SIZE;
+
+    VkWriteDescriptorSet writeVertexBuffer{};
+    writeVertexBuffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writeVertexBuffer.dstSet = _set;
+    writeVertexBuffer.dstBinding = 2;
+    writeVertexBuffer.descriptorCount = 1;
+    writeVertexBuffer.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    writeVertexBuffer.pBufferInfo = &vertexBufferInfo;
+
+    VkWriteDescriptorSet writes[3] = { writeAS, writeImage, writeVertexBuffer };
+    vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
 }
 
 VkDescriptorSetLayout& vkEngineRTDescriptor::getLayout()

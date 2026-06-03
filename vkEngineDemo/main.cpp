@@ -46,7 +46,8 @@ int main(){
 
     auto blas = std::make_shared<vkEngineAccelerationStructure>(logicalDevice, vkEngineAccelerationStructure::Type::BLAS);
     blas->setTriangleGeometry(vertexBuffer->getDeviceAddress(),
-        static_cast<uint32_t>(mesh.vertices.size()));
+        static_cast<uint32_t>(mesh.vertices.size()),
+        static_cast<uint32_t>(sizeof(ObjVertex)));
     blas->build(commandPool);
     std::cout << "BLAS ready, address = " << blas->getDeviceAddress() << std::endl;
 
@@ -57,7 +58,7 @@ int main(){
 
     vkEngineRTDescriptor descriptor(logicalDevice);
     descriptor.create();
-    descriptor.setup(tlas, image);
+    descriptor.setup(tlas, image, vertexBuffer);
     std::cout << "descriptor ready" << std::endl;
 
     vkEngineRayTracingPipeline rtPipeline(logicalDevice);

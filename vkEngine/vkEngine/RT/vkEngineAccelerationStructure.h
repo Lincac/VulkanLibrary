@@ -44,7 +44,9 @@ public:
     /// @brief 设置三角形几何
     /// @param vertexAddress 顶点地址
     /// @param vertexCount 顶点数量
-    void setTriangleGeometry(VkDeviceAddress vertexAddress, uint32_t vertexCount);
+    /// @param vertexStride 单个顶点字节 stride（pos+normal 时大于 12，BLAS 仍只读前 3 个 float）
+    void setTriangleGeometry(VkDeviceAddress vertexAddress, uint32_t vertexCount,
+        uint32_t vertexStride = sizeof(float) * 3);
 
     /// @brief 设置实例
     /// @param blas 底层加速结构
@@ -77,6 +79,7 @@ private:
     // BLAS 参数
     VkDeviceAddress _vertexAddress = 0; // 顶点地址
     uint32_t _vertexCount = 0; // 顶点数量
+    uint32_t _vertexStride = sizeof(float) * 3; // 顶点 stride
 
     // TLAS 参数
     std::shared_ptr<vkEngineBuffer> _instanceBuffer; // instance 数据 buffer
