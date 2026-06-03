@@ -31,4 +31,7 @@ add_custom_command(TARGET vkEngineDemo POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE_DIR:vkEngineDemo>/shaders/closesthit.spv"
         "${CMAKE_CURRENT_SOURCE_DIR}/shaders/output/closesthit.spv"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/models"
+        "$<TARGET_FILE_DIR:vkEngineDemo>/models"
 )

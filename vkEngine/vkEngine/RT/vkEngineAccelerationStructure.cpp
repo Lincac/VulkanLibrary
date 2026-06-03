@@ -77,6 +77,9 @@ void vkEngineAccelerationStructure::build(std::shared_ptr<vkEngineCommandPool> c
         if (_vertexCount == 0 || _vertexAddress == 0) {
             throw std::runtime_error("BLAS geometry not set, call setTriangleGeometry() first");
         }
+        if (_vertexCount % 3 != 0) {
+            throw std::runtime_error("BLAS vertex count must be a multiple of 3 (triangle list)");
+        }
 
         VkAccelerationStructureGeometryTrianglesDataKHR triangles{};
         triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
@@ -92,7 +95,7 @@ void vkEngineAccelerationStructure::build(std::shared_ptr<vkEngineCommandPool> c
         geometry.geometry.triangles = triangles;
 
         asType = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-        maxPrimitiveCount = 1;
+        maxPrimitiveCount = _vertexCount / 3;
     }
     else {
         if (_instanceData.empty()) {

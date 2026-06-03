@@ -26,17 +26,12 @@ int main(){
         transitionImageLayout(cmd, image->getImage(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
     });
 
-    struct Vertex { float pos[3]; };
+    const ObjMesh mesh = loadObj("models/bunny.obj");
+    std::cout << "loaded obj: " << mesh.triangleCount() << " triangles, "
+              << mesh.vertices.size() << " vertices" << std::endl;
 
-    const std::vector<Vertex> triangleVertices = {
-        {{-2.0f, -2.0f, 0.0f }},
-        {{ 0.0f,  2.0f, 0.0f }},
-        {{ 2.0f, -2.0f, 0.0f }},
-    };
-
-    // 在 commandPool 创建之后：
     auto vertexBuffer = std::make_shared<vkEngineBuffer>(logicalDevice);
-    vertexBuffer->setSize(sizeof(Vertex) * triangleVertices.size());
+    vertexBuffer->setSize(sizeof(ObjVertex) * mesh.vertices.size());
     vertexBuffer->setUsage(
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
         | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
@@ -44,13 +39,14 @@ int main(){
         | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     vertexBuffer->setMemoryProperties(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     vertexBuffer->create();
-    vertexBuffer->upload(commandPool, triangleVertices.data(),
-        sizeof(Vertex) * triangleVertices.size());
+    vertexBuffer->upload(commandPool, mesh.vertices.data(),
+        sizeof(ObjVertex) * mesh.vertices.size());
     std::cout << "vertex buffer ready, address = "
-            << vertexBuffer->getDeviceAddress() << std::endl;    
+            << vertexBuffer->getDeviceAddress() << std::endl;
 
     auto blas = std::make_shared<vkEngineAccelerationStructure>(logicalDevice, vkEngineAccelerationStructure::Type::BLAS);
-    blas->setTriangleGeometry(vertexBuffer->getDeviceAddress(), 3);
+    blas->setTriangleGeometry(vertexBuffer->getDeviceAddress(),
+        static_cast<uint32_t>(mesh.vertices.size()));
     blas->build(commandPool);
     std::cout << "BLAS ready, address = " << blas->getDeviceAddress() << std::endl;
 
