@@ -27,13 +27,13 @@ void vkEngineAccelerationStructure::setTriangleGeometry(VkDeviceAddress vertexAd
     _vertexCount = vertexCount;
 }
 
-void vkEngineAccelerationStructure::setInstance(vkEngineAccelerationStructure& blas, const glm::mat4& transform)
+void vkEngineAccelerationStructure::setInstance(std::shared_ptr<vkEngineAccelerationStructure> blas, const glm::mat4& transform)
 {
     if (_type != Type::TLAS) {
         throw std::runtime_error("setInstance() is only valid for TLAS");
     }
 
-    if (blas._type != Type::BLAS) {
+    if (blas->_type != Type::BLAS) {
         throw std::runtime_error("setInstance() requires a BLAS");
     }
 
@@ -43,12 +43,12 @@ void vkEngineAccelerationStructure::setInstance(vkEngineAccelerationStructure& b
     instance.mask = 0xFF;
     instance.instanceShaderBindingTableRecordOffset = 0;
     instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-    instance.accelerationStructureReference = blas.getDeviceAddress();
+    instance.accelerationStructureReference = blas->getDeviceAddress();
 
     _instances.push_back(instance);
 }
 
-void vkEngineAccelerationStructure::build(vkEngineCommandPool& commandPool)
+void vkEngineAccelerationStructure::build(std::shared_ptr<vkEngineCommandPool> commandPool)
 {
     VkAccelerationStructureGeometryKHR geometry{};
     geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -159,7 +159,7 @@ void vkEngineAccelerationStructure::build(vkEngineCommandPool& commandPool)
 
     const VkAccelerationStructureBuildRangeInfoKHR* pRangeInfo = &rangeInfo;
 
-    commandPool.submitOneTimeCommands([&](VkCommandBuffer cmd) {
+    commandPool->submitOneTimeCommands([&](VkCommandBuffer cmd) {
         vkCmdBuildAccelerationStructuresKHR(cmd, 1, &buildInfo, &pRangeInfo);
     });
 }

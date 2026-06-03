@@ -30,7 +30,7 @@ public:
     /// @param commandPool 命令池
     /// @param data 数据
     /// @param size 大小
-    void upload(vkEngineCommandPool& mandPool, const void* data, VkDeviceSize size);  // staging → device local
+    void upload(std::shared_ptr<vkEngineCommandPool> mandPool, const void* data, VkDeviceSize size);  // staging → device local
 
     /// @brief 获取缓冲区
     /// @return 缓冲区

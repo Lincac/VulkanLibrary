@@ -78,7 +78,7 @@ void vkEngineBuffer::create()
     vkBindBufferMemory(device, _buffer, _memory, 0);    
 }
 
-void vkEngineBuffer::upload(vkEngineCommandPool& commandPool, const void *data, VkDeviceSize size)
+void vkEngineBuffer::upload(std::shared_ptr<vkEngineCommandPool> commandPool, const void *data, VkDeviceSize size)
 {
     if (size > _size) {
         throw std::runtime_error("upload size exceeds buffer size!");
@@ -117,7 +117,7 @@ void vkEngineBuffer::upload(vkEngineCommandPool& commandPool, const void *data, 
     vkUnmapMemory(device, stagingMemory);
 
     // --- 3. GPU copy ---
-    commandPool.submitOneTimeCommands([&](VkCommandBuffer cmd) {
+    commandPool->submitOneTimeCommands([&](VkCommandBuffer cmd) {
         VkBufferCopy copyRegion{};
         copyRegion.size = size;
         vkCmdCopyBuffer(cmd, stagingBuffer, _buffer, 1, &copyRegion);

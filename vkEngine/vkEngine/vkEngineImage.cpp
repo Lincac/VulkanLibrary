@@ -109,7 +109,7 @@ glm::ivec2 vkEngineImage::getResolution() const
     return _resolution;
 }
 
-void vkEngineImage::saveToPng(vkEngineCommandPool& commandPool, const std::string& filepath,
+void vkEngineImage::saveToPng(std::shared_ptr<vkEngineCommandPool> commandPool, const std::string& filepath,
     std::function<void(VkCommandBuffer)> beforeCopy)
 {
     const uint32_t width = static_cast<uint32_t>(_resolution.x);
@@ -125,7 +125,7 @@ void vkEngineImage::saveToPng(vkEngineCommandPool& commandPool, const std::strin
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     stagingBuffer.create();
 
-    commandPool.submitOneTimeCommands([&](VkCommandBuffer cmd) {
+    commandPool->submitOneTimeCommands([&](VkCommandBuffer cmd) {
         if (beforeCopy) {
             beforeCopy(cmd);
         }

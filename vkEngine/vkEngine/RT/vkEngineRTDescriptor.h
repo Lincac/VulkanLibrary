@@ -18,7 +18,7 @@ public:
     /// @brief 分配 set 并写入 TLAS / 输出图
     /// @param tlas 顶层加速结构
     /// @param image 输出 storage image
-    void setup(vkEngineAccelerationStructure& tlas, vkEngineImage& image);
+    void setup(std::shared_ptr<vkEngineAccelerationStructure> tlas, std::shared_ptr<vkEngineImage> image);
 
     /// @brief 获取描述符集布局
     /// @return 描述符集布局

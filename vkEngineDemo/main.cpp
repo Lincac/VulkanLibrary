@@ -35,33 +35,33 @@ int main(){
     };
 
     // 在 commandPool 创建之后：
-    vkEngineBuffer vertexBuffer(logicalDevice);
-    vertexBuffer.setSize(sizeof(Vertex) * triangleVertices.size());
-    vertexBuffer.setUsage(
+    auto vertexBuffer = std::make_shared<vkEngineBuffer>(logicalDevice);
+    vertexBuffer->setSize(sizeof(Vertex) * triangleVertices.size());
+    vertexBuffer->setUsage(
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
         | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
         | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
         | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-    vertexBuffer.setMemoryProperties(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    vertexBuffer.create();
-    vertexBuffer.upload(*commandPool.get(), triangleVertices.data(),
+    vertexBuffer->setMemoryProperties(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    vertexBuffer->create();
+    vertexBuffer->upload(commandPool, triangleVertices.data(),
         sizeof(Vertex) * triangleVertices.size());
     std::cout << "vertex buffer ready, address = "
-            << vertexBuffer.getDeviceAddress() << std::endl;    
+            << vertexBuffer->getDeviceAddress() << std::endl;    
 
-    vkEngineAccelerationStructure blas(logicalDevice, vkEngineAccelerationStructure::Type::BLAS);
-    blas.setTriangleGeometry(vertexBuffer.getDeviceAddress(), 3);
-    blas.build(*commandPool.get());
-    std::cout << "BLAS ready, address = " << blas.getDeviceAddress() << std::endl;
+    auto blas = std::make_shared<vkEngineAccelerationStructure>(logicalDevice, vkEngineAccelerationStructure::Type::BLAS);
+    blas->setTriangleGeometry(vertexBuffer->getDeviceAddress(), 3);
+    blas->build(commandPool);
+    std::cout << "BLAS ready, address = " << blas->getDeviceAddress() << std::endl;
 
-    vkEngineAccelerationStructure tlas(logicalDevice, vkEngineAccelerationStructure::Type::TLAS);
-    tlas.setInstance(blas);   // 默认单位矩阵
-    tlas.build(*commandPool.get());
-    std::cout << "TLAS ready, address = " << tlas.getDeviceAddress() << std::endl;
+    auto tlas = std::make_shared<vkEngineAccelerationStructure>(logicalDevice, vkEngineAccelerationStructure::Type::TLAS);
+    tlas->setInstance(blas);   // 默认单位矩阵
+    tlas->build(commandPool);
+    std::cout << "TLAS ready, address = " << tlas->getDeviceAddress() << std::endl;
 
     vkEngineRTDescriptor descriptor(logicalDevice);
     descriptor.create();
-    descriptor.setup(tlas, *image);
+    descriptor.setup(tlas, image);
     std::cout << "descriptor ready" << std::endl;
 
     vkEngineRayTracingPipeline rtPipeline(logicalDevice);
@@ -72,7 +72,7 @@ int main(){
     std::cout << "RT pipeline ready" << std::endl;
 
     const std::string outputPath = pathNextToExe("output.png");
-    image->saveToPng(*commandPool.get(), outputPath, [&](VkCommandBuffer cmd) {
+    image->saveToPng(commandPool, outputPath, [&](VkCommandBuffer cmd) {
         rtPipeline.recordTrace(cmd, descriptor.getSet(), 800, 600, 1);
     });
     std::cout << "trace rays done" << std::endl;

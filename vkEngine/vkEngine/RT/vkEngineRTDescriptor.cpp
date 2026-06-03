@@ -61,7 +61,7 @@ void vkEngineRTDescriptor::create()
     }
 }
 
-void vkEngineRTDescriptor::setup(vkEngineAccelerationStructure& tlas, vkEngineImage& image)
+void vkEngineRTDescriptor::setup(std::shared_ptr<vkEngineAccelerationStructure> tlas, std::shared_ptr<vkEngineImage> image)
 {
     if (_layout == VK_NULL_HANDLE || _pool == VK_NULL_HANDLE) {
         throw std::runtime_error("descriptor layout/pool not created, call create() first");
@@ -78,7 +78,7 @@ void vkEngineRTDescriptor::setup(vkEngineAccelerationStructure& tlas, vkEngineIm
         throw std::runtime_error("failed to allocate descriptor set!");
     }
 
-    VkAccelerationStructureKHR tlasHandle = tlas.getHandle();
+    VkAccelerationStructureKHR tlasHandle = tlas->getHandle();
 
     VkWriteDescriptorSetAccelerationStructureKHR asWrite{};
     asWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
@@ -94,7 +94,7 @@ void vkEngineRTDescriptor::setup(vkEngineAccelerationStructure& tlas, vkEngineIm
     writeAS.pNext = &asWrite;
 
     VkDescriptorImageInfo imageInfo{};
-    imageInfo.imageView = image.getImageView();
+    imageInfo.imageView = image->getImageView();
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkWriteDescriptorSet writeImage{};

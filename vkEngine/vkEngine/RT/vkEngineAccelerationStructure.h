@@ -49,12 +49,12 @@ public:
     /// @brief 设置实例
     /// @param blas 底层加速结构
     /// @param transform 变换矩阵
-    void setInstance(vkEngineAccelerationStructure& blas, const glm::mat4& transform = glm::mat4(1.0f));
+    void setInstance(std::shared_ptr<vkEngineAccelerationStructure> blas, const glm::mat4& transform = glm::mat4(1.0f));
 
     // 查询 size、创建 buffer、提交 build（一步完成）
     /// @brief 构建
     /// @param commandPool 命令池
-    void build(vkEngineCommandPool& commandPool);
+    void build(std::shared_ptr<vkEngineCommandPool> commandPool);
 
     /// @brief 获取句柄
     /// @return 句柄

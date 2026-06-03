@@ -3,9 +3,6 @@
 #include "vkEngineLogicalDevice.h"
 #include "vkEngineCommandPool.h"
 
-#include <functional>
-#include <string>
-
 /// @brief 图像类
 class vkEngineImage {
 public:
@@ -50,7 +47,7 @@ public:
     /// @param commandPool 命令池
     /// @param filepath 输出路径
     /// @param beforeCopy 复制前在同一 command buffer 中执行的回调（如 trace rays）
-    void saveToPng(vkEngineCommandPool& commandPool, const std::string& filepath,
+    void saveToPng(std::shared_ptr<vkEngineCommandPool> commandPool, const std::string& filepath,
         std::function<void(VkCommandBuffer)> beforeCopy = nullptr);
 
 private:
