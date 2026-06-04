@@ -37,15 +37,16 @@ void main() {
     }
 
     DisneyMaterial mat;
-    mat.baseColor = vec3(0.82, 0.67, 0.52);
-    mat.roughness = 0.35;
-    mat.subSurface = 0.0;
-    mat.sheen = 0.0;
-    mat.sheenTint = 0.0;
-    mat.metallic = 0.85;
-    mat.specular = 0.5;
-    mat.specularTint = 0.0;
-    mat.clearcoat = 0.0;
+    mat.baseColor      = vec3(1.00, 0.78, 0.34);   // 更接近真实金的谱反射
+    mat.roughness      = 0.25;                     // 金属表面较光滑
+    mat.subSurface     = 0.0;                      // 金属无次表面散射
+    mat.sheen          = 0.0;                      // 金属无布料光泽
+    mat.sheenTint      = 0.0;
+
+    mat.metallic       = 1.0;                      // 金属必须是 1.0
+    mat.specular       = 0.9;                      // 强烈镜面反射
+    mat.specularTint   = 0.6;                      // 高光染上金色（关键）
+    mat.clearcoat      = 0.0;                      // 金属一般不加清漆
     mat.clearcoatGloss = 0.0;
 
     payload.hitNormal = vec4(1.0, n.x, n.y, n.z);

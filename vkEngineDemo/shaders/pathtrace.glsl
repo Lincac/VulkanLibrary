@@ -1,7 +1,7 @@
 // 路径追踪公用函数（由 raygen / closesthit / miss include）
 
 const uint MAX_BOUNCES = 10u;
-const uint SAMPLES_PER_PIXEL = 8u;
+const uint SAMPLES_PER_PIXEL = 64u;
 const float PI = 3.14159265358979323846;
 const float EXPOSURE = 0.5; // EV 档，tone map 前亮度 *= 2^EXPOSURE
 
@@ -226,6 +226,10 @@ bool sampleGGXReflection(vec3 n, vec3 v, float alphaRoughness, inout uint seed, 
 
 float specularSamplingProbability(DisneyMaterial m, vec3 n, vec3 v)
 {
+    if (m.metallic >= 1.0) {
+        return 1.0;
+    }
+
     const float nDotV = clamp(dot(n, v), 0.0, 1.0);
     const vec3 f0 = specularF0(m);
     const vec3 fresnel = schlickFresnel(nDotV, f0);
