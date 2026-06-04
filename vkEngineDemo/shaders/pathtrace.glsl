@@ -1,7 +1,7 @@
 // 路径追踪公用函数（由 raygen / closesthit / miss include）
 
 const uint MAX_BOUNCES = 10u;
-const uint SAMPLES_PER_PIXEL = 64u;
+const uint SAMPLES_PER_PIXEL = 1u;
 const float PI = 3.14159265358979323846;
 const float EXPOSURE = 1.0; // EV 档，tone map 前亮度 *= 2^EXPOSURE
 
