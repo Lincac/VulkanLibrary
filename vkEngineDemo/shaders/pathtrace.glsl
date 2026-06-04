@@ -5,6 +5,10 @@ const uint SAMPLES_PER_PIXEL = 32u;
 const float PI = 3.14159265358979323846;
 const float EXPOSURE = 1.0; // EV 档，tone map 前亮度 *= 2^EXPOSURE
 
+// Path Regularization（PBRT v4 §13.4.1）：首次非镜面反弹后加大 roughness，便于 NEE+MIS
+const bool PATH_REGULARIZE = true;
+const float REGULARIZE_MIN_ROUGHNESS = 0.075;
+
 // 相机参数：修改此处即可改变位置与朝向
 const vec3 CAMERA_ORIGIN = vec3(0.0, 0.0, 2.0);
 const vec3 CAMERA_LOOK_AT = vec3(0.0, 0.0, 0.0);
@@ -83,6 +87,7 @@ struct BsdfSample {
     vec3 wi;
     float pdf;
     vec3 weight; // f_r * cos(theta_i) / pdf
+    bool isSpecular;
 };
 
 DisneyMaterial unpackMaterial(PathPayload payload)
@@ -108,6 +113,18 @@ void packMaterial(inout PathPayload payload, DisneyMaterial m)
     payload.material2 = vec4(m.specular, m.specularTint, m.clearcoat, m.clearcoatGloss);
 }
 
+DisneyMaterial regularizeDisneyMaterial(DisneyMaterial m)
+{
+    m.roughness = max(m.roughness, REGULARIZE_MIN_ROUGHNESS);
+    m.clearcoatGloss = min(m.clearcoatGloss, 0.5);
+    return m;
+}
+
+bool isDisneyNonSpecular(DisneyMaterial m)
+{
+    return m.metallic < 1.0 || m.roughness > 1e-4 || m.sheen > 0.0 || m.subSurface > 0.0;
+}
+
 uint pcgHash(inout uint state)
 {
     state = state * 747796405u + 2891336453u;
@@ -118,6 +135,33 @@ uint pcgHash(inout uint state)
 float rand01(inout uint seed)
 {
     return float(pcgHash(seed)) / 4294967296.0;
+}
+
+uint deriveSeed(ivec2 pixel, uint sampleIndex, uint salt)
+{
+    uint state = uint(pixel.x) ^ (uint(pixel.y) * 747796405u + 2891336453u);
+    state ^= sampleIndex * 668265263u + salt * 48271u;
+    pcgHash(state);
+    pcgHash(state);
+    return state;
+}
+
+float rand01FromSeed(uint seed)
+{
+    uint state = seed;
+    return float(pcgHash(state)) / 4294967296.0;
+}
+
+vec2 samplePrimaryJitter(ivec2 pixel, uint sampleIndex)
+{
+    const uint seedX = deriveSeed(pixel, sampleIndex, 0u);
+    const uint seedY = deriveSeed(pixel, sampleIndex, 1u);
+    return vec2(rand01FromSeed(seedX), rand01FromSeed(seedY)) - 0.5;
+}
+
+uint initSampleSeed(ivec2 pixel, uint sampleIndex)
+{
+    return deriveSeed(pixel, sampleIndex, 2u);
 }
 
 void buildOrthonormalBasis(vec3 n, out vec3 t, out vec3 b)
@@ -388,10 +432,11 @@ float pdfDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, vec3 wi)
         + pClear * pdfGGXVNDFReflection(n, v, wi, ccAlpha);
 }
 
-float balanceHeuristic(float a, float b)
+float powerHeuristic(float a, float b)
 {
-    const float denom = a + b;
-    return denom > 1e-8 ? a / denom : 0.0;
+    const float a2 = a * a;
+    const float b2 = b * b;
+    return a2 / max(a2 + b2, 1e-16);
 }
 
 BsdfSample sampleDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, inout uint seed)
@@ -400,6 +445,7 @@ BsdfSample sampleDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, inout uint seed)
     result.wi = vec3(0.0);
     result.pdf = 0.0;
     result.weight = vec3(0.0);
+    result.isSpecular = false;
 
     float pDiff;
     float pSpec;
@@ -411,6 +457,7 @@ BsdfSample sampleDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, inout uint seed)
 
     const float lobeRand = rand01(seed);
     if (lobeRand < pDiff) {
+        result.isSpecular = false;
         result.wi = sampleCosineHemisphere(n, seed);
         const float nDotL = dot(n, result.wi);
         if (nDotL <= 0.0) {
@@ -418,11 +465,13 @@ BsdfSample sampleDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, inout uint seed)
         }
         result.pdf = pDiff * pdfCosineHemisphere(nDotL);
     } else if (lobeRand < pDiff + pSpec) {
+        result.isSpecular = true;
         if (!sampleGGXVNDFReflection(n, v, alpha, seed, result.wi, result.pdf)) {
             return result;
         }
         result.pdf *= pSpec;
     } else {
+        result.isSpecular = true;
         if (!sampleGGXVNDFReflection(n, v, ccAlpha, seed, result.wi, result.pdf)) {
             return result;
         }
