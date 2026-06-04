@@ -1,10 +1,10 @@
 // 路径追踪公用函数（由 raygen / closesthit / miss include）
 
-const uint MAX_BOUNCES = 20u;
-const uint SAMPLES_PER_PIXEL = 32u;
+const uint MAX_BOUNCES = 15u;
+const uint SAMPLES_PER_PIXEL = 128u;
 const float PI = 3.14159265358979323846;
 // tone map 前线性亮度 *= 2^EXPOSURE；ACES 比 Reinhard 更压暗部，可略调高
-const float EXPOSURE = 0.5;
+const float EXPOSURE = 0.0;
 
 // Path Regularization（PBRT v4 §13.4.1）：首次非镜面反弹后加大 roughness，便于 NEE+MIS
 const bool PATH_REGULARIZE = true;
