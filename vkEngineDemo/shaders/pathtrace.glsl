@@ -3,7 +3,60 @@
 const uint MAX_BOUNCES = 10u;
 const uint SAMPLES_PER_PIXEL = 64u;
 const float PI = 3.14159265358979323846;
-const float EXPOSURE = 0.5; // EV 档，tone map 前亮度 *= 2^EXPOSURE
+const float EXPOSURE = 1.0; // EV 档，tone map 前亮度 *= 2^EXPOSURE
+
+// 相机参数：修改此处即可改变位置与朝向
+const vec3 CAMERA_ORIGIN = vec3(0.0, 0.0, 2.0);
+const vec3 CAMERA_LOOK_AT = vec3(0.0, 0.0, 0.0);
+const vec3 CAMERA_UP = vec3(0.0, 1.0, 0.0);
+const float CAMERA_FOV_Y = 45.0;
+
+struct Camera {
+    vec3 origin;
+    vec3 forward;
+    vec3 right;
+    vec3 up;
+    float tanHalfFovY;
+};
+
+struct CameraRay {
+    vec3 origin;
+    vec3 direction;
+};
+
+Camera createCamera(vec3 origin, vec3 lookAt, vec3 worldUp, float verticalFovDegrees)
+{
+    Camera camera;
+    camera.origin = origin;
+    camera.forward = normalize(lookAt - origin);
+    camera.right = abs(dot(camera.forward, normalize(worldUp))) > 0.999
+        ? normalize(cross(camera.forward, vec3(0.0, 0.0, 1.0)))
+        : normalize(cross(camera.forward, worldUp));
+    camera.up = cross(camera.right, camera.forward);
+    camera.tanHalfFovY = tan(radians(verticalFovDegrees * 0.5));
+    return camera;
+}
+
+Camera getCamera()
+{
+    return createCamera(CAMERA_ORIGIN, CAMERA_LOOK_AT, CAMERA_UP, CAMERA_FOV_Y);
+}
+
+CameraRay getCameraRay(Camera camera, vec2 pixelCenter, vec2 imageSize, vec2 jitter)
+{
+    const vec2 pixel = pixelCenter + jitter;
+    const vec2 uv = pixel / imageSize;
+    const vec2 ndc = vec2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    const float aspect = imageSize.x / imageSize.y;
+
+    CameraRay ray;
+    ray.origin = camera.origin;
+    ray.direction = normalize(
+        camera.forward
+        + camera.right * (ndc.x * aspect * camera.tanHalfFovY)
+        + camera.up * (ndc.y * camera.tanHalfFovY));
+    return ray;
+}
 
 struct PathPayload {
     vec4 hitNormal; // x: 1=命中, yzw: 世界空间法线
@@ -237,6 +290,27 @@ float specularSamplingProbability(DisneyMaterial m, vec3 n, vec3 v)
     return clamp(mix(specWeight, 1.0, m.metallic), 0.05, 0.95);
 }
 
+float pdfDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, vec3 wi)
+{
+    const float nDotL = dot(n, wi);
+    if (nDotL <= 0.0) {
+        return 0.0;
+    }
+
+    const float specProb = specularSamplingProbability(m, n, v);
+    const float alpha = max(m.roughness * m.roughness, 1e-4);
+    const vec3 h = normalize(v + wi);
+    const float specPdf = pdfGGXReflection(n, v, h, alpha) * specProb;
+    const float diffPdf = (1.0 - specProb) * pdfCosineHemisphere(nDotL);
+    return specPdf + diffPdf;
+}
+
+float balanceHeuristic(float a, float b)
+{
+    const float denom = a + b;
+    return denom > 1e-8 ? a / denom : 0.0;
+}
+
 BsdfSample sampleDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, inout uint seed)
 {
     BsdfSample result;
@@ -269,13 +343,104 @@ BsdfSample sampleDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, inout uint seed)
     return result;
 }
 
-vec3 sampleEnvironment(sampler2D envMap, vec3 direction)
+vec2 directionToEnvUv(vec3 direction)
 {
     direction = normalize(direction);
     const float phi = atan(direction.z, direction.x);
     const float theta = acos(clamp(direction.y, -1.0, 1.0));
-    const vec2 uv = vec2(phi * (0.5 / PI) + 0.5, theta / PI);
-    return texture(envMap, uv).rgb;
+    return vec2(phi * (0.5 / PI) + 0.5, theta / PI);
+}
+
+vec3 uvToDirection(vec2 uv)
+{
+    const float phi = (uv.x - 0.5) * 2.0 * PI;
+    const float theta = uv.y * PI;
+    const float sinTheta = sin(theta);
+    return normalize(vec3(cos(phi) * sinTheta, cos(theta), sin(phi) * sinTheta));
+}
+
+int envCdfSearchMarginal(sampler2D envCdf, float xi, int height)
+{
+    int left = 0;
+    int right = height - 1;
+    while (left < right) {
+        const int mid = (left + right) >> 1;
+        const float cdfVal = texelFetch(envCdf, ivec2(0, mid), 0).g;
+        if (cdfVal < xi) {
+            left = mid + 1;
+        } else {
+            right = mid;
+        }
+    }
+    return left;
+}
+
+int envCdfSearchConditional(sampler2D envCdf, int row, float xi, int width)
+{
+    int left = 0;
+    int right = width - 1;
+    while (left < right) {
+        const int mid = (left + right) >> 1;
+        const float cdfVal = texelFetch(envCdf, ivec2(mid, row), 0).r;
+        if (cdfVal < xi) {
+            left = mid + 1;
+        } else {
+            right = mid;
+        }
+    }
+    return left;
+}
+
+float environmentPdfAtCell(sampler2D envCdf, ivec2 cdfSize, int col, int row, vec2 uv)
+{
+    const float marginal = texelFetch(envCdf, ivec2(0, row), 0).g;
+    const float marginalPrev = row > 0 ? texelFetch(envCdf, ivec2(0, row - 1), 0).g : 0.0;
+    const float rowProb = max(marginal - marginalPrev, 0.0);
+
+    const float cond = texelFetch(envCdf, ivec2(col, row), 0).r;
+    const float condPrev = col > 0 ? texelFetch(envCdf, ivec2(col - 1, row), 0).r : 0.0;
+    const float colProb = max(cond - condPrev, 0.0);
+
+    const float sinTheta = max(sin(uv.y * PI), 1e-6);
+    return rowProb * colProb * float(cdfSize.x * cdfSize.y) / (2.0 * PI * PI * sinTheta);
+}
+
+float environmentPdf(sampler2D envCdf, ivec2 cdfSize, vec3 direction)
+{
+    const vec2 uv = directionToEnvUv(direction);
+    const int col = clamp(int(floor(uv.x * float(cdfSize.x))), 0, cdfSize.x - 1);
+    const int row = clamp(int(floor(uv.y * float(cdfSize.y))), 0, cdfSize.y - 1);
+    return environmentPdfAtCell(envCdf, cdfSize, col, row, uv);
+}
+
+struct EnvLightSample {
+    vec3 wi;
+    vec3 radiance;
+    float pdf;
+};
+
+EnvLightSample sampleEnvironmentLight(sampler2D envMap, sampler2D envCdf, ivec2 cdfSize, inout uint seed)
+{
+    EnvLightSample result;
+    result.wi = vec3(0.0);
+    result.radiance = vec3(0.0);
+    result.pdf = 0.0;
+
+    const float xi = rand01(seed);
+    const float yi = rand01(seed);
+    const int row = envCdfSearchMarginal(envCdf, xi, cdfSize.y);
+    const int col = envCdfSearchConditional(envCdf, row, yi, cdfSize.x);
+
+    const vec2 uv = (vec2(float(col), float(row)) + vec2(rand01(seed), rand01(seed))) / vec2(cdfSize);
+    result.wi = uvToDirection(uv);
+    result.radiance = texture(envMap, uv).rgb;
+    result.pdf = environmentPdfAtCell(envCdf, cdfSize, col, row, uv);
+    return result;
+}
+
+vec3 sampleEnvironment(sampler2D envMap, vec3 direction)
+{
+    return texture(envMap, directionToEnvUv(direction)).rgb;
 }
 
 vec3 toneMap(vec3 color)

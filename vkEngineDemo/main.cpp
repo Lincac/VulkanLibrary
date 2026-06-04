@@ -30,6 +30,8 @@ int main(){
     environmentMap->loadHdr(commandPool, "hdr/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
     std::cout << "environment HDR ready " << environmentMap->getResolution().x
               << "x" << environmentMap->getResolution().y << std::endl;
+    std::cout << "environment CDF ready " << environmentMap->getEnvCdfResolution().x
+              << "x" << environmentMap->getEnvCdfResolution().y << std::endl;
 
     const ObjMesh mesh = loadObj("models/bunny.obj");
     std::cout << "loaded obj: " << mesh.triangleCount() << " triangles, "

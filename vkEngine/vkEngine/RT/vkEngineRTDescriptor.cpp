@@ -24,7 +24,7 @@ void vkEngineRTDescriptor::create()
 {
     auto device = _device->getVkDevice();
 
-    VkDescriptorSetLayoutBinding bindings[4]{};
+    VkDescriptorSetLayoutBinding bindings[5]{};
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
     bindings[0].descriptorCount = 1;
@@ -49,9 +49,14 @@ void vkEngineRTDescriptor::create()
     bindings[3].descriptorCount = 1;
     bindings[3].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR;
 
+    bindings[4].binding = 4;
+    bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[4].descriptorCount = 1;
+    bindings[4].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 4;
+    layoutInfo.bindingCount = 5;
     layoutInfo.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &_layout) != VK_SUCCESS) {
@@ -66,7 +71,7 @@ void vkEngineRTDescriptor::create()
     poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[2].descriptorCount = 1;
     poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[3].descriptorCount = 1;
+    poolSizes[3].descriptorCount = 2;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -150,8 +155,21 @@ void vkEngineRTDescriptor::setup(std::shared_ptr<vkEngineAccelerationStructure> 
     writeEnvironment.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     writeEnvironment.pImageInfo = &envInfo;
 
-    VkWriteDescriptorSet writes[4] = { writeAS, writeImage, writeVertexBuffer, writeEnvironment };
-    vkUpdateDescriptorSets(device, 4, writes, 0, nullptr);
+    VkDescriptorImageInfo envCdfInfo{};
+    envCdfInfo.imageView = environmentMap->getEnvCdfImageView();
+    envCdfInfo.sampler = environmentMap->getEnvCdfSampler();
+    envCdfInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkWriteDescriptorSet writeEnvCdf{};
+    writeEnvCdf.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writeEnvCdf.dstSet = _set;
+    writeEnvCdf.dstBinding = 4;
+    writeEnvCdf.descriptorCount = 1;
+    writeEnvCdf.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writeEnvCdf.pImageInfo = &envCdfInfo;
+
+    VkWriteDescriptorSet writes[5] = { writeAS, writeImage, writeVertexBuffer, writeEnvironment, writeEnvCdf };
+    vkUpdateDescriptorSets(device, 5, writes, 0, nullptr);
 }
 
 VkDescriptorSetLayout& vkEngineRTDescriptor::getLayout()
