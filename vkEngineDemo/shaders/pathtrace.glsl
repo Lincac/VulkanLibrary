@@ -1,7 +1,7 @@
 // 路径追踪公用函数（由 raygen / closesthit / miss include）
 
-const uint MAX_BOUNCES = 10u;
-const uint SAMPLES_PER_PIXEL = 1u;
+const uint MAX_BOUNCES = 20u;
+const uint SAMPLES_PER_PIXEL = 32u;
 const float PI = 3.14159265358979323846;
 const float EXPOSURE = 1.0; // EV 档，tone map 前亮度 *= 2^EXPOSURE
 
@@ -222,17 +222,112 @@ vec3 evalDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, vec3 l)
     return evalDisneyDiffuse(m, n, v, l) + evalDisneySpecular(m, n, v, l);
 }
 
+float luminance(vec3 c)
+{
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+float ggxSmithG1(float nDotV, float alphaRoughness)
+{
+    const float a2 = alphaRoughness * alphaRoughness;
+    const float b = nDotV * nDotV;
+    return 2.0 * nDotV / max(nDotV + sqrt(a2 + b - a2 * b), 1e-5);
+}
+
 float pdfCosineHemisphere(float nDotL)
 {
     return max(nDotL, 0.0) / PI;
 }
 
-float pdfGGXReflection(vec3 n, vec3 v, vec3 h, float alphaRoughness)
+// Heitz 2018 — 在局部空间 (N=+Z) 对可见法线分布 (VNDF) 采样
+vec3 sampleGGXVNDF_Local(vec3 vLocal, float alpha, vec2 xi)
 {
-    const float nDotH = clamp(dot(n, h), 0.0, 1.0);
-    const float vDotH = clamp(dot(v, h), 0.0, 1.0);
-    const float d = distributionGTR2(nDotH, alphaRoughness);
-    return d * nDotH / max(4.0 * vDotH, 1e-5);
+    vec3 vh = normalize(vec3(alpha * vLocal.x, alpha * vLocal.y, vLocal.z));
+    const float lenSq = dot(vh.xy, vh.xy);
+
+    vec3 t1 = lenSq > 1e-8 ? vec3(-vh.y, vh.x, 0.0) * inversesqrt(lenSq) : vec3(1.0, 0.0, 0.0);
+    const vec3 t2 = cross(vh, t1);
+
+    const float r = sqrt(xi.x);
+    const float phi = 2.0 * PI * xi.y;
+    const float t1c = r * cos(phi);
+    float t2c = r * sin(phi);
+    const float s = 0.5 * (1.0 + vh.z);
+    t2c = mix(sqrt(max(0.0, 1.0 - t1c * t1c)), t2c, s);
+
+    const vec3 nh = t1c * t1 + t2c * t2 + sqrt(max(0.0, 1.0 - t1c * t1c - t2c * t2c)) * vh;
+    return normalize(vec3(alpha * nh.x, alpha * nh.y, max(0.0, nh.z)));
+}
+
+float pdfGGXVNDF_Local(vec3 vLocal, vec3 hLocal, float alpha)
+{
+    const float nDotV = max(vLocal.z, 1e-5);
+    const float nDotH = clamp(hLocal.z, 0.0, 1.0);
+    const float vDotH = max(dot(vLocal, hLocal), 0.0);
+    const float d = distributionGTR2(nDotH, alpha);
+    const float g1 = ggxSmithG1(nDotV, alpha);
+    return g1 * vDotH * d / nDotV;
+}
+
+vec3 worldFromLocal(vec3 n, vec3 tangent, vec3 bitangent, vec3 local)
+{
+    return normalize(tangent * local.x + bitangent * local.y + n * local.z);
+}
+
+vec3 localFromWorld(vec3 n, vec3 tangent, vec3 bitangent, vec3 world)
+{
+    return vec3(dot(world, tangent), dot(world, bitangent), dot(world, n));
+}
+
+// 统一镜面 VNDF 反射采样（主 spec / clearcoat 共用，仅 alpha 不同）
+bool sampleGGXVNDFReflection(vec3 n, vec3 v, float alphaRoughness, inout uint seed, out vec3 l, out float pdf)
+{
+    vec3 tangent;
+    vec3 bitangent;
+    buildOrthonormalBasis(n, tangent, bitangent);
+
+    const vec3 vLocal = localFromWorld(n, tangent, bitangent, v);
+    if (vLocal.z <= 0.0) {
+        pdf = 0.0;
+        return false;
+    }
+
+    const vec2 xi = vec2(rand01(seed), rand01(seed));
+    const vec3 hLocal = sampleGGXVNDF_Local(vLocal, alphaRoughness, xi);
+    const vec3 h = worldFromLocal(n, tangent, bitangent, hLocal);
+
+    l = normalize(reflect(-v, h));
+    const float nDotL = dot(n, l);
+    if (nDotL <= 0.0) {
+        pdf = 0.0;
+        return false;
+    }
+
+    const vec3 hLocalCheck = localFromWorld(n, tangent, bitangent, h);
+    const float pdfH = pdfGGXVNDF_Local(vLocal, hLocalCheck, alphaRoughness);
+    const float vDotH = max(dot(v, h), 1e-5);
+    pdf = pdfH / (4.0 * vDotH);
+    return pdf > 0.0;
+}
+
+float pdfGGXVNDFReflection(vec3 n, vec3 v, vec3 wi, float alphaRoughness)
+{
+    const vec3 h = normalize(v + wi);
+    const float nDotL = dot(n, wi);
+    const float nDotV = dot(n, v);
+    if (nDotL <= 0.0 || nDotV <= 0.0) {
+        return 0.0;
+    }
+
+    vec3 tangent;
+    vec3 bitangent;
+    buildOrthonormalBasis(n, tangent, bitangent);
+
+    const vec3 vLocal = localFromWorld(n, tangent, bitangent, v);
+    const vec3 hLocal = localFromWorld(n, tangent, bitangent, h);
+    const float pdfH = pdfGGXVNDF_Local(vLocal, hLocal, alphaRoughness);
+    const float vDotH = max(dot(v, h), 1e-5);
+    return pdfH / (4.0 * vDotH);
 }
 
 vec3 sampleCosineHemisphere(vec3 normal, inout uint seed)
@@ -251,43 +346,26 @@ vec3 sampleCosineHemisphere(vec3 normal, inout uint seed)
     return normalize(tangent * local.x + bitangent * local.y + normal * local.z);
 }
 
-bool sampleGGXReflection(vec3 n, vec3 v, float alphaRoughness, inout uint seed, out vec3 l, out float pdf)
-{
-    const float r1 = rand01(seed);
-    const float r2 = rand01(seed);
-    const float phi = 2.0 * PI * r1;
-    const float cosTheta = sqrt((1.0 - r2) / (1.0 + (alphaRoughness * alphaRoughness - 1.0) * r2));
-    const float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
-
-    vec3 tangent;
-    vec3 bitangent;
-    buildOrthonormalBasis(n, tangent, bitangent);
-
-    const vec3 hLocal = vec3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
-    const vec3 h = normalize(tangent * hLocal.x + bitangent * hLocal.y + n * hLocal.z);
-
-    l = normalize(reflect(-v, h));
-    const float nDotL = dot(n, l);
-    if (nDotL <= 0.0) {
-        pdf = 0.0;
-        return false;
-    }
-
-    pdf = pdfGGXReflection(n, v, h, alphaRoughness);
-    return pdf > 0.0;
-}
-
-float specularSamplingProbability(DisneyMaterial m, vec3 n, vec3 v)
+// 按 Disney 各瓣近似能量分配采样概率（diffuse / spec / clearcoat）
+void computeLobeProbabilities(DisneyMaterial m, vec3 n, vec3 v, out float pDiff, out float pSpec, out float pClear)
 {
     if (m.metallic >= 1.0) {
-        return 1.0;
+        pDiff = 0.0;
+        pClear = m.clearcoat > 0.0 ? clamp(m.clearcoat, 0.0, 0.5) : 0.0;
+        pSpec = 1.0 - pClear;
+        return;
     }
 
     const float nDotV = clamp(dot(n, v), 0.0, 1.0);
     const vec3 f0 = specularF0(m);
-    const vec3 fresnel = schlickFresnel(nDotV, f0);
-    const float specWeight = clamp(max(fresnel.r, max(fresnel.g, fresnel.b)), 0.0, 1.0);
-    return clamp(mix(specWeight, 1.0, m.metallic), 0.05, 0.95);
+    const float diffW = max(luminance(m.baseColor), 0.01) * (1.0 - m.metallic);
+    const float specW = max(luminance(schlickFresnel(nDotV, f0)), 0.01);
+    const float clearW = max(m.clearcoat, 0.0);
+    const float sum = diffW + specW + clearW;
+
+    pDiff = diffW / sum;
+    pSpec = specW / sum;
+    pClear = clearW / sum;
 }
 
 float pdfDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, vec3 wi)
@@ -297,12 +375,17 @@ float pdfDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, vec3 wi)
         return 0.0;
     }
 
-    const float specProb = specularSamplingProbability(m, n, v);
+    float pDiff;
+    float pSpec;
+    float pClear;
+    computeLobeProbabilities(m, n, v, pDiff, pSpec, pClear);
+
     const float alpha = max(m.roughness * m.roughness, 1e-4);
-    const vec3 h = normalize(v + wi);
-    const float specPdf = pdfGGXReflection(n, v, h, alpha) * specProb;
-    const float diffPdf = (1.0 - specProb) * pdfCosineHemisphere(nDotL);
-    return specPdf + diffPdf;
+    const float ccAlpha = mix(0.1, 0.001, m.clearcoatGloss);
+
+    return pDiff * pdfCosineHemisphere(nDotL)
+        + pSpec * pdfGGXVNDFReflection(n, v, wi, alpha)
+        + pClear * pdfGGXVNDFReflection(n, v, wi, ccAlpha);
 }
 
 float balanceHeuristic(float a, float b)
@@ -318,23 +401,32 @@ BsdfSample sampleDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, inout uint seed)
     result.pdf = 0.0;
     result.weight = vec3(0.0);
 
-    const float alpha = max(m.roughness * m.roughness, 1e-4);
-    const float specProb = specularSamplingProbability(m, n, v);
-    const bool sampleSpecular = rand01(seed) < specProb;
+    float pDiff;
+    float pSpec;
+    float pClear;
+    computeLobeProbabilities(m, n, v, pDiff, pSpec, pClear);
 
-    if (sampleSpecular) {
-        if (!sampleGGXReflection(n, v, alpha, seed, result.wi, result.pdf)) {
-            return result;
-        }
-        result.pdf *= specProb;
-    } else {
+    const float alpha = max(m.roughness * m.roughness, 1e-4);
+    const float ccAlpha = mix(0.1, 0.001, m.clearcoatGloss);
+
+    const float lobeRand = rand01(seed);
+    if (lobeRand < pDiff) {
         result.wi = sampleCosineHemisphere(n, seed);
         const float nDotL = dot(n, result.wi);
         if (nDotL <= 0.0) {
-            result.pdf = 0.0;
             return result;
         }
-        result.pdf = (1.0 - specProb) * pdfCosineHemisphere(nDotL);
+        result.pdf = pDiff * pdfCosineHemisphere(nDotL);
+    } else if (lobeRand < pDiff + pSpec) {
+        if (!sampleGGXVNDFReflection(n, v, alpha, seed, result.wi, result.pdf)) {
+            return result;
+        }
+        result.pdf *= pSpec;
+    } else {
+        if (!sampleGGXVNDFReflection(n, v, ccAlpha, seed, result.wi, result.pdf)) {
+            return result;
+        }
+        result.pdf *= pClear;
     }
 
     const float nDotL = dot(n, result.wi);
