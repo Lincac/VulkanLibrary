@@ -35,16 +35,22 @@ vec3 tracePath(vec3 origin, vec3 direction, inout uint seed)
             break;
         }
 
-        const vec3 N = normalize(payload.hitNormal.yzw);
-        const vec3 albedo = payload.albedo.rgb;
+        const vec3 n = normalize(payload.hitNormal.yzw);
+        const vec3 v = normalize(-direction);
+        const DisneyMaterial mat = unpackMaterial(payload);
 
         if (bounce + 1u >= MAX_BOUNCES) {
             break;
         }
 
-        throughput *= albedo;
-        direction = sampleCosineHemisphere(N, seed);
-        origin = payload.position.xyz + N * 0.001;
+        const BsdfSample bsdf = sampleDisneyBsdf(mat, n, v, seed);
+        if (bsdf.pdf <= 1e-8) {
+            break;
+        }
+
+        throughput *= bsdf.weight;
+        direction = bsdf.wi;
+        origin = payload.position.xyz + n * 0.001;
     }
 
     return radiance;
