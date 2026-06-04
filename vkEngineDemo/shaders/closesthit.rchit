@@ -44,8 +44,8 @@ void main() {
     mat.sheenTint      = 0.0;
 
     mat.metallic       = 1.0;                      // 金属必须是 1.0
-    mat.specular       = 0.9;                      // 强烈镜面反射
-    mat.specularTint   = 0.6;                      // 高光染上金色（关键）
+    mat.specular       = 1.0;                      // 强烈镜面反射
+    mat.specularTint   = 0.5;                      // 高光染上金色（关键）
     mat.clearcoat      = 0.0;                      // 金属一般不加清漆
     mat.clearcoatGloss = 0.0;
 

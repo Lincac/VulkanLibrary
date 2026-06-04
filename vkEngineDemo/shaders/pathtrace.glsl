@@ -3,7 +3,8 @@
 const uint MAX_BOUNCES = 20u;
 const uint SAMPLES_PER_PIXEL = 32u;
 const float PI = 3.14159265358979323846;
-const float EXPOSURE = 1.0; // EV 档，tone map 前亮度 *= 2^EXPOSURE
+// tone map 前线性亮度 *= 2^EXPOSURE；ACES 比 Reinhard 更压暗部，可略调高
+const float EXPOSURE = 0.5;
 
 // Path Regularization（PBRT v4 §13.4.1）：首次非镜面反弹后加大 roughness，便于 NEE+MIS
 const bool PATH_REGULARIZE = true;
@@ -584,9 +585,20 @@ vec3 sampleEnvironment(sampler2D envMap, vec3 direction)
     return texture(envMap, directionToEnvUv(direction)).rgb;
 }
 
+vec3 ACESFilm(vec3 color)
+{
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    return clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0, 1.0);
+}
+
+// HDR 路径追踪结果 → 显示：先曝光，再 ACES，再 sRGB（与旧 Reinhard 管线一致）
 vec3 toneMap(vec3 color)
 {
     color *= exp2(EXPOSURE);
-    color = color / (color + vec3(1.0));
+    color = ACESFilm(color);
     return pow(color, vec3(1.0 / 2.2));
 }
