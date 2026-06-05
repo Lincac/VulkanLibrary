@@ -34,12 +34,6 @@ vkEnginePhysicalDevice::vkEnginePhysicalDevice(std::shared_ptr<vkEngine> engine)
     VkPhysicalDeviceProperties2 props2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
     props2.pNext = &rtProps;
     vkGetPhysicalDeviceProperties2(_physicalDevice, &props2);
-
-    // 每个 shader group 在 SBT 里占 32 字节（NVIDIA 常见值）。
-    std::cerr << "shaderGroupHandleSize = " << rtProps.shaderGroupHandleSize << std::endl;
-    // SBT 起始地址需 64 字节对齐
-    std::cerr << "shaderGroupHandleAlignment = " << rtProps.shaderGroupHandleAlignment << std::endl;
-    std::cerr << "shaderGroupBaseAlignment = " << rtProps.shaderGroupBaseAlignment << std::endl;
 }
 
 vkEnginePhysicalDevice::~vkEnginePhysicalDevice()
