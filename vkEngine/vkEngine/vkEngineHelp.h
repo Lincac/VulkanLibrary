@@ -172,6 +172,22 @@ struct ObjVertex {
 static_assert(offsetof(ObjVertex, pos) == 0, "BLAS expects position at offset 0");
 static_assert(sizeof(ObjVertex) == sizeof(float) * 6, "ObjVertex layout mismatch");
 
+/// @brief 路径追踪 uniform（std140，binding = 5，与 pathtrace.glsl PathTraceSettings 一致）
+struct PathTraceSettingsGPU {
+    alignas(16) glm::vec3 cameraOrigin{0.0f, 0.0f, 2.0f};
+    float exposure = 0.0f;
+    alignas(16) glm::vec3 cameraLookAt{0.0f, 0.0f, 0.0f};
+    float fovYDegrees = 45.0f;
+    alignas(16) glm::vec3 cameraUp{0.0f, 1.0f, 0.0f};
+    float _pad0 = 0.0f;
+    uint32_t samplesPerPixel = 64;
+    uint32_t maxBounces = 50;
+    uint32_t _pad1 = 0;
+    uint32_t _pad2 = 0;
+};
+
+static_assert(sizeof(PathTraceSettingsGPU) == 64, "PathTraceSettingsGPU std140 size mismatch");
+
 /// @brief 从 OBJ 解析出的三角网格（非索引 triangle list，每 3 个顶点一个三角形）
 struct ObjMesh {
     std::vector<ObjVertex> vertices;

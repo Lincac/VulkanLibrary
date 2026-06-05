@@ -7,6 +7,9 @@ layout(set = 0, binding = 0) uniform accelerationStructureEXT tlas;
 layout(set = 0, binding = 1, rgba8) uniform writeonly image2D outputImage;
 layout(set = 0, binding = 3) uniform sampler2D environmentMap;
 layout(set = 0, binding = 4) uniform sampler2D environmentCdf;
+layout(std140, set = 0, binding = 5) uniform PathTraceSettingsBlock {
+    PathTraceSettings uSettings;
+};
 
 layout(location = 0) rayPayloadEXT PathPayload payload;
 
@@ -30,7 +33,7 @@ bool traceShadow(vec3 origin, vec3 direction)
     return payload.hitNormal.x >= 0.5;
 }
 
-vec3 tracePath(vec3 origin, vec3 direction, inout uint seed)
+vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, inout uint seed)
 {
     vec3 radiance = vec3(0.0);
     vec3 throughput = vec3(1.0);
@@ -38,10 +41,11 @@ vec3 tracePath(vec3 origin, vec3 direction, inout uint seed)
     bool specularBounce = false;
     bool anyNonSpecularBounces = false;
     uint depth = 0u;
+    float mediumIOR = 1.0;
 
     const ivec2 cdfSize = textureSize(environmentCdf, 0);
 
-    for (uint bounce = 0u; bounce < MAX_BOUNCES; ++bounce) {
+    for (uint bounce = 0u; bounce < maxBounces; ++bounce) {
         payload.hitNormal.x = 0.0;
 
         traceRayEXT(
@@ -71,30 +75,30 @@ vec3 tracePath(vec3 origin, vec3 direction, inout uint seed)
         const vec3 n = normalize(payload.hitNormal.yzw);
         const vec3 v = normalize(-direction);
         const vec3 hitPos = payload.position.xyz;
-        DisneyMaterial mat = unpackMaterial(payload);
+        PbrMaterial mat = unpackMaterial(payload);
 
-        if (PATH_REGULARIZE && anyNonSpecularBounces) {
-            mat = regularizeDisneyMaterial(mat);
+        if (PATH_REGULARIZE && anyNonSpecularBounces && isPbrOpaque(mat)) {
+            mat = regularizePbrMaterial(mat);
         }
 
-        if (isDisneyNonSpecular(mat)) {
+        if (isPbrNonSpecular(mat)) {
             const EnvLightSample envLight = sampleEnvironmentLight(environmentMap, environmentCdf, cdfSize, seed);
             const float nDotEnv = dot(n, envLight.wi);
             if (envLight.pdf > 1e-8 && nDotEnv > 0.0) {
                 if (!traceShadow(hitPos + n * 0.001, envLight.wi)) {
-                    const vec3 fr = evalDisneyBsdf(mat, n, v, envLight.wi);
-                    const float bsdfPdf = pdfDisneyBsdf(mat, n, v, envLight.wi);
+                    const vec3 fr = evalPbrBsdf(mat, n, v, envLight.wi);
+                    const float bsdfPdf = pdfPbrBsdf(mat, n, v, envLight.wi);
                     const float w_l = powerHeuristic(envLight.pdf, bsdfPdf);
                     radiance += throughput * w_l * fr * envLight.radiance * nDotEnv / max(envLight.pdf, 1e-8);
                 }
             }
         }
 
-        if (depth + 1u >= MAX_BOUNCES) {
+        if (depth + 1u >= maxBounces) {
             break;
         }
 
-        const BsdfSample bsdf = sampleDisneyBsdf(mat, n, v, seed);
+        const BsdfSample bsdf = samplePbrBsdf(mat, n, v, mediumIOR, seed);
         if (bsdf.pdf <= 1e-8) {
             break;
         }
@@ -104,7 +108,6 @@ vec3 tracePath(vec3 origin, vec3 direction, inout uint seed)
         specularBounce = bsdf.isSpecular;
         anyNonSpecularBounces = anyNonSpecularBounces || !bsdf.isSpecular;
 
-        // Russian Roulette（PBRT v4：depth > 1 且 throughput 较小时终止）
         if (depth >= 1u) {
             const float rrMax = max(throughput.r, max(throughput.g, throughput.b));
             if (rrMax < 1.0) {
@@ -117,7 +120,13 @@ vec3 tracePath(vec3 origin, vec3 direction, inout uint seed)
         }
 
         direction = bsdf.wi;
-        origin = hitPos + n * 0.001;
+        origin = hitPos + bsdf.wi * RAY_SURFACE_EPS;
+
+        if (bsdf.isTransmissive) {
+            const bool insideMedium = mediumIOR > 1.0001;
+            mediumIOR = insideMedium ? 1.0 : mat.ior;
+        }
+
         depth++;
     }
 
@@ -128,16 +137,18 @@ void main() {
     const ivec2 pixel = ivec2(gl_LaunchIDEXT.xy);
     const vec2 pixelCenter = vec2(pixel) + vec2(0.5);
     const vec2 imageSize = vec2(gl_LaunchSizeEXT.xy);
-    const Camera camera = getCamera();
+    const Camera camera = getCamera(uSettings);
+
+    const uint spp = max(uSettings.samplesPerPixel, 1u);
 
     vec3 accumulated = vec3(0.0);
-    for (uint s = 0u; s < SAMPLES_PER_PIXEL; ++s) {
+    for (uint s = 0u; s < spp; ++s) {
         const vec2 jitter = samplePrimaryJitter(pixel, s);
         uint seed = initSampleSeed(pixel, s);
         const CameraRay primaryRay = getCameraRay(camera, pixelCenter, imageSize, jitter);
-        accumulated += tracePath(primaryRay.origin, primaryRay.direction, seed);
+        accumulated += tracePath(primaryRay.origin, primaryRay.direction, uSettings.maxBounces, seed);
     }
 
-    accumulated /= float(SAMPLES_PER_PIXEL);
-    imageStore(outputImage, pixel, vec4(toneMap(accumulated), 1.0));
+    accumulated /= float(spp);
+    imageStore(outputImage, pixel, vec4(toneMap(accumulated, uSettings.exposure), 1.0));
 }

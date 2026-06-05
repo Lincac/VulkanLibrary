@@ -16,7 +16,7 @@ int main(){
     std::cout << "vulkan is init" << std::endl;
 
     auto image = std::make_shared<vkEngineImage>(logicalDevice);
-    image->setResolution(glm::ivec2(800,600));
+    image->setResolution(glm::ivec2(1280,720));
     image->setFormat(VK_FORMAT_R8G8B8A8_UNORM);
     image->setImageUsageFlags(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     image->generate();
@@ -33,7 +33,7 @@ int main(){
     std::cout << "environment CDF ready " << environmentMap->getEnvCdfResolution().x
               << "x" << environmentMap->getEnvCdfResolution().y << std::endl;
 
-    const ObjMesh mesh = loadObj("models/bunny.obj");
+    const ObjMesh mesh = loadObj("models/sphere.obj");
     std::cout << "loaded obj: " << mesh.triangleCount() << " triangles, "
               << mesh.vertices.size() << " vertices" << std::endl;
 
@@ -63,9 +63,17 @@ int main(){
     tlas->build(commandPool);
     std::cout << "TLAS ready, address = " << tlas->getDeviceAddress() << std::endl;
 
+    const PathTraceSettingsGPU pathTraceSettings{};
+    auto settingsBuffer = std::make_shared<vkEngineBuffer>(logicalDevice);
+    settingsBuffer->setSize(sizeof(PathTraceSettingsGPU));
+    settingsBuffer->setUsage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    settingsBuffer->setMemoryProperties(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    settingsBuffer->create();
+    settingsBuffer->upload(commandPool, &pathTraceSettings, sizeof(PathTraceSettingsGPU));
+
     vkEngineRTDescriptor descriptor(logicalDevice);
     descriptor.create();
-    descriptor.setup(tlas, image, vertexBuffer, environmentMap);
+    descriptor.setup(tlas, image, vertexBuffer, environmentMap, settingsBuffer);
     std::cout << "descriptor ready" << std::endl;
 
     vkEngineRayTracingPipeline rtPipeline(logicalDevice);
@@ -77,7 +85,7 @@ int main(){
 
     const std::string outputPath = pathNextToExe("output.png");
     image->saveToPng(commandPool, outputPath, [&](VkCommandBuffer cmd) {
-        rtPipeline.recordTrace(cmd, descriptor.getSet(), 800, 600, 1);
+        rtPipeline.recordTrace(cmd, descriptor.getSet(), 1280, 720, 1);
     });
     std::cout << "path trace done" << std::endl;
     std::cout << "saved " << outputPath << std::endl;

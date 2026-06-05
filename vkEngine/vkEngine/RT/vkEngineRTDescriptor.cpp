@@ -1,4 +1,5 @@
 ﻿#include "vkEngineRTDescriptor.h"
+#include "vkEngineHelp.h"
 
 vkEngineRTDescriptor::vkEngineRTDescriptor(std::shared_ptr<vkEngineLogicalDevice> device)
     : _device(device)
@@ -24,7 +25,7 @@ void vkEngineRTDescriptor::create()
 {
     auto device = _device->getVkDevice();
 
-    VkDescriptorSetLayoutBinding bindings[5]{};
+    VkDescriptorSetLayoutBinding bindings[6]{};
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
     bindings[0].descriptorCount = 1;
@@ -54,16 +55,21 @@ void vkEngineRTDescriptor::create()
     bindings[4].descriptorCount = 1;
     bindings[4].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
+    bindings[5].binding = 5;
+    bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[5].descriptorCount = 1;
+    bindings[5].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 5;
+    layoutInfo.bindingCount = 6;
     layoutInfo.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &_layout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor set layout!");
     }
 
-    VkDescriptorPoolSize poolSizes[4]{};
+    VkDescriptorPoolSize poolSizes[5]{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
     poolSizes[0].descriptorCount = 1;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -72,10 +78,12 @@ void vkEngineRTDescriptor::create()
     poolSizes[2].descriptorCount = 1;
     poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[3].descriptorCount = 2;
+    poolSizes[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[4].descriptorCount = 1;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 4;
+    poolInfo.poolSizeCount = 5;
     poolInfo.pPoolSizes = poolSizes;
     poolInfo.maxSets = 1;
 
@@ -85,10 +93,14 @@ void vkEngineRTDescriptor::create()
 }
 
 void vkEngineRTDescriptor::setup(std::shared_ptr<vkEngineAccelerationStructure> tlas, std::shared_ptr<vkEngineImage> image,
-    std::shared_ptr<vkEngineBuffer> vertexBuffer, std::shared_ptr<vkEngineTexture> environmentMap)
+    std::shared_ptr<vkEngineBuffer> vertexBuffer, std::shared_ptr<vkEngineTexture> environmentMap,
+    std::shared_ptr<vkEngineBuffer> settingsBuffer)
 {
     if (_layout == VK_NULL_HANDLE || _pool == VK_NULL_HANDLE) {
         throw std::runtime_error("descriptor layout/pool not created, call create() first");
+    }
+    if (!settingsBuffer) {
+        throw std::runtime_error("path trace settings buffer is required (binding = 5)");
     }
 
     auto device = _device->getVkDevice();
@@ -168,8 +180,23 @@ void vkEngineRTDescriptor::setup(std::shared_ptr<vkEngineAccelerationStructure> 
     writeEnvCdf.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     writeEnvCdf.pImageInfo = &envCdfInfo;
 
-    VkWriteDescriptorSet writes[5] = { writeAS, writeImage, writeVertexBuffer, writeEnvironment, writeEnvCdf };
-    vkUpdateDescriptorSets(device, 5, writes, 0, nullptr);
+    VkDescriptorBufferInfo settingsBufferInfo{};
+    settingsBufferInfo.buffer = settingsBuffer->getBuffer();
+    settingsBufferInfo.offset = 0;
+    settingsBufferInfo.range = sizeof(PathTraceSettingsGPU);
+
+    VkWriteDescriptorSet writeSettings{};
+    writeSettings.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writeSettings.dstSet = _set;
+    writeSettings.dstBinding = 5;
+    writeSettings.descriptorCount = 1;
+    writeSettings.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writeSettings.pBufferInfo = &settingsBufferInfo;
+
+    VkWriteDescriptorSet writes[6] = {
+        writeAS, writeImage, writeVertexBuffer, writeEnvironment, writeEnvCdf, writeSettings
+    };
+    vkUpdateDescriptorSets(device, 6, writes, 0, nullptr);
 }
 
 VkDescriptorSetLayout& vkEngineRTDescriptor::getLayout()

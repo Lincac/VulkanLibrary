@@ -1,20 +1,25 @@
 // 路径追踪公用函数（由 raygen / closesthit / miss include）
 
-const uint MAX_BOUNCES = 15u;
-const uint SAMPLES_PER_PIXEL = 128u;
 const float PI = 3.14159265358979323846;
-// tone map 前线性亮度 *= 2^EXPOSURE；ACES 比 Reinhard 更压暗部，可略调高
-const float EXPOSURE = 0.0;
 
-// Path Regularization（PBRT v4 §13.4.1）：首次非镜面反弹后加大 roughness，便于 NEE+MIS
 const bool PATH_REGULARIZE = true;
-const float REGULARIZE_MIN_ROUGHNESS = 0.075;
+const float REGULARIZE_MIN_ROUGHNESS = 0.04;
+const float GLASS_DELTA_ROUGHNESS = 0.05;
+const float RAY_SURFACE_EPS = 0.002;
 
-// 相机参数：修改此处即可改变位置与朝向
-const vec3 CAMERA_ORIGIN = vec3(0.0, 0.0, 2.0);
-const vec3 CAMERA_LOOK_AT = vec3(0.0, 0.0, 0.0);
-const vec3 CAMERA_UP = vec3(0.0, 1.0, 0.0);
-const float CAMERA_FOV_Y = 45.0;
+// std140，与 C++ PathTraceSettingsGPU 一致（binding = 5）
+struct PathTraceSettings {
+    vec3 cameraOrigin;
+    float exposure;
+    vec3 cameraLookAt;
+    float fovYDegrees;
+    vec3 cameraUp;
+    float _pad0;
+    uint samplesPerPixel;
+    uint maxBounces;
+    uint _pad1;
+    uint _pad2;
+};
 
 struct Camera {
     vec3 origin;
@@ -42,9 +47,13 @@ Camera createCamera(vec3 origin, vec3 lookAt, vec3 worldUp, float verticalFovDeg
     return camera;
 }
 
-Camera getCamera()
+Camera getCamera(PathTraceSettings settings)
 {
-    return createCamera(CAMERA_ORIGIN, CAMERA_LOOK_AT, CAMERA_UP, CAMERA_FOV_Y);
+    return createCamera(
+        settings.cameraOrigin,
+        settings.cameraLookAt,
+        settings.cameraUp,
+        settings.fovYDegrees);
 }
 
 CameraRay getCameraRay(Camera camera, vec2 pixelCenter, vec2 imageSize, vec2 jitter)
@@ -66,64 +75,60 @@ CameraRay getCameraRay(Camera camera, vec2 pixelCenter, vec2 imageSize, vec2 jit
 struct PathPayload {
     vec4 hitNormal; // x: 1=命中, yzw: 世界空间法线
     vec4 position;  // xyz: 命中点
-    vec4 material0; // baseColor.rgb, roughness
-    vec4 material1; // subSurface, sheen, sheenTint, metallic
-    vec4 material2; // specular, specularTint, clearcoat, clearcoatGloss
+    vec4 material0; // baseColor.rgb, transmission
+    vec4 material1; // roughness, metallic, ior, unused
 };
 
-struct DisneyMaterial {
-    vec3 baseColor;
+struct PbrMaterial {
+    vec3  baseColor;
     float roughness;
-    float subSurface;
-    float sheen;
-    float sheenTint;
     float metallic;
-    float specular;
-    float specularTint;
-    float clearcoat;
-    float clearcoatGloss;
+    float ior;
+    float transmission; // 0=不透明, 1=玻璃
 };
 
 struct BsdfSample {
     vec3 wi;
     float pdf;
-    vec3 weight; // f_r * cos(theta_i) / pdf
+    vec3 weight;
     bool isSpecular;
+    bool isTransmissive;
 };
 
-DisneyMaterial unpackMaterial(PathPayload payload)
+PbrMaterial unpackMaterial(PathPayload payload)
 {
-    DisneyMaterial m;
+    PbrMaterial m;
     m.baseColor = payload.material0.rgb;
-    m.roughness = payload.material0.w;
-    m.subSurface = payload.material1.x;
-    m.sheen = payload.material1.y;
-    m.sheenTint = payload.material1.z;
-    m.metallic = payload.material1.w;
-    m.specular = payload.material2.x;
-    m.specularTint = payload.material2.y;
-    m.clearcoat = payload.material2.z;
-    m.clearcoatGloss = payload.material2.w;
+    m.transmission = payload.material0.w;
+    m.roughness = payload.material1.x;
+    m.metallic = payload.material1.y;
+    m.ior = max(payload.material1.z, 1.0);
     return m;
 }
 
-void packMaterial(inout PathPayload payload, DisneyMaterial m)
+void packMaterial(inout PathPayload payload, PbrMaterial m)
 {
-    payload.material0 = vec4(m.baseColor, m.roughness);
-    payload.material1 = vec4(m.subSurface, m.sheen, m.sheenTint, m.metallic);
-    payload.material2 = vec4(m.specular, m.specularTint, m.clearcoat, m.clearcoatGloss);
+    payload.material0 = vec4(m.baseColor, m.transmission);
+    payload.material1 = vec4(m.roughness, m.metallic, m.ior, 0.0);
 }
 
-DisneyMaterial regularizeDisneyMaterial(DisneyMaterial m)
+PbrMaterial regularizePbrMaterial(PbrMaterial m)
 {
     m.roughness = max(m.roughness, REGULARIZE_MIN_ROUGHNESS);
-    m.clearcoatGloss = min(m.clearcoatGloss, 0.5);
     return m;
 }
 
-bool isDisneyNonSpecular(DisneyMaterial m)
+bool isPbrOpaque(PbrMaterial m)
 {
-    return m.metallic < 1.0 || m.roughness > 1e-4 || m.sheen > 0.0 || m.subSurface > 0.0;
+    return m.transmission < 0.01;
+}
+
+bool isPbrNonSpecular(PbrMaterial m)
+{
+    if (!isPbrOpaque(m)) {
+        return m.roughness > 0.05;
+    }
+    return m.metallic < 1.0 && m.roughness > 1e-3;
 }
 
 uint pcgHash(inout uint state)
@@ -198,78 +203,16 @@ float visibilitySmithGGXCorrelated(float nDotV, float nDotL, float alphaRoughnes
     return 0.5 / max(gv + gl, 1e-5);
 }
 
-vec3 specularF0(DisneyMaterial m)
-{
-    const vec3 dielectric = vec3(0.08) * m.specular * mix(vec3(1.0), m.baseColor, m.specularTint);
-    return mix(dielectric, m.baseColor, m.metallic);
-}
-
-vec3 evalDisneyDiffuse(DisneyMaterial m, vec3 n, vec3 v, vec3 l)
-{
-    if (m.metallic >= 1.0) {
-        return vec3(0.0);
-    }
-
-    const vec3 h = normalize(l + v);
-    const float nDotL = clamp(dot(n, l), 0.0, 1.0);
-    const float nDotV = clamp(dot(n, v), 0.0, 1.0);
-    const float lDotH = clamp(dot(l, h), 0.0, 1.0);
-    const float nDotH = clamp(dot(n, h), 0.0, 1.0);
-
-    const float fd90 = 0.5 + 2.0 * lDotH * lDotH * m.roughness;
-    const float fl = pow(1.0 - nDotL, 5.0);
-    const float fv = pow(1.0 - nDotV, 5.0);
-    float fd = mix(1.0, fd90, fl) * mix(1.0, fd90, fv);
-
-    const float fss90 = lDotH * lDotH * m.roughness;
-    const float fss = mix(1.0, fss90, fl) * mix(1.0, fss90, fv);
-    fd = mix(fd, fss, m.subSurface);
-
-    vec3 diffuse = fd * m.baseColor * (1.0 / PI);
-
-    const vec3 csheen = mix(vec3(1.0), m.baseColor, m.sheenTint);
-    diffuse += m.sheen * schlickFresnel(nDotH, csheen) * (1.0 / PI);
-
-    return diffuse;
-}
-
-vec3 evalDisneySpecular(DisneyMaterial m, vec3 n, vec3 v, vec3 l)
-{
-    const vec3 h = normalize(l + v);
-    const float nDotL = clamp(dot(n, l), 0.0, 1.0);
-    const float nDotV = clamp(dot(n, v), 0.0, 1.0);
-    const float nDotH = clamp(dot(n, h), 0.0, 1.0);
-    const float lDotH = clamp(dot(l, h), 0.0, 1.0);
-
-    if (nDotL <= 0.0 || nDotV <= 0.0) {
-        return vec3(0.0);
-    }
-
-    const float alpha = max(m.roughness * m.roughness, 1e-4);
-    const float d = distributionGTR2(nDotH, alpha);
-    const float g = visibilitySmithGGXCorrelated(nDotV, nDotL, alpha);
-    const vec3 f0 = specularF0(m);
-    const vec3 f = schlickFresnel(lDotH, f0);
-
-    vec3 spec = d * g * f / max(4.0 * nDotL * nDotV, 1e-5);
-
-    const float ccAlpha = mix(0.1, 0.001, m.clearcoatGloss);
-    const float dr = distributionGTR2(nDotH, ccAlpha);
-    const float gr = visibilitySmithGGXCorrelated(nDotV, nDotL, ccAlpha);
-    const float fr = mix(0.04, 1.0, schlickWeight(lDotH));
-    spec += 0.25 * m.clearcoat * dr * gr * fr;
-
-    return spec;
-}
-
-vec3 evalDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, vec3 l)
-{
-    return evalDisneyDiffuse(m, n, v, l) + evalDisneySpecular(m, n, v, l);
-}
-
 float luminance(vec3 c)
 {
     return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec3 fresnelF0(PbrMaterial m)
+{
+    const float f0Scalar = pow((m.ior - 1.0) / (m.ior + 1.0), 2.0);
+    const vec3 dielectricF0 = vec3(f0Scalar);
+    return mix(dielectricF0, m.baseColor, m.metallic);
 }
 
 float ggxSmithG1(float nDotV, float alphaRoughness)
@@ -284,7 +227,6 @@ float pdfCosineHemisphere(float nDotL)
     return max(nDotL, 0.0) / PI;
 }
 
-// Heitz 2018 — 在局部空间 (N=+Z) 对可见法线分布 (VNDF) 采样
 vec3 sampleGGXVNDF_Local(vec3 vLocal, float alpha, vec2 xi)
 {
     vec3 vh = normalize(vec3(alpha * vLocal.x, alpha * vLocal.y, vLocal.z));
@@ -324,7 +266,6 @@ vec3 localFromWorld(vec3 n, vec3 tangent, vec3 bitangent, vec3 world)
     return vec3(dot(world, tangent), dot(world, bitangent), dot(world, n));
 }
 
-// 统一镜面 VNDF 反射采样（主 spec / clearcoat 共用，仅 alpha 不同）
 bool sampleGGXVNDFReflection(vec3 n, vec3 v, float alphaRoughness, inout uint seed, out vec3 l, out float pdf)
 {
     vec3 tangent;
@@ -391,46 +332,130 @@ vec3 sampleCosineHemisphere(vec3 normal, inout uint seed)
     return normalize(tangent * local.x + bitangent * local.y + normal * local.z);
 }
 
-// 按 Disney 各瓣近似能量分配采样概率（diffuse / spec / clearcoat）
-void computeLobeProbabilities(DisneyMaterial m, vec3 n, vec3 v, out float pDiff, out float pSpec, out float pClear)
+bool refractSnell(vec3 wi, vec3 n, float eta, out vec3 wt)
 {
-    if (m.metallic >= 1.0) {
-        pDiff = 0.0;
-        pClear = m.clearcoat > 0.0 ? clamp(m.clearcoat, 0.0, 0.5) : 0.0;
-        pSpec = 1.0 - pClear;
+    float cosThetaI = dot(n, wi);
+    vec3 normal = n;
+    float etap = eta;
+    if (cosThetaI < 0.0) {
+        normal = -n;
+        cosThetaI = -cosThetaI;
+        etap = 1.0 / eta;
+    }
+
+    const float sin2T = etap * etap * (1.0 - cosThetaI * cosThetaI);
+    if (sin2T >= 1.0) {
+        return false;
+    }
+
+    const float cosT = sqrt(1.0 - sin2T);
+    wt = normalize(etap * (-wi) + (etap * cosThetaI - cosT) * normal);
+    return true;
+}
+
+float dielectricFresnelReflectProb(vec3 n, vec3 v, PbrMaterial m)
+{
+    const float nDotV = max(dot(n, v), 0.0);
+    const vec3 f0 = fresnelF0(m);
+    return clamp(luminance(schlickFresnel(nDotV, f0)), 0.0, 0.999);
+}
+
+vec3 evalPbrBsdf(PbrMaterial m, vec3 n, vec3 v, vec3 l)
+{
+    const float nDotL = max(dot(n, l), 0.0);
+    const float nDotV = max(dot(n, v), 0.0);
+    if (nDotL <= 0.0 || nDotV <= 0.0) {
+        return vec3(0.0);
+    }
+
+    const vec3 h = normalize(v + l);
+    const float nDotH = max(dot(n, h), 0.0);
+    const float lDotH = max(dot(l, h), 0.0);
+
+    const vec3 f0 = fresnelF0(m);
+    const vec3 F = schlickFresnel(lDotH, f0);
+
+    const float alpha = max(m.roughness * m.roughness, 1e-4);
+    const float D = distributionGTR2(nDotH, alpha);
+    const float G = visibilitySmithGGXCorrelated(nDotV, nDotL, alpha);
+    const vec3 spec = D * G * F / max(4.0 * nDotL * nDotV, 1e-5);
+
+    const float opaque = 1.0 - m.transmission;
+    const vec3 kd = (vec3(1.0) - F) * (1.0 - m.metallic) * opaque;
+    const vec3 diffuse = kd * m.baseColor * (1.0 / PI);
+
+    return diffuse + spec * opaque;
+}
+
+void computeLobeProbabilities(PbrMaterial m, vec3 n, vec3 v,
+                              out float pDiff, out float pSpec, out float pTrans)
+{
+    pDiff = 0.0;
+    pSpec = 0.0;
+    pTrans = 0.0;
+
+    const float nDotV = max(dot(n, v), 0.0);
+    const vec3 f0 = fresnelF0(m);
+    const float fresnel = clamp(luminance(schlickFresnel(nDotV, f0)), 0.0, 1.0);
+
+    if (m.transmission > 0.01) {
+        pSpec = fresnel;
+        pTrans = 1.0 - fresnel;
         return;
     }
 
-    const float nDotV = clamp(dot(n, v), 0.0, 1.0);
-    const vec3 f0 = specularF0(m);
-    const float diffW = max(luminance(m.baseColor), 0.01) * (1.0 - m.metallic);
-    const float specW = max(luminance(schlickFresnel(nDotV, f0)), 0.01);
-    const float clearW = max(m.clearcoat, 0.0);
-    const float sum = diffW + specW + clearW;
+    if (m.metallic >= 1.0) {
+        pSpec = 1.0;
+        return;
+    }
 
+    const float diffW = max(luminance(m.baseColor), 0.01) * (1.0 - m.metallic);
+    const float specW = max(fresnel, 0.01);
+    const float sum = diffW + specW;
     pDiff = diffW / sum;
     pSpec = specW / sum;
-    pClear = clearW / sum;
 }
 
-float pdfDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, vec3 wi)
+vec3 evalGlassReflection(PbrMaterial m, vec3 n, vec3 v, vec3 l, float alpha)
+{
+    const float nDotL = max(dot(n, l), 0.0);
+    const float nDotV = max(dot(n, v), 0.0);
+    if (nDotL <= 0.0 || nDotV <= 0.0) {
+        return vec3(0.0);
+    }
+    const vec3 h = normalize(v + l);
+    const float nDotH = max(dot(n, h), 0.0);
+    const float lDotH = max(dot(l, h), 0.0);
+    const vec3 f0 = fresnelF0(m);
+    const vec3 F = schlickFresnel(lDotH, f0);
+    const float D = distributionGTR2(nDotH, alpha);
+    const float G = visibilitySmithGGXCorrelated(nDotV, nDotL, alpha);
+    return D * G * F / max(4.0 * nDotL * nDotV, 1e-5);
+}
+
+float pdfPbrBsdf(PbrMaterial m, vec3 n, vec3 v, vec3 wi)
 {
     const float nDotL = dot(n, wi);
-    if (nDotL <= 0.0) {
+    if (nDotL <= 0.0 && m.transmission < 0.01) {
         return 0.0;
     }
 
     float pDiff;
     float pSpec;
-    float pClear;
-    computeLobeProbabilities(m, n, v, pDiff, pSpec, pClear);
+    float pTrans;
+    computeLobeProbabilities(m, n, v, pDiff, pSpec, pTrans);
 
     const float alpha = max(m.roughness * m.roughness, 1e-4);
-    const float ccAlpha = mix(0.1, 0.001, m.clearcoatGloss);
+    const float nDotWi = max(dot(n, wi), 0.0);
 
-    return pDiff * pdfCosineHemisphere(nDotL)
-        + pSpec * pdfGGXVNDFReflection(n, v, wi, alpha)
-        + pClear * pdfGGXVNDFReflection(n, v, wi, ccAlpha);
+    float pdf = pDiff * pdfCosineHemisphere(nDotWi)
+        + pSpec * pdfGGXVNDFReflection(n, v, wi, alpha);
+
+    if (pTrans > 0.0 && nDotWi <= 0.0) {
+        pdf += pTrans;
+    }
+
+    return pdf;
 }
 
 float powerHeuristic(float a, float b)
@@ -440,23 +465,78 @@ float powerHeuristic(float a, float b)
     return a2 / max(a2 + b2, 1e-16);
 }
 
-BsdfSample sampleDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, inout uint seed)
+BsdfSample samplePbrBsdf(PbrMaterial m, vec3 n, vec3 v, float mediumIOR, inout uint seed)
 {
     BsdfSample result;
     result.wi = vec3(0.0);
     result.pdf = 0.0;
     result.weight = vec3(0.0);
     result.isSpecular = false;
+    result.isTransmissive = false;
 
     float pDiff;
     float pSpec;
-    float pClear;
-    computeLobeProbabilities(m, n, v, pDiff, pSpec, pClear);
+    float pTrans;
+    computeLobeProbabilities(m, n, v, pDiff, pSpec, pTrans);
 
     const float alpha = max(m.roughness * m.roughness, 1e-4);
-    const float ccAlpha = mix(0.1, 0.001, m.clearcoatGloss);
-
     const float lobeRand = rand01(seed);
+
+    if (m.transmission > 0.01) {
+        const float nDotV = max(dot(n, v), 0.0);
+        const vec3 f0 = fresnelF0(m);
+        const vec3 F = schlickFresnel(nDotV, f0);
+        const float Fr = dielectricFresnelReflectProb(n, v, m);
+        const bool insideMedium = mediumIOR > 1.0001;
+        const float eta = insideMedium ? (mediumIOR / 1.0) : (1.0 / m.ior);
+
+        // 光滑玻璃：delta 反射/折射，避免 GGX pdf 极小导致边缘爆亮
+        if (m.roughness < GLASS_DELTA_ROUGHNESS) {
+            result.isSpecular = true;
+            if (lobeRand < Fr) {
+                result.wi = normalize(reflect(-v, n));
+                result.pdf = Fr;
+                result.weight = F / max(Fr, 1e-8);
+            } else if (refractSnell(v, n, eta, result.wi)) {
+                result.isTransmissive = true;
+                result.pdf = 1.0 - Fr;
+                result.weight = (vec3(1.0) - F) * m.baseColor / max(1.0 - Fr, 1e-8);
+            } else {
+                result.wi = normalize(reflect(-v, n));
+                result.pdf = 1.0;
+                result.weight = vec3(1.0);
+            }
+            return result;
+        }
+
+        if (lobeRand < Fr) {
+            result.isSpecular = false;
+            if (!sampleGGXVNDFReflection(n, v, alpha, seed, result.wi, result.pdf)) {
+                return result;
+            }
+            result.pdf *= Fr;
+            const float nDotL = max(dot(n, result.wi), 0.0);
+            const vec3 fr = evalGlassReflection(m, n, v, result.wi, alpha);
+            result.weight = fr * nDotL / max(result.pdf, 1e-8);
+        } else {
+            result.isSpecular = false;
+            result.isTransmissive = true;
+            if (!refractSnell(v, n, eta, result.wi)) {
+                if (!sampleGGXVNDFReflection(n, v, alpha, seed, result.wi, result.pdf)) {
+                    return result;
+                }
+                result.pdf = Fr;
+                const float nDotL = max(dot(n, result.wi), 0.0);
+                const vec3 fr = evalGlassReflection(m, n, v, result.wi, alpha);
+                result.weight = fr * nDotL / max(result.pdf, 1e-8);
+            } else {
+                result.pdf = 1.0 - Fr;
+                result.weight = (vec3(1.0) - F) * m.baseColor / max(1.0 - Fr, 1e-8);
+            }
+        }
+        return result;
+    }
+
     if (lobeRand < pDiff) {
         result.isSpecular = false;
         result.wi = sampleCosineHemisphere(n, seed);
@@ -465,22 +545,16 @@ BsdfSample sampleDisneyBsdf(DisneyMaterial m, vec3 n, vec3 v, inout uint seed)
             return result;
         }
         result.pdf = pDiff * pdfCosineHemisphere(nDotL);
-    } else if (lobeRand < pDiff + pSpec) {
-        result.isSpecular = true;
+    } else {
+        result.isSpecular = m.metallic >= 1.0 || m.roughness < 0.05;
         if (!sampleGGXVNDFReflection(n, v, alpha, seed, result.wi, result.pdf)) {
             return result;
         }
         result.pdf *= pSpec;
-    } else {
-        result.isSpecular = true;
-        if (!sampleGGXVNDFReflection(n, v, ccAlpha, seed, result.wi, result.pdf)) {
-            return result;
-        }
-        result.pdf *= pClear;
     }
 
-    const float nDotL = dot(n, result.wi);
-    const vec3 fr = evalDisneyBsdf(m, n, v, result.wi);
+    const float nDotL = max(dot(n, result.wi), 0.0);
+    const vec3 fr = evalPbrBsdf(m, n, v, result.wi);
     result.weight = fr * nDotL / max(result.pdf, 1e-8);
     return result;
 }
@@ -595,10 +669,9 @@ vec3 ACESFilm(vec3 color)
     return clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0, 1.0);
 }
 
-// HDR 路径追踪结果 → 显示：先曝光，再 ACES，再 sRGB（与旧 Reinhard 管线一致）
-vec3 toneMap(vec3 color)
+vec3 toneMap(vec3 color, float exposure)
 {
-    color *= exp2(EXPOSURE);
+    color *= exp2(exposure);
     color = ACESFilm(color);
     return pow(color, vec3(1.0 / 2.2));
 }

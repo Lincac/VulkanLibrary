@@ -21,6 +21,44 @@ vec3 fetchNormal(uint index)
     return vec3(vertices[index].normal[0], vertices[index].normal[1], vertices[index].normal[2]);
 }
 
+PbrMaterial materialForPrimitive(uint primId)
+{
+    PbrMaterial mat;
+    const uint slot = primId % 4u;
+
+    if (slot == 0u) {
+        // 金属（黄铜）
+        mat.baseColor = vec3(1.0, 0.86, 0.57);
+        mat.roughness = 0.18;
+        mat.metallic = 1.0;
+        mat.ior = 1.5;
+        mat.transmission = 0.0;
+    } else if (slot == 1u) {
+        // 塑料（红色亮面）
+        mat.baseColor = vec3(0.82, 0.06, 0.08);
+        mat.roughness = 0.28;
+        mat.metallic = 0.0;
+        mat.ior = 1.46;
+        mat.transmission = 0.0;
+    } else if (slot == 2u) {
+        // 非金属（哑光陶瓷/漫反射体）
+        mat.baseColor = vec3(0.72, 0.68, 0.62);
+        mat.roughness = 0.82;
+        mat.metallic = 0.0;
+        mat.ior = 1.5;
+        mat.transmission = 0.0;
+    } else {
+        // 玻璃
+        mat.baseColor = vec3(1.0);
+        mat.roughness = 0.015;
+        mat.metallic = 0.0;
+        mat.ior = 1.52;
+        mat.transmission = 1.0;
+    }
+
+    return mat;
+}
+
 void main() {
     const uint base = gl_PrimitiveID * 3u;
     const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
@@ -36,18 +74,7 @@ void main() {
         n = -n;
     }
 
-    DisneyMaterial mat;
-    mat.baseColor      = vec3(1.00, 0.78, 0.34);   // 更接近真实金的谱反射
-    mat.roughness      = 0.4;                     // 金属表面较光滑
-    mat.subSurface     = 0.0;                      // 金属无次表面散射
-    mat.sheen          = 0.0;                      // 金属无布料光泽
-    mat.sheenTint      = 0.0;
-
-    mat.metallic       = 1.0;                      // 金属必须是 1.0
-    mat.specular       = 0.7;                      // 强烈镜面反射
-    mat.specularTint   = 1.0;                      // 高光染上金色（关键）
-    mat.clearcoat      = 0.0;                      // 金属一般不加清漆
-    mat.clearcoatGloss = 0.0;
+    const PbrMaterial mat = materialForPrimitive(3u);
 
     payload.hitNormal = vec4(1.0, n.x, n.y, n.z);
     payload.position = vec4(worldPos, 1.0);
