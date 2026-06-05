@@ -29,8 +29,8 @@ PbrMaterial materialForPrimitive(uint primId)
     if (slot == 0u) {
         // 金属（黄铜）
         mat.baseColor = vec3(1.0, 0.86, 0.57);
-        mat.roughness = 0.18;
-        mat.metallic = 1.0;
+        mat.roughness = 0.25;
+        mat.metallic = 0.8;
         mat.ior = 1.5;
         mat.transmission = 0.0;
     } else if (slot == 1u) {
@@ -74,7 +74,7 @@ void main() {
         n = -n;
     }
 
-    const PbrMaterial mat = materialForPrimitive(3u);
+    const PbrMaterial mat = materialForPrimitive(2u);
 
     payload.hitNormal = vec4(1.0, n.x, n.y, n.z);
     payload.position = vec4(worldPos, 1.0);

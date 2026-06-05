@@ -6,6 +6,103 @@ const bool PATH_REGULARIZE = true;
 const float REGULARIZE_MIN_ROUGHNESS = 0.04;
 const float GLASS_DELTA_ROUGHNESS = 0.05;
 const float RAY_SURFACE_EPS = 0.002;
+const float GLOSSY_SPECULAR_THRESHOLD = 0.25;
+const float GRAZING_NDOTV_THRESHOLD = 0.08;
+const float METAL_DELTA_ROUGHNESS = 0.12;
+
+uint pcgHash(inout uint state)
+{
+    state = state * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+uint deriveSeed(ivec2 pixel, uint sampleIndex, uint salt)
+{
+    uint state = uint(pixel.x) ^ (uint(pixel.y) * 747796405u + 2891336453u);
+    state ^= sampleIndex * 668265263u + salt * 48271u;
+    pcgHash(state);
+    pcgHash(state);
+    return state;
+}
+
+// --- Owen-scrambled Sobol (PBRT 风格 QMC) ---
+const uint SOBOL_NUM_DIMS = 8u;
+const uint SOBOL_NUM_BITS = 32u;
+
+const uint SOBOL_V[256] = uint[](
+    1u,2u,4u,8u,16u,32u,64u,128u,256u,512u,1024u,2048u,4096u,8192u,16384u,32768u,65536u,131072u,262144u,524288u,1048576u,2097152u,4194304u,8388608u,16777216u,33554432u,67108864u,134217728u,268435456u,536870912u,1073741824u,2147483648u,
+    1u,3u,1u,5u,7u,1u,3u,1u,3u,5u,15u,17u,13u,29u,47u,63u,21u,49u,107u,39u,79u,27u,117u,39u,81u,35u,5u,113u,19u,57u,63u,45u,
+    1u,3u,3u,9u,29u,23u,39u,185u,113u,405u,537u,49u,291u,49u,299u,181u,429u,373u,103u,591u,445u,437u,993u,217u,1023u,113u,575u,457u,1537u,705u,1089u,1025u,
+    1u,1u,5u,5u,17u,13u,69u,67u,57u,143u,17u,25u,183u,111u,1025u,775u,81u,57u,753u,425u,1025u,55u,81u,57u,753u,425u,1025u,55u,81u,57u,753u,425u,
+    1u,3u,7u,11u,27u,19u,55u,19u,19u,53u,115u,31u,17u,81u,217u,99u,57u,53u,129u,155u,33u,79u,217u,99u,57u,53u,129u,155u,33u,79u,217u,99u,
+    1u,1u,3u,7u,15u,31u,63u,127u,255u,511u,1023u,2047u,4095u,8191u,16383u,32767u,65535u,131071u,262143u,524287u,1048575u,2097151u,4194303u,8388607u,16777215u,33554431u,67108863u,134217727u,268435455u,536870911u,1073741823u,2147483647u,
+    1u,3u,1u,1u,9u,7u,37u,31u,97u,153u,59u,17u,57u,35u,265u,899u,165u,73u,387u,497u,157u,719u,994u,765u,434u,587u,159u,299u,534u,445u,49u,291u,
+    1u,3u,3u,9u,7u,49u,71u,103u,15u,69u,59u,21u,143u,109u,141u,39u,79u,15u,211u,126u,141u,39u,79u,15u,211u,126u,141u,39u,79u,15u,211u,126u
+);
+
+struct PathSampler {
+    ivec2 pixel;
+    uint sampleIndex;
+    uint dimension;
+};
+
+uint sobolDirection(uint dim, uint bit)
+{
+    return SOBOL_V[(dim & (SOBOL_NUM_DIMS - 1u)) * SOBOL_NUM_BITS + bit];
+}
+
+uint sobolHash(PathSampler s, uint dim)
+{
+    uint state = uint(s.pixel.x) ^ (uint(s.pixel.y) * 747796405u + 2891336453u);
+    state ^= s.sampleIndex * 668265263u + dim * 48271u;
+    return pcgHash(state);
+}
+
+uint sobolGenerate(uint index, uint dim, uint scramble)
+{
+    uint result = 0u;
+    uint bit = 0u;
+    while (index != 0u) {
+        if ((index & 1u) != 0u) {
+            result ^= sobolDirection(dim, bit);
+        }
+        index >>= 1u;
+        bit++;
+    }
+    return result ^ scramble;
+}
+
+float samplePath1(inout PathSampler s)
+{
+    const uint scramble = sobolHash(s, s.dimension);
+    const uint x = sobolGenerate(s.sampleIndex, s.dimension, scramble);
+    s.dimension++;
+    return float(x) * (1.0 / 4294967296.0);
+}
+
+vec2 samplePath2(inout PathSampler s)
+{
+    return vec2(samplePath1(s), samplePath1(s));
+}
+
+PathSampler initPathSampler(ivec2 pixel, uint sampleIndex, uint firstDimension)
+{
+    PathSampler s;
+    s.pixel = pixel;
+    s.sampleIndex = sampleIndex;
+    s.dimension = firstDimension;
+    return s;
+}
+
+// PBRT Interaction::SpawnRay 风格：沿法线侧偏移，避免自相交
+vec3 safeRayOrigin(vec3 p, vec3 n, vec3 wi)
+{
+    const float scale = 1.0 + 0.002 * max(max(abs(p.x), abs(p.y)), abs(p.z));
+    const float eps = RAY_SURFACE_EPS * scale;
+    const vec3 nFace = dot(n, wi) > 0.0 ? n : -n;
+    return p + nFace * eps;
+}
 
 // std140，与 C++ PathTraceSettingsGPU 一致（binding = 5）
 struct PathTraceSettings {
@@ -131,45 +228,6 @@ bool isPbrNonSpecular(PbrMaterial m)
     return m.metallic < 1.0 && m.roughness > 1e-3;
 }
 
-uint pcgHash(inout uint state)
-{
-    state = state * 747796405u + 2891336453u;
-    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-    return (word >> 22u) ^ word;
-}
-
-float rand01(inout uint seed)
-{
-    return float(pcgHash(seed)) / 4294967296.0;
-}
-
-uint deriveSeed(ivec2 pixel, uint sampleIndex, uint salt)
-{
-    uint state = uint(pixel.x) ^ (uint(pixel.y) * 747796405u + 2891336453u);
-    state ^= sampleIndex * 668265263u + salt * 48271u;
-    pcgHash(state);
-    pcgHash(state);
-    return state;
-}
-
-float rand01FromSeed(uint seed)
-{
-    uint state = seed;
-    return float(pcgHash(state)) / 4294967296.0;
-}
-
-vec2 samplePrimaryJitter(ivec2 pixel, uint sampleIndex)
-{
-    const uint seedX = deriveSeed(pixel, sampleIndex, 0u);
-    const uint seedY = deriveSeed(pixel, sampleIndex, 1u);
-    return vec2(rand01FromSeed(seedX), rand01FromSeed(seedY)) - 0.5;
-}
-
-uint initSampleSeed(ivec2 pixel, uint sampleIndex)
-{
-    return deriveSeed(pixel, sampleIndex, 2u);
-}
-
 void buildOrthonormalBasis(vec3 n, out vec3 t, out vec3 b)
 {
     t = abs(n.z) < 0.999 ? normalize(cross(n, vec3(0.0, 0.0, 1.0)))
@@ -266,7 +324,7 @@ vec3 localFromWorld(vec3 n, vec3 tangent, vec3 bitangent, vec3 world)
     return vec3(dot(world, tangent), dot(world, bitangent), dot(world, n));
 }
 
-bool sampleGGXVNDFReflection(vec3 n, vec3 v, float alphaRoughness, inout uint seed, out vec3 l, out float pdf)
+bool sampleGGXVNDFReflection(vec3 n, vec3 v, float alphaRoughness, inout PathSampler samp, out vec3 l, out float pdf)
 {
     vec3 tangent;
     vec3 bitangent;
@@ -278,7 +336,7 @@ bool sampleGGXVNDFReflection(vec3 n, vec3 v, float alphaRoughness, inout uint se
         return false;
     }
 
-    const vec2 xi = vec2(rand01(seed), rand01(seed));
+    const vec2 xi = samplePath2(samp);
     const vec3 hLocal = sampleGGXVNDF_Local(vLocal, alphaRoughness, xi);
     const vec3 h = worldFromLocal(n, tangent, bitangent, hLocal);
 
@@ -316,10 +374,10 @@ float pdfGGXVNDFReflection(vec3 n, vec3 v, vec3 wi, float alphaRoughness)
     return pdfH / (4.0 * vDotH);
 }
 
-vec3 sampleCosineHemisphere(vec3 normal, inout uint seed)
+vec3 sampleCosineHemisphere(vec3 normal, inout PathSampler samp)
 {
-    const float r1 = rand01(seed);
-    const float r2 = rand01(seed);
+    const float r1 = samplePath1(samp);
+    const float r2 = samplePath1(samp);
     const float phi = 2.0 * PI * r1;
     const float cosTheta = sqrt(1.0 - r2);
     const float sinTheta = sqrt(r2);
@@ -360,7 +418,57 @@ float dielectricFresnelReflectProb(vec3 n, vec3 v, PbrMaterial m)
     return clamp(luminance(schlickFresnel(nDotV, f0)), 0.0, 0.999);
 }
 
-vec3 evalPbrBsdf(PbrMaterial m, vec3 n, vec3 v, vec3 l)
+float specAlpha(PbrMaterial m)
+{
+    return max(m.roughness * m.roughness, 1e-4);
+}
+
+bool isGlossySpecular(PbrMaterial m)
+{
+    return m.metallic >= 1.0 || m.roughness < GLOSSY_SPECULAR_THRESHOLD;
+}
+
+bool shouldUseDeltaSpecular(PbrMaterial m, vec3 n, vec3 v)
+{
+    if (m.transmission > 0.01) {
+        return false;
+    }
+    const float nDotV = max(dot(n, v), 0.0);
+    if (nDotV < GRAZING_NDOTV_THRESHOLD) {
+        return true;
+    }
+    if (m.metallic >= 1.0 && m.roughness < METAL_DELTA_ROUGHNESS) {
+        return true;
+    }
+    return false;
+}
+
+vec3 evalPbrDiffuse(PbrMaterial m, vec3 n, vec3 v, vec3 l)
+{
+    const float nDotL = max(dot(n, l), 0.0);
+    const float nDotV = max(dot(n, v), 0.0);
+    if (nDotL <= 0.0 || nDotV <= 0.0 || m.metallic >= 1.0) {
+        return vec3(0.0);
+    }
+
+    const vec3 h = normalize(v + l);
+    const float lDotH = max(dot(l, h), 0.0);
+    const vec3 f0 = fresnelF0(m);
+    const vec3 F = schlickFresnel(lDotH, f0);
+
+    const float opaque = 1.0 - m.transmission;
+    const vec3 kd = (vec3(1.0) - F) * (1.0 - m.metallic) * opaque;
+
+    // Burley diffuse（PBRT DisneyDiffuse / Burley 2012）
+    const float fd90 = 0.5 + 2.0 * lDotH * lDotH * m.roughness;
+    const float fl = pow(1.0 - nDotL, 5.0);
+    const float fv = pow(1.0 - nDotV, 5.0);
+    const float fd = mix(1.0, fd90, fl) * mix(1.0, fd90, fv);
+
+    return kd * m.baseColor * fd * (1.0 / PI);
+}
+
+vec3 evalPbrSpecular(PbrMaterial m, vec3 n, vec3 v, vec3 l)
 {
     const float nDotL = max(dot(n, l), 0.0);
     const float nDotV = max(dot(n, v), 0.0);
@@ -375,16 +483,51 @@ vec3 evalPbrBsdf(PbrMaterial m, vec3 n, vec3 v, vec3 l)
     const vec3 f0 = fresnelF0(m);
     const vec3 F = schlickFresnel(lDotH, f0);
 
-    const float alpha = max(m.roughness * m.roughness, 1e-4);
+    const float alpha = specAlpha(m);
     const float D = distributionGTR2(nDotH, alpha);
     const float G = visibilitySmithGGXCorrelated(nDotV, nDotL, alpha);
     const vec3 spec = D * G * F / max(4.0 * nDotL * nDotV, 1e-5);
 
     const float opaque = 1.0 - m.transmission;
-    const vec3 kd = (vec3(1.0) - F) * (1.0 - m.metallic) * opaque;
-    const vec3 diffuse = kd * m.baseColor * (1.0 / PI);
+    return spec * opaque;
+}
 
-    return diffuse + spec * opaque;
+vec3 evalPbrBsdf(PbrMaterial m, vec3 n, vec3 v, vec3 l)
+{
+    return evalPbrDiffuse(m, n, v, l) + evalPbrSpecular(m, n, v, l);
+}
+
+bool sampleOpaqueSpecular(PbrMaterial m, vec3 n, vec3 v, float pSpec, inout PathSampler samp,
+                          out vec3 wi, out float pdf, out vec3 weight)
+{
+    wi = vec3(0.0);
+    pdf = 0.0;
+    weight = vec3(0.0);
+
+    const float nDotV = max(dot(n, v), 0.0);
+    const vec3 f0 = fresnelF0(m);
+
+    if (shouldUseDeltaSpecular(m, n, v)) {
+        wi = normalize(reflect(-v, n));
+        const float nDotL = max(dot(n, wi), 0.0);
+        if (nDotL <= 0.0) {
+            return false;
+        }
+        pdf = max(pSpec, 1e-8);
+        const vec3 F = schlickFresnel(nDotV, f0);
+        weight = F / pdf;
+        return true;
+    }
+
+    const float alpha = specAlpha(m);
+    if (!sampleGGXVNDFReflection(n, v, alpha, samp, wi, pdf)) {
+        return false;
+    }
+    pdf *= pSpec;
+    const float nDotL = max(dot(n, wi), 0.0);
+    const vec3 fr = evalPbrSpecular(m, n, v, wi);
+    weight = fr * nDotL / max(pdf, 1e-8);
+    return true;
 }
 
 void computeLobeProbabilities(PbrMaterial m, vec3 n, vec3 v,
@@ -409,9 +552,11 @@ void computeLobeProbabilities(PbrMaterial m, vec3 n, vec3 v,
         return;
     }
 
+    // 用 F0 + roughness 估计瓣能量；勿用视角 Fresnel（掠射角→1 会让哑光材质在边缘过度镜面采样）
+    const float roughnessFactor = 1.0 - m.roughness * m.roughness;
     const float diffW = max(luminance(m.baseColor), 0.01) * (1.0 - m.metallic);
-    const float specW = max(fresnel, 0.01);
-    const float sum = diffW + specW;
+    const float specW = max(luminance(f0), 0.01) * roughnessFactor * (1.0 - m.metallic);
+    const float sum = max(diffW + specW, 1e-4);
     pDiff = diffW / sum;
     pSpec = specW / sum;
 }
@@ -445,7 +590,7 @@ float pdfPbrBsdf(PbrMaterial m, vec3 n, vec3 v, vec3 wi)
     float pTrans;
     computeLobeProbabilities(m, n, v, pDiff, pSpec, pTrans);
 
-    const float alpha = max(m.roughness * m.roughness, 1e-4);
+    const float alpha = specAlpha(m);
     const float nDotWi = max(dot(n, wi), 0.0);
 
     float pdf = pDiff * pdfCosineHemisphere(nDotWi)
@@ -465,7 +610,7 @@ float powerHeuristic(float a, float b)
     return a2 / max(a2 + b2, 1e-16);
 }
 
-BsdfSample samplePbrBsdf(PbrMaterial m, vec3 n, vec3 v, float mediumIOR, inout uint seed)
+BsdfSample samplePbrBsdf(PbrMaterial m, vec3 n, vec3 v, float mediumIOR, inout PathSampler samp)
 {
     BsdfSample result;
     result.wi = vec3(0.0);
@@ -479,8 +624,8 @@ BsdfSample samplePbrBsdf(PbrMaterial m, vec3 n, vec3 v, float mediumIOR, inout u
     float pTrans;
     computeLobeProbabilities(m, n, v, pDiff, pSpec, pTrans);
 
-    const float alpha = max(m.roughness * m.roughness, 1e-4);
-    const float lobeRand = rand01(seed);
+    const float alpha = specAlpha(m);
+    const float lobeRand = samplePath1(samp);
 
     if (m.transmission > 0.01) {
         const float nDotV = max(dot(n, v), 0.0);
@@ -490,7 +635,6 @@ BsdfSample samplePbrBsdf(PbrMaterial m, vec3 n, vec3 v, float mediumIOR, inout u
         const bool insideMedium = mediumIOR > 1.0001;
         const float eta = insideMedium ? (mediumIOR / 1.0) : (1.0 / m.ior);
 
-        // 光滑玻璃：delta 反射/折射，避免 GGX pdf 极小导致边缘爆亮
         if (m.roughness < GLASS_DELTA_ROUGHNESS) {
             result.isSpecular = true;
             if (lobeRand < Fr) {
@@ -511,7 +655,7 @@ BsdfSample samplePbrBsdf(PbrMaterial m, vec3 n, vec3 v, float mediumIOR, inout u
 
         if (lobeRand < Fr) {
             result.isSpecular = false;
-            if (!sampleGGXVNDFReflection(n, v, alpha, seed, result.wi, result.pdf)) {
+            if (!sampleGGXVNDFReflection(n, v, alpha, samp, result.wi, result.pdf)) {
                 return result;
             }
             result.pdf *= Fr;
@@ -522,7 +666,7 @@ BsdfSample samplePbrBsdf(PbrMaterial m, vec3 n, vec3 v, float mediumIOR, inout u
             result.isSpecular = false;
             result.isTransmissive = true;
             if (!refractSnell(v, n, eta, result.wi)) {
-                if (!sampleGGXVNDFReflection(n, v, alpha, seed, result.wi, result.pdf)) {
+                if (!sampleGGXVNDFReflection(n, v, alpha, samp, result.wi, result.pdf)) {
                     return result;
                 }
                 result.pdf = Fr;
@@ -539,23 +683,21 @@ BsdfSample samplePbrBsdf(PbrMaterial m, vec3 n, vec3 v, float mediumIOR, inout u
 
     if (lobeRand < pDiff) {
         result.isSpecular = false;
-        result.wi = sampleCosineHemisphere(n, seed);
+        result.wi = sampleCosineHemisphere(n, samp);
         const float nDotL = dot(n, result.wi);
         if (nDotL <= 0.0) {
             return result;
         }
         result.pdf = pDiff * pdfCosineHemisphere(nDotL);
+        const vec3 fr = evalPbrDiffuse(m, n, v, result.wi);
+        result.weight = fr * nDotL / max(result.pdf, 1e-8);
     } else {
-        result.isSpecular = m.metallic >= 1.0 || m.roughness < 0.05;
-        if (!sampleGGXVNDFReflection(n, v, alpha, seed, result.wi, result.pdf)) {
+        result.isSpecular = isGlossySpecular(m);
+        if (!sampleOpaqueSpecular(m, n, v, pSpec, samp, result.wi, result.pdf, result.weight)) {
             return result;
         }
-        result.pdf *= pSpec;
     }
 
-    const float nDotL = max(dot(n, result.wi), 0.0);
-    const vec3 fr = evalPbrBsdf(m, n, v, result.wi);
-    result.weight = fr * nDotL / max(result.pdf, 1e-8);
     return result;
 }
 
@@ -635,22 +777,53 @@ struct EnvLightSample {
     float pdf;
 };
 
-EnvLightSample sampleEnvironmentLight(sampler2D envMap, sampler2D envCdf, ivec2 cdfSize, inout uint seed)
+EnvLightSample sampleEnvironmentLight(sampler2D envMap, sampler2D envCdf, ivec2 cdfSize, inout PathSampler samp)
 {
     EnvLightSample result;
     result.wi = vec3(0.0);
     result.radiance = vec3(0.0);
     result.pdf = 0.0;
 
-    const float xi = rand01(seed);
-    const float yi = rand01(seed);
+    const float xi = samplePath1(samp);
+    const float yi = samplePath1(samp);
     const int row = envCdfSearchMarginal(envCdf, xi, cdfSize.y);
     const int col = envCdfSearchConditional(envCdf, row, yi, cdfSize.x);
 
-    const vec2 uv = (vec2(float(col), float(row)) + vec2(rand01(seed), rand01(seed))) / vec2(cdfSize);
+    const vec2 uv = (vec2(float(col), float(row)) + samplePath2(samp)) / vec2(cdfSize);
     result.wi = uvToDirection(uv);
     result.radiance = texture(envMap, uv).rgb;
     result.pdf = environmentPdfAtCell(envCdf, cdfSize, col, row, uv);
+    return result;
+}
+
+vec3 evaluateDirectEnvironmentMIS(PbrMaterial m, vec3 n, vec3 v, EnvLightSample light)
+{
+    const float nDotL = dot(n, light.wi);
+    if (light.pdf <= 1e-8 || nDotL <= 0.0) {
+        return vec3(0.0);
+    }
+
+    float pDiff;
+    float pSpec;
+    float pTrans;
+    computeLobeProbabilities(m, n, v, pDiff, pSpec, pTrans);
+
+    vec3 result = vec3(0.0);
+
+    if (pDiff > 1e-8) {
+        const float pdfDiff = pDiff * pdfCosineHemisphere(nDotL);
+        const vec3 fDiff = evalPbrDiffuse(m, n, v, light.wi);
+        result += powerHeuristic(light.pdf, pdfDiff) * fDiff * light.radiance * nDotL / light.pdf;
+    }
+
+    if (pSpec > 1e-8 && m.transmission < 0.01 && !shouldUseDeltaSpecular(m, n, v)) {
+        const float pdfSpec = pSpec * pdfGGXVNDFReflection(n, v, light.wi, specAlpha(m));
+        if (pdfSpec > 1e-8) {
+            const vec3 fSpec = evalPbrSpecular(m, n, v, light.wi);
+            result += powerHeuristic(light.pdf, pdfSpec) * fSpec * light.radiance * nDotL / light.pdf;
+        }
+    }
+
     return result;
 }
 

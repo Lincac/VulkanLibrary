@@ -63,7 +63,8 @@ int main(){
     tlas->build(commandPool);
     std::cout << "TLAS ready, address = " << tlas->getDeviceAddress() << std::endl;
 
-    const PathTraceSettingsGPU pathTraceSettings{};
+    PathTraceSettingsGPU pathTraceSettings{};
+    pathTraceSettings.exposure = -0.3;
     auto settingsBuffer = std::make_shared<vkEngineBuffer>(logicalDevice);
     settingsBuffer->setSize(sizeof(PathTraceSettingsGPU));
     settingsBuffer->setUsage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
