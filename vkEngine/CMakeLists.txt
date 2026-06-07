@@ -15,16 +15,18 @@ target_include_directories(vkEngine
         $<BUILD_INTERFACE:${VKENGINE_SOURCE_DIR}/RT>
 )
 
-get_filename_component(VULKAN_LIB_DIR "${Vulkan_LIBRARY}" DIRECTORY)
-
-add_library(volk STATIC IMPORTED GLOBAL)
-set_target_properties(volk PROPERTIES
-    IMPORTED_LOCATION_DEBUG "${VULKAN_LIB_DIR}/volkd.lib"
-    IMPORTED_LOCATION_RELEASE "${VULKAN_LIB_DIR}/volk.lib"
-    IMPORTED_LOCATION_RELWITHDEBINFO "${VULKAN_LIB_DIR}/volk.lib"
-    IMPORTED_LOCATION_MINSIZEREL "${VULKAN_LIB_DIR}/volk.lib"
-    INTERFACE_INCLUDE_DIRECTORIES "${Vulkan_INCLUDE_DIRS}"
+# volk: compile from Vulkan SDK (Include/Volk/volk.c + volk.h), not Lib/volk*.lib
+find_path(VOLK_SOURCE_DIR
+    NAMES volk.c
+    PATHS "${Vulkan_INCLUDE_DIRS}/Volk" "${Vulkan_INCLUDE_DIRS}/volk"
+    NO_DEFAULT_PATH
 )
+if(NOT VOLK_SOURCE_DIR)
+    message(FATAL_ERROR "volk.c not found under ${Vulkan_INCLUDE_DIRS}")
+endif()
+
+add_library(volk STATIC "${VOLK_SOURCE_DIR}/volk.c")
+target_include_directories(volk PUBLIC "${Vulkan_INCLUDE_DIRS}")
 
 target_compile_definitions(vkEngine
     PUBLIC
