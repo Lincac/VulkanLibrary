@@ -1,5 +1,6 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
+#extension GL_EXT_scalar_block_layout : require
 
 #include "pathtrace.glsl"
 
@@ -7,129 +8,11 @@ layout(set = 0, binding = 0) uniform accelerationStructureEXT tlas;
 layout(set = 0, binding = 1, rgba8) uniform writeonly image2D outputImage;
 layout(set = 0, binding = 3) uniform sampler2D environmentMap;
 layout(set = 0, binding = 4) uniform sampler2D environmentCdf;
-layout(std140, set = 0, binding = 5) uniform PathTraceSettingsBlock {
+layout(std430, set = 0, binding = 5) uniform PathTraceSettingsBlock {
     PathTraceSettings uSettings;
 };
 
 layout(location = 0) rayPayloadEXT PathPayload payload;
-
-bool traceShadow(vec3 origin, vec3 direction)
-{
-    payload.hitNormal.x = 0.0;
-
-    traceRayEXT(
-        tlas,
-        gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT,
-        0xFF,
-        0,
-        0,
-        0,
-        origin,
-        0.001,
-        direction,
-        1000.0,
-        0);
-
-    return payload.hitNormal.x >= 0.5;
-}
-
-vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, inout PathSampler samp)
-{
-    vec3 radiance = vec3(0.0);
-    vec3 throughput = vec3(1.0);
-    float p_b = 0.0;
-    bool specularBounce = false;
-    bool anyNonSpecularBounces = false;
-    uint depth = 0u;
-    float mediumIOR = 1.0;
-
-    const ivec2 cdfSize = textureSize(environmentCdf, 0);
-
-    for (uint bounce = 0u; bounce < maxBounces; ++bounce) {
-        payload.hitNormal.x = 0.0;
-
-        traceRayEXT(
-            tlas,
-            gl_RayFlagsOpaqueEXT,
-            0xFF,
-            0,
-            0,
-            0,
-            origin,
-            0.001,
-            direction,
-            1000.0,
-            0);
-
-        if (payload.hitNormal.x < 0.5) {
-            const vec3 envRadiance = sampleEnvironment(environmentMap, direction);
-            if (depth == 0u || specularBounce) {
-                radiance += throughput * envRadiance;
-            } else {
-                const float p_l = environmentPdf(environmentCdf, cdfSize, direction);
-                radiance += throughput * powerHeuristic(p_b, p_l) * envRadiance;
-            }
-            break;
-        }
-
-        const vec3 n = normalize(payload.hitNormal.yzw);
-        const vec3 v = normalize(-direction);
-        const vec3 hitPos = payload.position.xyz;
-        PbrMaterial mat = unpackMaterial(payload);
-
-        if (PATH_REGULARIZE && anyNonSpecularBounces && isPbrOpaque(mat)) {
-            mat = regularizePbrMaterial(mat);
-        }
-
-        // NEE：分瓣 MIS（diffuse / spec 分别与 light pdf 比）
-        if (isPbrNonSpecular(mat)) {
-            const EnvLightSample envLight = sampleEnvironmentLight(environmentMap, environmentCdf, cdfSize, samp);
-            if (envLight.pdf > 1e-8 && dot(n, envLight.wi) > 0.0) {
-                const vec3 shadowOrigin = safeRayOrigin(hitPos, n, envLight.wi);
-                if (!traceShadow(shadowOrigin, envLight.wi)) {
-                    radiance += throughput * evaluateDirectEnvironmentMIS(mat, n, v, envLight);
-                }
-            }
-        }
-
-        if (depth + 1u >= maxBounces) {
-            break;
-        }
-
-        const BsdfSample bsdf = samplePbrBsdf(mat, n, v, mediumIOR, samp);
-        if (bsdf.pdf <= 1e-8) {
-            break;
-        }
-
-        throughput *= bsdf.weight;
-        p_b = bsdf.pdf;
-        specularBounce = bsdf.isSpecular;
-        anyNonSpecularBounces = anyNonSpecularBounces || !bsdf.isSpecular;
-
-        if (depth >= 1u) {
-            const float rrMax = max(throughput.r, max(throughput.g, throughput.b));
-            if (rrMax < 1.0) {
-                const float q = max(0.0, 1.0 - rrMax);
-                if (samplePath1(samp) < q) {
-                    break;
-                }
-                throughput /= max(1.0 - q, 1e-8);
-            }
-        }
-
-        direction = bsdf.wi;
-        origin = safeRayOrigin(hitPos, n, bsdf.wi);
-
-        if (bsdf.isTransmissive) {
-            const bool insideMedium = mediumIOR > 1.0001;
-            mediumIOR = insideMedium ? 1.0 : mat.ior;
-        }
-
-        depth++;
-    }
-
-    return radiance;
-}
 
 void main() {
     const ivec2 pixel = ivec2(gl_LaunchIDEXT.xy);
@@ -139,14 +22,30 @@ void main() {
 
     const uint spp = max(uSettings.samplesPerPixel, 1u);
 
-    vec3 accumulated = vec3(0.0);
-    for (uint s = 0u; s < spp; ++s) {
-        PathSampler samp = initPathSampler(pixel, s, 0u);
-        const vec2 jitter = samplePath2(samp) - 0.5;
-        const CameraRay primaryRay = getCameraRay(camera, pixelCenter, imageSize, jitter);
-        accumulated += tracePath(primaryRay.origin, primaryRay.direction, uSettings.maxBounces, samp);
-    }
+    vec3 accumulated = vec3(0);
+    const CameraRay primaryRay = getCameraRay(camera, pixelCenter, imageSize, vec2(0.0));
 
-    accumulated /= float(spp);
+    traceRayEXT(
+            tlas,
+            gl_RayFlagsOpaqueEXT,
+            0xFF,
+            0,
+            0,
+            0,
+            primaryRay.origin,
+            0.001,
+            primaryRay.direction,
+            1000.0,
+            0);
+        
+    if(payload.hitNormal.x > 0.5)
+    {
+        accumulated = vec3(payload.hitNormal.yzw);
+    }
+    else
+    {
+        accumulated = sampleEnvironment(environmentMap, payload.hitNormal.yzw);
+    }
+    
     imageStore(outputImage, pixel, vec4(toneMap(accumulated, uSettings.exposure), 1.0));
 }

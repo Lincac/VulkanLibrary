@@ -19,7 +19,11 @@ vkEngineLogicalDevice::vkEngineLogicalDevice(std::shared_ptr<vkEnginePhysicalDev
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
+    VkPhysicalDeviceVulkan12Features vulkan12Features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+    vulkan12Features.scalarBlockLayout = VK_TRUE;
+
     VkPhysicalDeviceBufferDeviceAddressFeatures bdaFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
+    bdaFeatures.pNext = &vulkan12Features;
     bdaFeatures.bufferDeviceAddress = VK_TRUE;
 
     VkPhysicalDeviceRayQueryFeaturesKHR rqFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR };
