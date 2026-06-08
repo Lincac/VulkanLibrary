@@ -23,6 +23,17 @@ struct ShadingFrame {
     vec3 N; // local +Z (shading normal)
 };
 
+struct Material {
+    vec3  diffuseColor;
+    float roughness;   // 用于 Oren–Nayar: sigma
+};
+
+struct BsdfSample {
+    vec3  wo;   // 局部空间
+    vec3  f;    // BSDF 值
+    float pdf;
+};
+
 struct PathPayload {
     vec4 hitNormal; // x: 1=命中, yzw: 世界空间法线
     vec4 position;  // xyz: 命中点
@@ -105,6 +116,20 @@ vec3 toneMap(vec3 color, float exposure)
     return pow(color, vec3(1.0 / 2.2));
 }
 
+ShadingFrame makeSHadingFrame(vec3 n)
+{
+    vec3 t = normalize(abs(n.z) < 0.999 ? cross(vec3(0,0,1), n)
+                                        : cross(vec3(0,1,0), n));
+    vec3 b = cross(n, t);
+
+    ShadingFrame f;
+    f.N = n;   
+    f.T = t;  
+    f.B = b;  
+
+    return f;
+}
+
 mat3 shadingFrameToWorld(ShadingFrame frame)
 {
     return mat3(frame.T, frame.B, frame.N); // 列 = T,B,N
@@ -118,4 +143,64 @@ vec3 worldToLocal(vec3 vWorld, ShadingFrame frame)
 vec3 localToWorld(vec3 vLocal, ShadingFrame frame)
 {
     return shadingFrameToWorld(frame) * vLocal;
+}
+
+// bsdf
+vec3 lambert_eval(vec3 albedo, vec3 wi, vec3 wo) 
+{
+    if (wi.z <= 0.0 || wo.z <= 0.0)
+    {
+        return vec3(0.0);
+    }
+        
+    return albedo * (1.0 / PI);
+}
+
+float lambert_pdf(vec3 wi, vec3 wo) 
+{
+    if (wi.z <= 0.0 || wo.z <= 0.0)
+    {
+        return 0.0;
+    }
+        
+    return wo.z * (1.0 / PI); // 余弦加权半球
+}
+
+vec3 cosineSampleHemisphere(vec2 xi) 
+{
+    float r = sqrt(xi.x);
+    float phi = 2.0 * PI * xi.y;
+    float x = r * cos(phi);
+    float y = r * sin(phi);
+    float z = sqrt(max(0.0, 1.0 - x*x - y*y));
+    return vec3(x, y, z);
+}
+
+BsdfSample lambert_sample(vec3 albedo, vec3 wi, vec2 xi) 
+{
+    BsdfSample s;
+    if (wi.z <= 0.0) {
+        s.pdf = 0.0;
+        s.f   = vec3(0.0);
+        s.wo  = vec3(0.0, 0.0, 1.0);
+        return s;
+    }
+
+    s.wo  = cosineSampleHemisphere(xi);
+    s.pdf = lambert_pdf(wi, s.wo);
+    s.f   = lambert_eval(albedo, wi, s.wo);
+    
+    return s;
+}
+
+vec3 bsdf_eval(in Material m, vec3 wi, vec3 wo) {
+    return lambert_eval(m.diffuseColor, wi, wo);
+}
+
+float bsdf_pdf(in Material m, vec3 wi, vec3 wo) {
+    return lambert_pdf(wi, wo);
+}
+
+BsdfSample bsdf_sample(in Material m, vec3 wi, vec2 xi) {
+    return lambert_sample(m.diffuseColor, wi, xi);
 }
