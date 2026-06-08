@@ -6,5 +6,5 @@
 layout(location = 0) rayPayloadInEXT PathPayload payload;
 
 void main() {
-    payload.hitNormal.x = 0.0;
+    payload.hitNormal = vec4(0.0, normalize(gl_WorldRayDirectionEXT));
 }

@@ -38,13 +38,10 @@ void main() {
             1000.0,
             0);
         
-    if(payload.hitNormal.x > 0.5)
-    {
-        accumulated = vec3(payload.hitNormal.yzw);
-    }
-    else
-    {
-        accumulated = sampleEnvironment(environmentMap, payload.hitNormal.yzw);
+    if (payload.hitNormal.x > 0.5) {
+        accumulated = payload.hitNormal.yzw * 0.5 + 0.5;
+    } else {
+        accumulated = sampleEnvironment(environmentMap, primaryRay.direction);
     }
     
     imageStore(outputImage, pixel, vec4(toneMap(accumulated, uSettings.exposure), 1.0));

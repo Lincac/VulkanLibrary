@@ -3,7 +3,6 @@
 #include "vkEngineAccelerationStructure.h"
 #include "vkEngineRTDescriptor.h"
 #include "vkEngineRayTracingPipeline.h"
-#include "vkEngineHelp.h"
 #include "vkEngineRTHelp.h"
 
 #include <iostream>

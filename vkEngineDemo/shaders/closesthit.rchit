@@ -26,7 +26,7 @@ void main() {
 
     vec3 n = normalize(n0 * barycentrics.x + n1 * barycentrics.y + n2 * barycentrics.z);
 
-    const vec3 hitPosition = gl_WorldRayOriginEXT + gl_HitTEXT * gl_WorldRayDirectionEXT;
+    const vec3 hitPosition = gl_WorldRayOriginEXT + gl_RayTmaxEXT * gl_WorldRayDirectionEXT;
     const vec3 v = normalize(-gl_WorldRayDirectionEXT);
     
     if (dot(n, v) < 0.0) 
