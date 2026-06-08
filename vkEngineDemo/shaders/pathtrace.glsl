@@ -17,6 +17,12 @@ struct PathTraceSettings {
     uint maxBounces;
 };
 
+struct ShadingFrame {
+    vec3 T; // local +X
+    vec3 B; // local +Y
+    vec3 N; // local +Z (shading normal)
+};
+
 struct PathPayload {
     vec4 hitNormal; // x: 1=命中, yzw: 世界空间法线
     vec4 position;  // xyz: 命中点
@@ -97,4 +103,19 @@ vec3 toneMap(vec3 color, float exposure)
     color *= exp2(exposure);
     color = ACESFilm(color);
     return pow(color, vec3(1.0 / 2.2));
+}
+
+mat3 shadingFrameToWorld(ShadingFrame frame)
+{
+    return mat3(frame.T, frame.B, frame.N); // 列 = T,B,N
+}
+
+vec3 worldToLocal(vec3 vWorld, ShadingFrame frame)
+{
+    return transpose(shadingFrameToWorld(frame)) * vWorld;
+}
+
+vec3 localToWorld(vec3 vLocal, ShadingFrame frame)
+{
+    return shadingFrameToWorld(frame) * vLocal;
 }

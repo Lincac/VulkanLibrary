@@ -94,12 +94,10 @@ bool vkEnginePhysicalDevice::isDeviceSuitable(VkPhysicalDevice device)
     // 检查设备扩展支持
     VkPhysicalDeviceVulkan12Features vulkan12Features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
     VkPhysicalDeviceRayQueryFeaturesKHR rqFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR };
-    VkPhysicalDeviceBufferDeviceAddressFeatures bdaFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
     VkPhysicalDeviceAccelerationStructureFeaturesKHR asFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
 
-    bdaFeatures.pNext = &vulkan12Features;
-    rqFeatures.pNext = &bdaFeatures;
+    rqFeatures.pNext = &vulkan12Features;
     rtFeatures.pNext = &rqFeatures;
     asFeatures.pNext = &rtFeatures;
 
@@ -113,7 +111,7 @@ bool vkEnginePhysicalDevice::isDeviceSuitable(VkPhysicalDevice device)
     return asFeatures.accelerationStructure
         && rtFeatures.rayTracingPipeline
         && rqFeatures.rayQuery
-        && bdaFeatures.bufferDeviceAddress
+        && vulkan12Features.bufferDeviceAddress
         && vulkan12Features.scalarBlockLayout;
 }
 

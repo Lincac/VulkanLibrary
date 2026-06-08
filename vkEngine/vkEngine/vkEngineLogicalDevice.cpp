@@ -21,13 +21,10 @@ vkEngineLogicalDevice::vkEngineLogicalDevice(std::shared_ptr<vkEnginePhysicalDev
 
     VkPhysicalDeviceVulkan12Features vulkan12Features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
     vulkan12Features.scalarBlockLayout = VK_TRUE;
-
-    VkPhysicalDeviceBufferDeviceAddressFeatures bdaFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
-    bdaFeatures.pNext = &vulkan12Features;
-    bdaFeatures.bufferDeviceAddress = VK_TRUE;
+    vulkan12Features.bufferDeviceAddress = VK_TRUE;
 
     VkPhysicalDeviceRayQueryFeaturesKHR rqFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR };
-    rqFeatures.pNext = &bdaFeatures;
+    rqFeatures.pNext = &vulkan12Features;
     rqFeatures.rayQuery = VK_TRUE;
 
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };

@@ -32,7 +32,7 @@ function Get-GlslcPath {
 function Find-DemoShadersOutputDir {
     param([string]$PreferredConfiguration)
 
-    $buildRoot = Join-Path $RepoRoot "build"
+    $buildRoot = Join-Path $RepoRoot "build-vs"
     if (-not (Test-Path $buildRoot)) {
         return $null
     }
@@ -63,7 +63,7 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     $OutputDir = Find-DemoShadersOutputDir -PreferredConfiguration $Configuration
 }
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
-    $hint = Join-Path $RepoRoot "build\vkEngineDemo\Release\shaders"
+    $hint = Join-Path $RepoRoot "build-vs\vkEngineDemo\Release\shaders"
     throw "Demo output not found. Build vkEngineDemo first, or pass -OutputDir e.g.: $hint"
 }
 
