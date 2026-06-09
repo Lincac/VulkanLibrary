@@ -111,7 +111,6 @@ struct RoughPlastic {
     float int_ior;
     float ext_ior;
     float alpha;                
-    int distribution;           // 0=GGX, 1=Beckmann
 };
 
 struct Conductor {
@@ -123,7 +122,6 @@ struct RoughConductor {
     vec3 eta;
     vec3 k;
     float alpha;
-    int distribution;
 };
 
 struct Dielectric {
@@ -135,7 +133,6 @@ struct RoughDielectric {
     float int_ior;
     float ext_ior;
     float alpha;
-    int distribution;
 };
 
 struct Material {

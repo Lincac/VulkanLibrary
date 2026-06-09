@@ -5,6 +5,7 @@
 #include "traceGlobal.glsl"
 #include "diffuseMaterial.glsl"
 #include "plasticMaterial.glsl"
+#include "roughPlasticMaterial.glsl"
 #include "envMaterial.glsl"
 
 layout(set = 0, binding = 0) uniform accelerationStructureEXT tlas;
@@ -160,6 +161,10 @@ vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, uint sampleBase)
                               * abs(wi_env_local.z) / env.pdf * w_env;
                 }
             }            
+        }
+        else if(mat.type == MATERIAL_ROUGHPLASTIC)
+        {
+            
         }
         else
         {
