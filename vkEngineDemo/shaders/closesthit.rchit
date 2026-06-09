@@ -20,13 +20,16 @@ void main() {
     vec3 n = normalize(n0 * barycentrics.x + n1 * barycentrics.y + n2 * barycentrics.z);
 
     const vec3 hitPosition = gl_WorldRayOriginEXT + gl_RayTmaxEXT * gl_WorldRayDirectionEXT;
-    const vec3 wo = normalize(-gl_WorldRayDirectionEXT);
+    const vec3 v = normalize(-gl_WorldRayDirectionEXT);
     
-    if (dot(n, wo) < 0.0) 
+    if (dot(n, v) < 0.0) 
     {
         n = -n;
     }
 
     payload.hitNormal = vec4(1.0, n.x, n.y, n.z);
     payload.position = vec4(hitPosition, 1.0);
+    
+    payload.material0.rgb = vec3(1.0, 0.87, 0.1);
+    payload.material0.w = 1.0;
 }

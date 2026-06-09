@@ -14,35 +14,126 @@ layout(std430, set = 0, binding = 5) uniform PathTraceSettingsBlock {
 
 layout(location = 0) rayPayloadEXT PathPayload payload;
 
+bool traceShadow(vec3 origin, vec3 direction)
+{
+    payload.hitNormal.x = 0.0;
+
+    traceRayEXT(
+        tlas,
+        gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT,
+        0xFF,
+        0,
+        0,
+        0,
+        origin,
+        0.001,
+        direction,
+        1000.0,
+        0);
+
+    return payload.hitNormal.x >= 0.5;
+}
+
+vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, uint sampleBase)
+{
+    vec3 radiance = vec3(0.0);
+    vec3 throughput = vec3(1.0);
+    float prev_bsdf_pdf = 0.0;  // bounce 0 无上一跳
+
+    for (uint bounce = 0u; bounce < maxBounces; ++bounce)
+    {
+        payload.hitNormal.x = 0.0;
+
+        traceRayEXT(
+                    tlas,
+                    gl_RayFlagsOpaqueEXT,
+                    0xFF,
+                    0,
+                    0,
+                    0,
+                    origin,
+                    0.001,
+                    direction,
+                    1000.0,
+                    0);
+                    
+        if (payload.hitNormal.x < 0.5)
+        {
+            const vec3 envRadiance = sampleEnvironment(environmentMap, direction);
+
+            float w_bsdf = 1.0;
+            if (prev_bsdf_pdf > 1e-8)
+            {
+                float pdf_env = environmentPdf(direction, environmentCdf);
+                w_bsdf = prev_bsdf_pdf / (prev_bsdf_pdf + pdf_env);
+            }
+
+            radiance += throughput * envRadiance * w_bsdf;
+
+            break;
+        }
+        
+        ShadingFrame sf = makeShadingFrame(payload.hitNormal.yzw);
+        Material mat = unpackMaterial(payload);
+
+        vec3 world_wo = normalize(-direction);
+        vec3 local_wo = worldToLocal(world_wo, sf);
+
+        vec2 xi_env = sobol2D(sampleBase + 2u + bounce * 2u + 1u);  // 独立维度
+        EnvSample env = sampleEnvironmentImportance(xi_env, environmentMap, environmentCdf);
+
+        vec3 hitPos = payload.position.xyz;
+        if (env.pdf > 1e-8 && !traceShadow(hitPos + env.direction * 0.001, env.direction))
+        {
+            vec3 wi_env_local = worldToLocal(normalize(env.direction), sf);
+            if (wi_env_local.z > 0.0)
+            {
+                vec3 Le = sampleEnvironment(environmentMap, env.direction);
+                vec3 f  = bsdf_eval(mat, local_wo, wi_env_local);
+
+                float pdf_bsdf = bsdf_pdf(mat, local_wo, wi_env_local);
+                float w_env = env.pdf / (env.pdf + pdf_bsdf);
+
+                radiance += throughput * f * Le * abs(wi_env_local.z) / env.pdf * w_env;
+            }
+        }
+
+        vec2 xi_bsdf = sobol2D(sampleBase + 2u + bounce * 2u); 
+        const BsdfSample bsdf = bsdf_sample(mat, local_wo, xi_bsdf);
+        if(bsdf.pdf <= 1e-8)
+        {
+            break;
+        }
+
+        prev_bsdf_pdf = bsdf.pdf;
+        throughput *= bsdf.f * abs(bsdf.wo.z) / bsdf.pdf;
+
+        vec3 wi = localToWorld(bsdf.wo, sf);
+        origin = hitPos + wi * max(0.001, 0.0001 * length(hitPos));
+        direction = wi;
+    }
+
+    return radiance;
+}
+
 void main() {
     const ivec2 pixel = ivec2(gl_LaunchIDEXT.xy);
     const vec2 pixelCenter = vec2(pixel) + vec2(0.5);
     const vec2 imageSize = vec2(gl_LaunchSizeEXT.xy);
     const Camera camera = getCamera(uSettings);
-
     const uint spp = max(uSettings.samplesPerPixel, 1u);
 
     vec3 accumulated = vec3(0);
-    const CameraRay primaryRay = getCameraRay(camera, pixelCenter, imageSize, vec2(0.0));
+    for(uint s = 0u; s < spp ; ++s)
+    {
+        uint pixelSeed = uint(pixel.x) + uint(pixel.y) * uint(imageSize.x);
+        uint sampleBase = pixelSeed * spp + s; 
 
-    traceRayEXT(
-            tlas,
-            gl_RayFlagsOpaqueEXT,
-            0xFF,
-            0,
-            0,
-            0,
-            primaryRay.origin,
-            0.001,
-            primaryRay.direction,
-            1000.0,
-            0);
-        
-    if (payload.hitNormal.x > 0.5) {
-        accumulated = payload.hitNormal.yzw * 0.5 + 0.5;
-    } else {
-        accumulated = sampleEnvironment(environmentMap, primaryRay.direction);
+        const vec2 jitter = sobol2D(sampleBase) - vec2(0.5);
+        const CameraRay primaryRay = getCameraRay(camera, pixelCenter, imageSize, jitter);
+        accumulated += tracePath(primaryRay.origin, primaryRay.direction, uSettings.maxBounces, sampleBase);
     }
-    
+    accumulated /= float(spp);
+
     imageStore(outputImage, pixel, vec4(toneMap(accumulated, uSettings.exposure), 1.0));
 }
