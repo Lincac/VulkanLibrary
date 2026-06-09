@@ -1,6 +1,9 @@
 // 数据及结构定义
 const float PI = 3.14159265358979323846;
 
+const uint MAT_DIFFUSE         = 0u;
+const uint MAT_SMOOTH_PLASTIC  = 1u;
+
 // Sobol direction numbers for dimension 1
 const uint SOBOL_DIR_X[32] = uint[32](
     0x80000000u, 0x40000000u, 0x20000000u, 0x10000000u,
@@ -49,14 +52,19 @@ struct ShadingFrame {
 };
 
 struct Material {
+    uint  type;          // MAT_DIFFUSE / MAT_SMOOTH_PLASTIC
+
     vec3  diffuseColor;
     float roughness;   // 用于 Oren–Nayar: sigma
+    float intIOR;        // 塑料内部折射率，默认 1.49
+    float extIOR;        // 外部介质，默认 1.0
 };
 
 struct BsdfSample {
     vec3  wo;   // 局部空间
     vec3  f;    // BSDF 值
     float pdf;
+    bool isDelta;
 };
 
 // 输入 xi in [0,1]^2，输出世界空间方向 + pdf
@@ -69,6 +77,7 @@ struct PathPayload {
     vec4 hitNormal; // x: 1=命中, yzw: 世界空间法线
     vec4 position;  // xyz: 命中点
     vec4 material0; // diffuseColor(rgb) roughness(w)
+    vec4 material1; // type(r), intIOR(g), extIOR(b)
 };
 
 struct Camera {
@@ -117,14 +126,18 @@ float range01(uint index, const uint dir[32])
 Material unpackMaterial(PathPayload payload)
 {
     Material m;
+    m.type         = uint(payload.material1.r + 0.5);
     m.diffuseColor = payload.material0.rgb;
-    m.roughness = payload.material0.a;
+    m.roughness    = payload.material0.a;
+    m.intIOR       = max(payload.material1.g, 1.0);
+    m.extIOR       = max(payload.material1.b, 1.0);
     return m;
 }
 
 void packMaterial(inout PathPayload payload, Material m)
 {
     payload.material0 = vec4(m.diffuseColor, m.roughness);
+    payload.material1 = vec4(float(m.type), m.intIOR, m.extIOR, 0.0);
 }
 
 Camera getCamera(PathTraceSettings settings)
@@ -241,6 +254,50 @@ vec3 localToWorld(vec3 vLocal, ShadingFrame frame)
 }
 
 // bsdf 相关接口定义
+// Mitsuba 风格 dielectric Fresnel
+float fresnelDielectric(float cosThetaI, float etaI, float etaT)
+{
+    cosThetaI = abs(cosThetaI);
+
+    float sin2ThetaI = max(0.0, 1.0 - cosThetaI * cosThetaI);
+    float sin2ThetaT = (etaI / etaT) * (etaI / etaT) * sin2ThetaI;
+
+    if (sin2ThetaT >= 1.0)
+        return 1.0; // 全内反射
+
+    float cosThetaT = sqrt(max(0.0, 1.0 - sin2ThetaT));
+
+    float rPar  = ((etaT * cosThetaI) - (etaI * cosThetaT))
+                / ((etaT * cosThetaI) + (etaI * cosThetaT));
+    float rPerp = ((etaI * cosThetaI) - (etaT * cosThetaT))
+                / ((etaI * cosThetaI) + (etaT * cosThetaT));
+
+    return 0.5 * (rPar * rPar + rPerp * rPerp);
+}
+
+// 外部反射 Fresnel: air -> plastic
+float fresnelExt(float cosTheta, float etaI, float etaT)
+{
+    return fresnelDielectric(cosTheta, etaI, etaT);
+}
+
+// 内部出射 Fresnel: plastic -> air
+float fresnelInt(float cosTheta, float etaI, float etaT)
+{
+    return fresnelDielectric(cosTheta, etaT, etaI);
+}
+
+vec3 reflectLocal(vec3 wi)
+{
+    // wi: 局部空间入射方向 (z>0)
+    return vec3(-wi.x, -wi.y, wi.z);
+}
+
+bool isSpecularReflection(vec3 wi, vec3 wo)
+{
+    vec3 wr = reflectLocal(wi);
+    return dot(wr, wo) > 1.0 - 1e-4;
+}
 
 // 由 CDF 纹理尺寸和 (i,j) 算立体角微元 dΩ
 float envCellSolidAngle(ivec2 cdfRes, int i, int j)
@@ -374,6 +431,84 @@ vec3 cosineSampleHemisphere(vec2 xi)
     return vec3(x, y, z);
 }
 
+vec3 smooth_plastic_eval(vec3 rho, float etaI, float etaT, vec3 wi, vec3 wo)
+{
+    if (wi.z <= 0.0 || wo.z <= 0.0)
+        return vec3(0.0);
+
+    vec3 result = vec3(0.0);
+
+    // 1) 镜面 delta
+    if (isSpecularReflection(wi, wo))
+    {
+        float F = fresnelExt(wi.z, etaI, etaT);
+        result += vec3(F / wi.z);
+    }
+
+    // 2) 漫反射 — Fi/Fo 均用外部界面 Fresnel（Mitsuba plastic 一致）
+    float Fi  = fresnelExt(wi.z, etaI, etaT);
+    float Fo  = fresnelExt(wo.z, etaI, etaT);
+    result += rho * (1.0 - Fi) * (1.0 - Fo) * (1.0 / PI);
+
+    return result;
+}
+
+float smooth_plastic_pdf(vec3 rho, float etaI, float etaT, vec3 wi, vec3 wo)
+{
+    if (wi.z <= 0.0 || wo.z <= 0.0)
+        return 0.0;
+
+    float F = fresnelExt(wi.z, etaI, etaT);
+    float specProb = F;
+    float diffProb = 1.0 - F;
+
+    float pdf = 0.0;
+
+    // 镜面 lobe（delta 的 mixture pdf）
+    if (isSpecularReflection(wi, wo))
+        pdf += specProb;
+
+    // 漫反射 lobe
+    pdf += diffProb * wo.z * (1.0 / PI);
+
+    return pdf;
+}
+
+BsdfSample smooth_plastic_sample(vec3 rho, float etaI, float etaT, vec3 wi, vec2 xi)
+{
+    BsdfSample s;
+    s.wo  = vec3(0.0, 0.0, 1.0);
+    s.f   = vec3(0.0);
+    s.pdf = 0.0;
+
+    if (wi.z <= 0.0)
+        return s;
+
+    float F = fresnelExt(wi.z, etaI, etaT);
+
+    // 按 Fresnel 在镜面 / 漫反射之间选 lobe
+    if (xi.x < F)
+    {
+        // --- 镜面 ---
+        s.wo  = reflectLocal(wi);
+        s.pdf = F;                          // mixture pdf
+        s.f   = vec3(F / wi.z);             // delta BSDF * 与 throughput 公式配套
+    }
+    else
+    {
+        // --- 漫反射 ---
+        // 重映射 xi，避免浪费随机数
+        vec2 xiDiff = vec2((xi.x - F) / max(1.0 - F, 1e-8), xi.y);
+        s.wo  = cosineSampleHemisphere(xiDiff);
+
+        float Fo = fresnelExt(s.wo.z, etaI, etaT);
+        s.f   = rho * (1.0 - F) * (1.0 - Fo) * (1.0 / PI);
+        s.pdf = (1.0 - F) * s.wo.z * (1.0 / PI);
+    }
+
+    return s;
+}
+
 vec3 oren_nayar_eval(vec3 albedo, float sigma, vec3 wi, vec3 wo)
 {
     if (wi.z <= 0.0 || wo.z <= 0.0)
@@ -427,17 +562,26 @@ BsdfSample oren_nayar_sample(vec3 albedo, float sigma, vec3 wi, vec2 xi)
     return s;
 }
 
-vec3 bsdf_eval(in Material m, vec3 wi, vec3 wo) 
+vec3 bsdf_eval(in Material m, vec3 wi, vec3 wo)
 {
+    if (m.type == MAT_SMOOTH_PLASTIC)
+        return smooth_plastic_eval(m.diffuseColor, m.extIOR, m.intIOR, wi, wo);
+
     return oren_nayar_eval(m.diffuseColor, m.roughness, wi, wo);
 }
 
-float bsdf_pdf(in Material m, vec3 wi, vec3 wo) 
+float bsdf_pdf(in Material m, vec3 wi, vec3 wo)
 {
+    if (m.type == MAT_SMOOTH_PLASTIC)
+        return smooth_plastic_pdf(m.diffuseColor, m.extIOR, m.intIOR, wi, wo);
+
     return oren_nayar_pdf(wi, wo);
 }
 
-BsdfSample bsdf_sample(in Material m, vec3 wi, vec2 xi) 
+BsdfSample bsdf_sample(in Material m, vec3 wi, vec2 xi)
 {
+    if (m.type == MAT_SMOOTH_PLASTIC)
+        return smooth_plastic_sample(m.diffuseColor, m.extIOR, m.intIOR, wi, xi);
+
     return oren_nayar_sample(m.diffuseColor, m.roughness, wi, xi);
 }

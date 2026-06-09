@@ -30,6 +30,6 @@ void main() {
     payload.hitNormal = vec4(1.0, n.x, n.y, n.z);
     payload.position = vec4(hitPosition, 1.0);
     
-    payload.material0.rgb = vec3(1.0, 0.87, 0.1);
-    payload.material0.w = 1.0;
+    payload.material0 = vec4(vec3(0.8, 0.1, 0.1), 1.0);
+    payload.material1 = vec4(float(MAT_SMOOTH_PLASTIC), 1.49, 1.0, 0.0);
 }
