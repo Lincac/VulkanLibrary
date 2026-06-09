@@ -1,7 +1,12 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
 
-#include "pathtrace.glsl"
+#include "traceGlobal.glsl"
+
+struct Vertex {
+    float pos[3];
+    float normal[3];
+};
 
 layout(set = 0, binding = 2, std430) readonly buffer VertexBuffer {
     Vertex vertices[];
@@ -21,15 +26,26 @@ void main() {
 
     const vec3 hitPosition = gl_WorldRayOriginEXT + gl_RayTmaxEXT * gl_WorldRayDirectionEXT;
     const vec3 v = normalize(-gl_WorldRayDirectionEXT);
-    
     if (dot(n, v) < 0.0) 
     {
         n = -n;
     }
 
-    payload.hitNormal = vec4(1.0, n.x, n.y, n.z);
-    payload.position = vec4(hitPosition, 1.0);
-    
-    payload.material0 = vec4(vec3(0.8, 0.1, 0.1), 1.0);
-    payload.material1 = vec4(float(MAT_SMOOTH_PLASTIC), 1.49, 1.0, 0.0);
+    payload.hitNormal     = vec4(n, 0.0);
+    payload.hitPosition   = vec4(hitPosition, 0.0);
+
+    payload.hitInfo.x = 1.0;
+    payload.hitInfo.y = float(MAT_TYPE);
+
+    switch(MAT_TYPE)
+    {
+        case MATERIAL_DIFFUSE:
+            payload.material0 = vec4(vec3(0.8, 0.1, 0.1), 1.0);
+            break;
+        case MATERIAL_PLASTIC:
+            payload.material0 = vec4(vec3(0.8, 0.1, 0.1), 0.0);
+            payload.material1 = vec4(vec3(0.8, 0.1, 0.1), 0.0);
+            payload.material2 = vec4(1.49, 1.0, 0.0, 0.0);
+            break;
+    }
 }
