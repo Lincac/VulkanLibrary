@@ -35,16 +35,16 @@ void main() {
     payload.hitPosition   = vec4(hitPosition, 0.0);
 
     payload.hitInfo.x = 1.0;
-    payload.hitInfo.y = float(MAT_TYPE);
+    payload.hitInfo.y = float(DEMO_MATERIAL);
 
-    switch(MAT_TYPE)
+    switch(DEMO_MATERIAL)
     {
         case MATERIAL_DIFFUSE:
             payload.material0 = vec4(vec3(0.8, 0.1, 0.1), 1.0);
             break;
         case MATERIAL_PLASTIC:
             payload.material0 = vec4(vec3(0.8, 0.1, 0.1), 0.0);
-            payload.material1 = vec4(vec3(0.8, 0.1, 0.1), 0.0);
+            payload.material1 = vec4(vec3(0.1, 0.8, 0.1), 0.0);
             payload.material2 = vec4(1.49, 1.0, 0.0, 0.0);
             break;
     }

@@ -1,5 +1,3 @@
-#include "traceGlobal.glsl"
-
 vec3 cosineSampleHemisphere(vec2 xi) 
 {
     float r = sqrt(xi.x);

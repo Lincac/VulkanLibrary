@@ -1,5 +1,3 @@
-#include "diffuseMaterial.glsl"
-
 float fresnelDielectric(float cosThetaI, float etaI, float etaT)
 {
     cosThetaI = abs(cosThetaI);
@@ -87,7 +85,7 @@ float smooth_plastic_pdf(vec3 rho, float etaI, float etaT, vec3 wi, vec3 wo)
     return pdf;
 }
 
-BsdfSample smooth_plastic_sample(vec3 rho, float etaI, float etaT, vec3 wi, vec2 xi)
+BsdfSample smooth_plastic_sample(vec3 rho, vec3 specColor, float etaI, float etaT, vec3 wi, vec2 xi)
 {
     BsdfSample s;
     s.wo  = vec3(0.0, 0.0, 1.0);
@@ -105,7 +103,7 @@ BsdfSample smooth_plastic_sample(vec3 rho, float etaI, float etaT, vec3 wi, vec2
         // --- 镜面 ---
         s.wo  = reflectLocal(wi);
         s.pdf = F;                          // mixture pdf
-        s.f   = vec3(F / wi.z);             // delta BSDF * 与 throughput 公式配套
+        s.f = specColor * F / wi.z;         
     }
     else
     {

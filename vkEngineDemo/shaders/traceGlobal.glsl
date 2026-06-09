@@ -1,7 +1,8 @@
+#ifndef TRACE_GLOBAL_GLSL
+#define TRACE_GLOBAL_GLSL
+
 // 数据、结构、宏
 const float PI = 3.14159265358979323846;
-
-const uint MAT_TYPE = 0u;
 
 const int MATERIAL_DIFFUSE        = 0;
 const int MATERIAL_PLASTIC        = 1;
@@ -11,6 +12,8 @@ const int MATERIAL_ROUGHCONDUCTOR = 4;
 const int MATERIAL_DIELECTRIC     = 5;
 const int MATERIAL_ROUGHDIELECTRIC= 6;
 
+// demo 场景默认材质（closesthit / miss 共用）
+const int DEMO_MATERIAL = MATERIAL_PLASTIC;
 
 const uint SOBOL_DIR_X[32] = uint[32](
     0x80000000u, 0x40000000u, 0x20000000u, 0x10000000u,
@@ -328,3 +331,5 @@ vec3 localToWorld(vec3 vLocal, ShadingFrame frame)
 {
     return shadingFrameToWorld(frame) * vLocal;
 }
+
+#endif // TRACE_GLOBAL_GLSL

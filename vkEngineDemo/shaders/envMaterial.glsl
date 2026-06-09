@@ -1,5 +1,3 @@
-#include "traceGlobal.glsl"
-
 // 由 CDF 纹理尺寸和 (i,j) 算立体角微元 dΩ
 float envCellSolidAngle(ivec2 cdfRes, int i, int j)
 {

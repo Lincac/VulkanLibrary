@@ -2,6 +2,8 @@
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_scalar_block_layout : require
 
+#include "traceGlobal.glsl"
+#include "diffuseMaterial.glsl"
 #include "plasticMaterial.glsl"
 #include "envMaterial.glsl"
 
@@ -50,6 +52,7 @@ BsdfSample bsdf_sample(in Material m, vec3 wi, vec2 xi)
         case MATERIAL_PLASTIC:
             return smooth_plastic_sample(
                 m.plastic.diffuse_reflectance, 
+                m.plastic.specular_reflectance, 
                 m.plastic.ext_ior, m.plastic.int_ior, wi, xi);
     }
 
@@ -60,7 +63,7 @@ BsdfSample bsdf_sample(in Material m, vec3 wi, vec2 xi)
 
 bool traceShadow(vec3 origin, vec3 direction)
 {
-    payload.hitNormal.x = 0.0;
+    payload.hitInfo.x = 0.0;
 
     traceRayEXT(
         tlas,
@@ -75,7 +78,7 @@ bool traceShadow(vec3 origin, vec3 direction)
         1000.0,
         0);
 
-    return payload.hitNormal.x >= 0.5;
+    return payload.hitInfo.x >= 0.5;
 }
 
 vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, uint sampleBase)
@@ -86,7 +89,7 @@ vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, uint sampleBase)
 
     for (uint bounce = 0u; bounce < maxBounces; ++bounce)
     {
-        payload.hitNormal.x = 0.0;
+        payload.hitInfo.x = 0.0;
 
         traceRayEXT(
                     tlas,
@@ -101,7 +104,7 @@ vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, uint sampleBase)
                     1000.0,
                     0);
                     
-        if (payload.hitNormal.x < 0.5)
+        if (payload.hitInfo.x < 0.5)
         {
             const vec3 envRadiance = sampleEnvironment(environmentMap, direction);
 
@@ -117,18 +120,18 @@ vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, uint sampleBase)
             break;
         }
         
-        ShadingFrame sf = makeShadingFrame(payload.hitNormal.yzw);
+        ShadingFrame sf = makeShadingFrame(payload.hitNormal.xyz);
         Material mat = unpackMaterial(payload);
-        vec3 hitPos = payload.position.xyz;
+        vec3 hitPos = payload.hitPosition.xyz;
 
         vec3 local_wo = worldToLocal(normalize(-direction), sf);
 
         vec2 xi_bsdf = sobol2D(sampleBase + 2u + bounce * 2u); 
         vec2 xi_env = sobol2D(sampleBase + 2u + bounce * 2u + 1u); 
         
-        if (mat.type == MAT_SMOOTH_PLASTIC)
+        if (mat.type == MATERIAL_PLASTIC)
         {
-            const float F = fresnelExt(local_wo.z, mat.extIOR, mat.intIOR);
+            const float F = fresnelExt(local_wo.z, mat.plastic.ext_ior, mat.plastic.int_ior);
 
             const vec3 wr_world = localToWorld(reflectLocal(local_wo), sf);
             const vec3 Le_spec  = sampleEnvironment(environmentMap, wr_world);
@@ -145,10 +148,10 @@ vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, uint sampleBase)
                 {
                     const vec3 Le = sampleEnvironment(environmentMap, env.direction);
                     
-                    const float Fi = fresnelExt(local_wo.z, mat.extIOR, mat.intIOR);
-                    const float Fo = fresnelExt(wi_env_local.z, mat.extIOR, mat.intIOR);
+                    const float Fi = fresnelExt(local_wo.z, mat.plastic.ext_ior, mat.plastic.int_ior);
+                    const float Fo = fresnelExt(wi_env_local.z, mat.plastic.ext_ior, mat.plastic.int_ior);
 
-                    const vec3  f_diff   = mat.diffuseColor
+                    const vec3  f_diff   = mat.plastic.diffuse_reflectance
                                          * (1.0 - Fi) * (1.0 - Fo) * (1.0 / PI);
                     const float pdf_diff = (1.0 - Fi) * wi_env_local.z * (1.0 / PI);
                     const float w_env    = env.pdf / (env.pdf + pdf_diff);
