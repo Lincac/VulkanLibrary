@@ -13,7 +13,7 @@ const int MATERIAL_DIELECTRIC     = 5;
 const int MATERIAL_ROUGHDIELECTRIC= 6;
 
 // demo 场景默认材质（closesthit / miss 共用）
-const int DEMO_MATERIAL = MATERIAL_PLASTIC;
+const int DEMO_MATERIAL = MATERIAL_ROUGHPLASTIC;
 
 const uint SOBOL_DIR_X[32] = uint[32](
     0x80000000u, 0x40000000u, 0x20000000u, 0x10000000u,
@@ -59,6 +59,7 @@ struct BsdfSample {
     vec3  wo;   // 局部空间
     vec3  f;   
     float pdf;
+    bool isDelta;
 };
 
 struct EnvSample {
@@ -194,6 +195,13 @@ Material unpackMaterial(PathPayload payload)
             m.plastic.int_ior = payload.material2.r;
             m.plastic.ext_ior = payload.material2.g;
             break;
+        case MATERIAL_ROUGHPLASTIC:
+            m.roughplastic.diffuse_reflectance = payload.material0.rgb;
+            m.roughplastic.alpha = payload.material0.a;
+            m.roughplastic.specular_reflectance = payload.material1.rgb;
+            m.roughplastic.int_ior = payload.material2.r;
+            m.roughplastic.ext_ior = payload.material2.g;
+            break;
     }
 
     return m;
@@ -212,6 +220,11 @@ void packMaterial(inout PathPayload payload, Material m)
             payload.material0 = vec4(m.plastic.diffuse_reflectance, 0.0);
             payload.material1 = vec4(m.plastic.specular_reflectance, 0.0);
             payload.material2 = vec4(m.plastic.int_ior, m.plastic.ext_ior, 0.0, 0.0);
+            break;
+        case MATERIAL_ROUGHPLASTIC:
+            payload.material0 = vec4(m.roughplastic.diffuse_reflectance, m.roughplastic.alpha);
+            payload.material1 = vec4(m.roughplastic.specular_reflectance, 0.0);
+            payload.material2 = vec4(m.roughplastic.int_ior, m.roughplastic.ext_ior, 0.0, 0.0);
             break;
     }
 }

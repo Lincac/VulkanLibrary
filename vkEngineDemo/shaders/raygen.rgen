@@ -20,46 +20,41 @@ layout(location = 0) rayPayloadEXT PathPayload payload;
 
 vec3 bsdf_eval(in Material m, vec3 wi, vec3 wo)
 {
-    switch(m.type)
+    switch (m.type)
     {
         case MATERIAL_PLASTIC:
-            return smooth_plastic_eval(
-                m.plastic.diffuse_reflectance, 
-                m.plastic.ext_ior, m.plastic.int_ior, wi, wo);
+            return smooth_plastic_eval(m.plastic, wi, wo);
+        case MATERIAL_ROUGHPLASTIC:
+            return rough_plastic_eval(m.roughplastic, wi, wo);
     }
 
-    return oren_nayar_eval(
-        m.diffuse.diffuse_reflectance, 
-        m.diffuse.alpha, wi, wo);
+    return diffuse_eval(m.diffuse, wi, wo);
 }
 
 float bsdf_pdf(in Material m, vec3 wi, vec3 wo)
 {
-    switch(m.type)
+    switch (m.type)
     {
         case MATERIAL_PLASTIC:
-            return smooth_plastic_pdf(
-                m.plastic.diffuse_reflectance, 
-                m.plastic.ext_ior, m.plastic.int_ior, wi, wo);
+            return smooth_plastic_pdf(m.plastic, wi, wo);
+        case MATERIAL_ROUGHPLASTIC:
+            return rough_plastic_pdf(m.roughplastic, wi, wo);
     }
 
-    return oren_nayar_pdf(wi, wo);
+    return diffuse_pdf(m.diffuse, wi, wo);
 }
 
 BsdfSample bsdf_sample(in Material m, vec3 wi, vec2 xi)
 {
-    switch(m.type)
+    switch (m.type)
     {
         case MATERIAL_PLASTIC:
-            return smooth_plastic_sample(
-                m.plastic.diffuse_reflectance, 
-                m.plastic.specular_reflectance, 
-                m.plastic.ext_ior, m.plastic.int_ior, wi, xi);
+            return smooth_plastic_sample(m.plastic, wi, xi);
+        case MATERIAL_ROUGHPLASTIC:
+            return rough_plastic_sample(m.roughplastic, wi, xi);
     }
 
-    return oren_nayar_sample(
-        m.diffuse.diffuse_reflectance, 
-        m.diffuse.alpha, wi, xi);
+    return diffuse_sample(m.diffuse, wi, xi);
 }
 
 bool traceShadow(vec3 origin, vec3 direction)
@@ -134,7 +129,7 @@ vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, uint sampleBase)
         {
             const float F = fresnelExt(local_wo.z, mat.plastic.ext_ior, mat.plastic.int_ior);
 
-            const vec3 wr_world = localToWorld(reflectLocal(local_wo), sf);
+            const vec3 wr_world = localToWorld(plasticReflectLocal(local_wo), sf);
             const vec3 Le_spec  = sampleEnvironment(environmentMap, wr_world);
             radiance += throughput * vec3(F) * Le_spec;
 
@@ -162,9 +157,24 @@ vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, uint sampleBase)
                 }
             }            
         }
-        else if(mat.type == MATERIAL_ROUGHPLASTIC)
+        else if (mat.type == MATERIAL_ROUGHPLASTIC)
         {
-            
+            EnvSample env = sampleEnvironmentImportance(xi_env, environmentMap, environmentCdf);
+
+            if (env.pdf > 1e-8 && !traceShadow(hitPos + env.direction * 0.001, env.direction))
+            {
+                vec3 wi_env_local = worldToLocal(normalize(env.direction), sf);
+                if (wi_env_local.z > 0.0)
+                {
+                    vec3 Le = sampleEnvironment(environmentMap, env.direction);
+                    vec3 f  = bsdf_eval(mat, local_wo, wi_env_local);
+
+                    float pdf_bsdf = bsdf_pdf(mat, local_wo, wi_env_local);
+                    float w_env = env.pdf / (env.pdf + pdf_bsdf);
+
+                    radiance += throughput * f * Le * abs(wi_env_local.z) / env.pdf * w_env;
+                }
+            }
         }
         else
         {
