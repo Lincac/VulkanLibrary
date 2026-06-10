@@ -13,7 +13,7 @@ const int MATERIAL_DIELECTRIC     = 5;
 const int MATERIAL_ROUGHDIELECTRIC= 6;
 
 // demo 场景默认材质（closesthit / miss 共用）
-const int DEMO_MATERIAL = MATERIAL_CONDUCTOR;
+const int DEMO_MATERIAL = MATERIAL_ROUGHCONDUCTOR;
 
 const uint SOBOL_DIR_X[32] = uint[32](
     0x80000000u, 0x40000000u, 0x20000000u, 0x10000000u,

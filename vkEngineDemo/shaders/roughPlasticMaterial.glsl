@@ -41,7 +41,7 @@ vec3 sampleGGX(float alpha, vec2 xi)
     );
 }
 
-vec3 roughplastic_eval_specular(RoughPlastic mat, vec3 wi, vec3 wo)
+vec3 rough_plastic_eval_specular(RoughPlastic mat, vec3 wi, vec3 wo)
  {
     float NoI = wi.z;
     float NoO = wo.z;
@@ -66,7 +66,7 @@ vec3 roughplastic_eval_specular(RoughPlastic mat, vec3 wi, vec3 wo)
     return Fr;
 }
 
-vec3 roughplastic_eval_diffuse(RoughPlastic mat, vec3 wi, vec3 wo) 
+vec3 rough_plastic_eval_diffuse(RoughPlastic mat, vec3 wi, vec3 wo) 
 {
     float NoI = wi.z;
     float NoO = wo.z;
@@ -85,8 +85,8 @@ vec3 rough_plastic_eval_radiance(RoughPlastic mat, vec3 wi, vec3 wo)
     if (wi.z <= 0.0 || wo.z <= 0.0)
         return vec3(0.0);
 
-    vec3 fs = roughplastic_eval_specular(mat, wi, wo);
-    vec3 fd = roughplastic_eval_diffuse(mat, wi, wo);
+    vec3 fs = rough_plastic_eval_specular(mat, wi, wo);
+    vec3 fd = rough_plastic_eval_diffuse(mat, wi, wo);
     return fs * wo.z + fd * wo.z;
 }
 
@@ -95,12 +95,12 @@ vec3 rough_plastic_eval(RoughPlastic mat, vec3 wi, vec3 wo)
     if (wi.z <= 0.0 || wo.z <= 0.0)
         return vec3(0.0);
 
-    vec3 fs = roughplastic_eval_specular(mat, wi, wo);
-    vec3 fd = roughplastic_eval_diffuse(mat, wi, wo);
+    vec3 fs = rough_plastic_eval_specular(mat, wi, wo);
+    vec3 fd = rough_plastic_eval_diffuse(mat, wi, wo);
     return fs + fd;
 }
 
-float roughplastic_pdf_specular(RoughPlastic mat, vec3 wi, vec3 wo) 
+float rough_plastic_pdf_specular(RoughPlastic mat, vec3 wi, vec3 wo) 
 {
     float NoI = wi.z;
     float NoO = wo.z;
@@ -121,7 +121,7 @@ float roughplastic_pdf_specular(RoughPlastic mat, vec3 wi, vec3 wo)
     return pWo;
 }
 
-float roughplastic_pdf_diffuse(RoughPlastic mat, vec3 wi, vec3 wo) 
+float rough_plastic_pdf_diffuse(RoughPlastic mat, vec3 wi, vec3 wo) 
 {
     float NoI = wi.z;
     float NoO = wo.z;
@@ -141,8 +141,8 @@ float rough_plastic_pdf(RoughPlastic mat, vec3 wi, vec3 wo)
     // Fresnel 决定 lobe 权重（入射方向）
     float F = fresnelDielectric(NoI, mat.ext_ior, mat.int_ior);
 
-    float ps = roughplastic_pdf_specular(mat, wi, wo);
-    float pd = roughplastic_pdf_diffuse(mat, wi, wo);
+    float ps = rough_plastic_pdf_specular(mat, wi, wo);
+    float pd = rough_plastic_pdf_diffuse(mat, wi, wo);
 
     return F * ps + (1.0 - F) * pd;
 }
@@ -197,8 +197,8 @@ BsdfSample rough_plastic_sample(RoughPlastic mat, vec3 wi, vec2 xi) {
         float denom = 4.0 * NoI * NoO;
         vec3 Fr = mat.specular_reflectance * Fs * D * G / max(denom, 1e-6);
 
-        float ps = roughplastic_pdf_specular(mat, wi, wo);
-        float pd = roughplastic_pdf_diffuse(mat, wi, wo);
+        float ps = rough_plastic_pdf_specular(mat, wi, wo);
+        float pd = rough_plastic_pdf_diffuse(mat, wi, wo);
         float pdf = F * ps + (1.0 - F) * pd;
 
         s.f   = Fr;
@@ -222,8 +222,8 @@ BsdfSample rough_plastic_sample(RoughPlastic mat, vec3 wi, vec2 xi) {
 
         vec3 fd = mat.diffuse_reflectance * (1.0 - Fi) * (1.0 - Fo) * (1.0 / PI);
 
-        float ps = roughplastic_pdf_specular(mat, wi, wo);
-        float pd = roughplastic_pdf_diffuse(mat, wi, wo);
+        float ps = rough_plastic_pdf_specular(mat, wi, wo);
+        float pd = rough_plastic_pdf_diffuse(mat, wi, wo);
         float pdf = F * ps + (1.0 - F) * pd;
 
         s.f   = fd;
