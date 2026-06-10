@@ -136,6 +136,7 @@ vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, uint sampleBase)
             const EnvSample env = sampleEnvironmentImportance(
                 xi_env, environmentMap, environmentCdf);
 
+            // nee
             if (env.pdf > 1e-8
                 && !traceShadow(hitPos + env.direction * 0.001, env.direction))
             {
@@ -159,20 +160,25 @@ vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, uint sampleBase)
         }
         else if (mat.type == MATERIAL_ROUGHPLASTIC)
         {
-            EnvSample env = sampleEnvironmentImportance(xi_env, environmentMap, environmentCdf);
+            const EnvSample env = sampleEnvironmentImportance(
+                xi_env, environmentMap, environmentCdf);
 
-            if (env.pdf > 1e-8 && !traceShadow(hitPos + env.direction * 0.001, env.direction))
+            if (env.pdf > 1e-8
+                && !traceShadow(hitPos + env.direction * 0.001, env.direction))
             {
-                vec3 wi_env_local = worldToLocal(normalize(env.direction), sf);
+                const vec3 wi_env_local = worldToLocal(normalize(env.direction), sf);
                 if (wi_env_local.z > 0.0)
                 {
-                    vec3 Le = sampleEnvironment(environmentMap, env.direction);
-                    vec3 f  = bsdf_eval(mat, local_wo, wi_env_local);
+                    const vec3 Le = sampleEnvironment(environmentMap, env.direction);
 
-                    float pdf_bsdf = bsdf_pdf(mat, local_wo, wi_env_local);
-                    float w_env = env.pdf / (env.pdf + pdf_bsdf);
+                    // f·cos 与 mixture pdf 一致，避免 specular/diffuse lobe 公式混用
+                    const vec3  f_cos    = rough_plastic_eval_radiance(
+                        mat.roughplastic, local_wo, wi_env_local);
+                    const float pdf_bsdf = rough_plastic_pdf(
+                        mat.roughplastic, local_wo, wi_env_local);
+                    const float w_env    = env.pdf / (env.pdf + pdf_bsdf);
 
-                    radiance += throughput * f * Le * abs(wi_env_local.z) / env.pdf * w_env;
+                    radiance += throughput * f_cos * Le / env.pdf * w_env;
                 }
             }
         }

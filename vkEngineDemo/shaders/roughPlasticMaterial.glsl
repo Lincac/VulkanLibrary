@@ -73,14 +73,21 @@ vec3 roughplastic_eval_diffuse(RoughPlastic mat, vec3 wi, vec3 wo)
     if (NoI <= 0.0 || NoO <= 0.0)
         return vec3(0.0);
 
-    // 入射方向的 Fresnel（外→内）
     float Fi = fresnelDielectric(NoI, mat.ext_ior, mat.int_ior);
-    // 出射方向的 Fresnel（内→外）
-    float Fo = fresnelDielectric(NoO, mat.int_ior, mat.ext_ior);
+    float Fo = fresnelDielectric(NoO, mat.ext_ior, mat.int_ior);
 
-    // 简化版 Mitsuba：rho_d / PI * (1 - Fi) * (1 - Fo)
-    vec3 fd = mat.diffuse_reflectance * (1.0 - Fi) * (1.0 - Fo) * (1.0 / PI);
-    return fd;
+    return mat.diffuse_reflectance * (1.0 - Fi) * (1.0 - Fo) * (1.0 / PI);
+}
+
+// 渲染方程被积函数 f(wi, wo) * cos(wo)
+vec3 rough_plastic_eval_radiance(RoughPlastic mat, vec3 wi, vec3 wo)
+{
+    if (wi.z <= 0.0 || wo.z <= 0.0)
+        return vec3(0.0);
+
+    vec3 fs = roughplastic_eval_specular(mat, wi, wo);
+    vec3 fd = roughplastic_eval_diffuse(mat, wi, wo);
+    return fs * wo.z + fd * wo.z;
 }
 
 vec3 rough_plastic_eval(RoughPlastic mat, vec3 wi, vec3 wo) 
@@ -211,7 +218,7 @@ BsdfSample rough_plastic_sample(RoughPlastic mat, vec3 wi, vec2 xi) {
         float NoO = wo.z;
 
         float Fi = fresnelDielectric(NoI, mat.ext_ior, mat.int_ior);
-        float Fo = fresnelDielectric(NoO, mat.int_ior, mat.ext_ior);
+        float Fo = fresnelDielectric(NoO, mat.ext_ior, mat.int_ior);
 
         vec3 fd = mat.diffuse_reflectance * (1.0 - Fi) * (1.0 - Fo) * (1.0 / PI);
 
