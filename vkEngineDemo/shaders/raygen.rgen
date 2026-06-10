@@ -7,6 +7,7 @@
 #include "plasticMaterial.glsl"
 #include "roughPlasticMaterial.glsl"
 #include "conductorMaterial.glsl"
+#include "roughConductorMaterial.glsl"
 #include "envMaterial.glsl"
 
 layout(set = 0, binding = 0) uniform accelerationStructureEXT tlas;
@@ -29,6 +30,8 @@ vec3 bsdf_eval(in Material m, vec3 wi, vec3 wo)
             return rough_plastic_eval(m.roughplastic, wi, wo);
         case MATERIAL_CONDUCTOR:
             return smooth_conductor_eval(m.conductor, wi, wo);
+        case MATERIAL_ROUGHCONDUCTOR:
+            return rough_conductor_eval(m.roughconductor, wi, wo);
     }
 
     return diffuse_eval(m.diffuse, wi, wo);
@@ -44,6 +47,8 @@ float bsdf_pdf(in Material m, vec3 wi, vec3 wo)
             return rough_plastic_pdf(m.roughplastic, wi, wo);
         case MATERIAL_CONDUCTOR:
             return smooth_conductor_pdf(m.conductor, wi, wo);
+        case MATERIAL_ROUGHCONDUCTOR:
+            return rough_conductor_pdf(m.roughconductor, wi, wo);
     }
 
     return diffuse_pdf(m.diffuse, wi, wo);
@@ -59,6 +64,8 @@ BsdfSample bsdf_sample(in Material m, vec3 wi, vec2 xi)
             return rough_plastic_sample(m.roughplastic, wi, xi);
         case MATERIAL_CONDUCTOR:
             return smooth_conductor_sample(m.conductor, wi, xi);
+        case MATERIAL_ROUGHCONDUCTOR:
+            return rough_conductor_sample(m.roughconductor, wi, xi);
     }
 
     return diffuse_sample(m.diffuse, wi, xi);
@@ -196,6 +203,29 @@ vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, uint sampleBase)
             const vec3 F        = fresnelConductor(mat.conductor, abs(local_wo.z));
 
             radiance += throughput * F * Le;
+        }
+        else if (mat.type == MATERIAL_ROUGHCONDUCTOR)
+        {
+            const EnvSample env = sampleEnvironmentImportance(
+                xi_env, environmentMap, environmentCdf);
+
+            if (env.pdf > 1e-8
+                && !traceShadow(hitPos + env.direction * 0.001, env.direction))
+            {
+                const vec3 wi_env_local = worldToLocal(normalize(env.direction), sf);
+                if (wi_env_local.z > 0.0)
+                {
+                    const vec3 Le = sampleEnvironment(environmentMap, env.direction);
+
+                    const vec3  f_cos    = rough_conductor_eval_radiance(
+                        mat.roughconductor, local_wo, wi_env_local);
+                    const float pdf_bsdf = rough_conductor_pdf(
+                        mat.roughconductor, local_wo, wi_env_local);
+                    const float w_env    = env.pdf / (env.pdf + pdf_bsdf);
+
+                    radiance += throughput * f_cos * Le / env.pdf * w_env;
+                }
+            }
         }
         else
         {

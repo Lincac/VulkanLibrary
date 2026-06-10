@@ -206,6 +206,11 @@ Material unpackMaterial(PathPayload payload)
             m.conductor.eta = payload.material3.rgb;
             m.conductor.k   = payload.material4.rgb;
             break;
+        case MATERIAL_ROUGHCONDUCTOR:
+            m.roughconductor.alpha = payload.material0.a;
+            m.roughconductor.eta   = payload.material3.rgb;
+            m.roughconductor.k     = payload.material4.rgb;
+            break;
     }
 
     return m;
@@ -233,6 +238,11 @@ void packMaterial(inout PathPayload payload, Material m)
         case MATERIAL_CONDUCTOR:
             payload.material3 = vec4(m.conductor.eta, 0.0);
             payload.material4 = vec4(m.conductor.k, 0.0);
+            break;
+        case MATERIAL_ROUGHCONDUCTOR:
+            payload.material0 = vec4(0.0, 0.0, 0.0, m.roughconductor.alpha);
+            payload.material3 = vec4(m.roughconductor.eta, 0.0);
+            payload.material4 = vec4(m.roughconductor.k, 0.0);
             break;
     }
 }

@@ -57,5 +57,11 @@ void main() {
             payload.material3 = vec4(0.143, 0.374, 1.442, 0.0);
             payload.material4 = vec4(3.983, 2.453, 1.943, 0.0);
             break;
+        case MATERIAL_ROUGHCONDUCTOR:
+            // 金 (Au) + 中等粗糙度
+            payload.material0 = vec4(0.0, 0.0, 0.0, 0.3);
+            payload.material3 = vec4(0.143, 0.374, 1.442, 0.0);
+            payload.material4 = vec4(3.983, 2.453, 1.943, 0.0);
+            break;
     }
 }
