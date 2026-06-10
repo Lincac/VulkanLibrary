@@ -52,5 +52,10 @@ void main() {
             payload.material1 = vec4(vec3(1.0), 0.0);
             payload.material2 = vec4(1.49, 1.0, 0.0, 0.0);
             break;
+        case MATERIAL_CONDUCTOR:
+            // 金 (Au) @ 550nm 附近，Mitsuba 常用 IOR 数据
+            payload.material3 = vec4(0.143, 0.374, 1.442, 0.0);
+            payload.material4 = vec4(3.983, 2.453, 1.943, 0.0);
+            break;
     }
 }
