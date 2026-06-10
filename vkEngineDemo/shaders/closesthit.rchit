@@ -63,5 +63,9 @@ void main() {
             payload.material3 = vec4(0.143, 0.374, 1.442, 0.0);
             payload.material4 = vec4(3.983, 2.453, 1.943, 0.0);
             break;
+        case MATERIAL_DIELECTRIC:
+            // BK7 玻璃 / 空气（Mitsuba 默认 dielectric）
+            payload.material2 = vec4(1.5046, 1.0, 0.0, 0.0);
+            break;
     }
 }

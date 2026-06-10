@@ -13,7 +13,7 @@ const int MATERIAL_DIELECTRIC     = 5;
 const int MATERIAL_ROUGHDIELECTRIC= 6;
 
 // demo 场景默认材质（closesthit / miss 共用）
-const int DEMO_MATERIAL = MATERIAL_ROUGHCONDUCTOR;
+const int DEMO_MATERIAL = MATERIAL_DIELECTRIC;
 
 const uint SOBOL_DIR_X[32] = uint[32](
     0x80000000u, 0x40000000u, 0x20000000u, 0x10000000u,
@@ -211,6 +211,10 @@ Material unpackMaterial(PathPayload payload)
             m.roughconductor.eta   = payload.material3.rgb;
             m.roughconductor.k     = payload.material4.rgb;
             break;
+        case MATERIAL_DIELECTRIC:
+            m.dielectric.int_ior = payload.material2.r;
+            m.dielectric.ext_ior = payload.material2.g;
+            break;
     }
 
     return m;
@@ -243,6 +247,9 @@ void packMaterial(inout PathPayload payload, Material m)
             payload.material0 = vec4(0.0, 0.0, 0.0, m.roughconductor.alpha);
             payload.material3 = vec4(m.roughconductor.eta, 0.0);
             payload.material4 = vec4(m.roughconductor.k, 0.0);
+            break;
+        case MATERIAL_DIELECTRIC:
+            payload.material2 = vec4(m.dielectric.int_ior, m.dielectric.ext_ior, 0.0, 0.0);
             break;
     }
 }

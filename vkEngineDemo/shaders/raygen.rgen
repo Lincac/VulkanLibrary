@@ -8,6 +8,7 @@
 #include "roughPlasticMaterial.glsl"
 #include "conductorMaterial.glsl"
 #include "roughConductorMaterial.glsl"
+#include "dielectricMaterial.glsl"
 #include "envMaterial.glsl"
 
 layout(set = 0, binding = 0) uniform accelerationStructureEXT tlas;
@@ -32,6 +33,8 @@ vec3 bsdf_eval(in Material m, vec3 wi, vec3 wo)
             return smooth_conductor_eval(m.conductor, wi, wo);
         case MATERIAL_ROUGHCONDUCTOR:
             return rough_conductor_eval(m.roughconductor, wi, wo);
+        case MATERIAL_DIELECTRIC:
+            return smooth_dielectric_eval(m.dielectric, wi, wo);
     }
 
     return diffuse_eval(m.diffuse, wi, wo);
@@ -49,6 +52,8 @@ float bsdf_pdf(in Material m, vec3 wi, vec3 wo)
             return smooth_conductor_pdf(m.conductor, wi, wo);
         case MATERIAL_ROUGHCONDUCTOR:
             return rough_conductor_pdf(m.roughconductor, wi, wo);
+        case MATERIAL_DIELECTRIC:
+            return smooth_dielectric_pdf(m.dielectric, wi, wo);
     }
 
     return diffuse_pdf(m.diffuse, wi, wo);
@@ -66,6 +71,8 @@ BsdfSample bsdf_sample(in Material m, vec3 wi, vec2 xi)
             return smooth_conductor_sample(m.conductor, wi, xi);
         case MATERIAL_ROUGHCONDUCTOR:
             return rough_conductor_sample(m.roughconductor, wi, xi);
+        case MATERIAL_DIELECTRIC:
+            return smooth_dielectric_sample(m.dielectric, wi, xi);
     }
 
     return diffuse_sample(m.diffuse, wi, xi);
@@ -221,6 +228,37 @@ vec3 tracePath(vec3 origin, vec3 direction, uint maxBounces, uint sampleBase)
                         mat.roughconductor, local_wo, wi_env_local);
                     const float pdf_bsdf = rough_conductor_pdf(
                         mat.roughconductor, local_wo, wi_env_local);
+                    const float w_env    = env.pdf / (env.pdf + pdf_bsdf);
+
+                    radiance += throughput * f_cos * Le / env.pdf * w_env;
+                }
+            }
+        }
+        else if (mat.type == MATERIAL_DIELECTRIC)
+        {
+            float cosThetaT;
+            const float eta = dielectric_eta(mat.dielectric);
+            const float F   = fresnelDielectricExt(local_wo.z, cosThetaT, eta);
+
+            const vec3 wr_world = localToWorld(dielectricReflectLocal(local_wo), sf);
+            const vec3 Le_refl = sampleEnvironment(environmentMap, wr_world);
+            radiance += throughput * vec3(F) * Le_refl;
+
+            const EnvSample env = sampleEnvironmentImportance(
+                xi_env, environmentMap, environmentCdf);
+
+            if (env.pdf > 1e-8
+                && !traceShadow(hitPos + env.direction * 0.001, env.direction))
+            {
+                const vec3 wi_env_local = worldToLocal(normalize(env.direction), sf);
+                if (abs(wi_env_local.z) > 1e-6)
+                {
+                    const vec3 Le = sampleEnvironment(environmentMap, env.direction);
+
+                    const vec3  f_cos    = smooth_dielectric_eval_radiance(
+                        mat.dielectric, local_wo, wi_env_local);
+                    const float pdf_bsdf = smooth_dielectric_pdf(
+                        mat.dielectric, local_wo, wi_env_local);
                     const float w_env    = env.pdf / (env.pdf + pdf_bsdf);
 
                     radiance += throughput * f_cos * Le / env.pdf * w_env;
