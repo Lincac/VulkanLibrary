@@ -2,8 +2,6 @@
 
 #include "vkEngineHelp.h"
 
-#define MAX_FRAMES_IN_FLIGHT 1
-
 /// @brief vk 引擎类
 class vkEngine
 {
@@ -20,9 +18,6 @@ public:
     VkInstance& getInstance();
 
 private:
-    // 初始化 vk 句柄
-    void initInstance();
-
     // 验证层检查接口
     bool checkValidationLayerSupport();
 

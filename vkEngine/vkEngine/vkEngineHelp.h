@@ -19,13 +19,14 @@
 
 #include <glm/glm.hpp>
 
+#define MAX_FRAMES_IN_FLIGHT 1
+
 /// @brief 查找内存类型
 /// @param physDev 物理设备
 /// @param typeFilter 类型过滤
 /// @param properties 内存属性
 /// @return 内存类型
-inline uint32_t findMemoryType(VkPhysicalDevice physDev, uint32_t typeFilter, VkMemoryPropertyFlags properties)
-{
+inline uint32_t findMemoryType(VkPhysicalDevice physDev, uint32_t typeFilter, VkMemoryPropertyFlags properties){
     VkPhysicalDeviceMemoryProperties memProps{};
     vkGetPhysicalDeviceMemoryProperties(physDev, &memProps);
 
