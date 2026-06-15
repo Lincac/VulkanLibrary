@@ -1,4 +1,4 @@
-﻿#include "core/vkEngine.h"
+﻿#include "core/vkEngineContext.h"
 #include "device/vkEnginePhysicalDevice.h"
 #include "device/vkEngineLogicalDevice.h"
 #include "device/vkEngineCommandPool.h"
@@ -13,9 +13,12 @@
 #include <iostream>
 
 int main(){
-    auto engine = std::make_shared<vkEngine>("Vulkan Demo", true);
+    vkEngineConfig config;
+    config.applicationName = "Vulkan Demo";
+    config.enableValidationLayers = true;
+    auto context = std::make_shared<vkEngineContext>(config);
 
-    auto physicalDevice = std::make_shared<vkEnginePhysicalDevice>(engine);
+    auto physicalDevice = std::make_shared<vkEnginePhysicalDevice>(context);
     auto logicalDevice = std::make_shared<vkEngineLogicalDevice>(physicalDevice);
     auto commandPool = std::make_shared<vkEngineCommandPool>(logicalDevice);
 

@@ -3,7 +3,8 @@
 vkEngineLogicalDevice::vkEngineLogicalDevice(std::shared_ptr<vkEnginePhysicalDevice> physicalDevice)
     : _physicalDevice(physicalDevice)
 {
-    auto indices = physicalDevice->findQueueFamilies();
+    const auto& indices = physicalDevice->getQueueFamilies();
+    const auto& req = physicalDevice->getPhysicalDeviceReq();
 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
@@ -47,10 +48,10 @@ vkEngineLogicalDevice::vkEngineLogicalDevice(std::shared_ptr<vkEnginePhysicalDev
     createInfo.pEnabledFeatures = nullptr;
     createInfo.pNext = &features2;
 
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(_physicalDevice->_deviceExtensions.size());
-    createInfo.ppEnabledExtensionNames = _physicalDevice->_deviceExtensions.data();
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(req.extensions.size());
+    createInfo.ppEnabledExtensionNames = req.extensions.data();
 
-    if (vkCreateDevice(_physicalDevice->_physicalDevice, &createInfo, nullptr, &_device) != VK_SUCCESS) {
+    if (vkCreateDevice(_physicalDevice->getVkPhysicalDevice(), &createInfo, nullptr, &_device) != VK_SUCCESS) {
         throw std::runtime_error("failed to create logical device!");
     }
 

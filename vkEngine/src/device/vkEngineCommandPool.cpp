@@ -4,7 +4,7 @@ vkEngineCommandPool::vkEngineCommandPool(std::shared_ptr<vkEngineLogicalDevice> 
     : _device(device)
 {
     auto physicalDevice = _device->getPhysicalDevice();
-    auto indices = physicalDevice->findQueueFamilies();
+    const auto& indices = physicalDevice->getQueueFamilies();
 
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;

@@ -1,7 +1,7 @@
 set(VKENGINE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 set(VKENGINE_SOURCES
-    ${VKENGINE_ROOT}/core/vkEngine.cpp
+    ${VKENGINE_ROOT}/core/vkEngineContext.cpp
     ${VKENGINE_ROOT}/device/vkEnginePhysicalDevice.cpp
     ${VKENGINE_ROOT}/device/vkEngineLogicalDevice.cpp
     ${VKENGINE_ROOT}/device/vkEngineCommandPool.cpp

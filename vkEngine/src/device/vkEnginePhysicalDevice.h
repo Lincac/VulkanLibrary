@@ -1,70 +1,45 @@
 ﻿#pragma once
 
-#include "core/vkEngine.h"
+#include "core/vkEngineContext.h"
+#include "common/vkEngineHelp.h"
 
-/// @brief 队列族索引
 struct QueueFamilyIndices {
-    std::optional<uint32_t> graphicsFamily; // 图形队列族索引
+    /// @brief 图形队列族索引
+    std::optional<uint32_t> graphicsFamily;
+    /// @brief 呈现队列族索引
+    std::optional<uint32_t> presentFamily;
 
-    bool isComplete() { // 判断队列族索引是否完整
-        return graphicsFamily.has_value();
+    bool isComplete(const vkEnginePhysicalDeviceReq& req) const {
+        if (req.enableGraphicsFamily && !graphicsFamily) return false;
+        if (req.enablePresentFamily && !presentFamily) return false;
+        return true;
     }
 };
-
-class vkEngineLogicalDevice;
-class vkEngineCommandPool;
 
 /// @brief 物理设备类
 class vkEnginePhysicalDevice
 {
 public:
-    /// @brief 构造函数
-    /// @param engine 引擎
-    vkEnginePhysicalDevice(std::shared_ptr<vkEngine> engine);
-
+    explicit vkEnginePhysicalDevice(std::shared_ptr<vkEngineContext> context);
     ~vkEnginePhysicalDevice();
 
-    /// @brief 获取引擎
-    /// @return 引擎
-    std::shared_ptr<vkEngine> getEngine();
+    std::shared_ptr<vkEngineContext> getContext() const;
 
-    /// @brief 获取物理设备
-    /// @return 物理设备
-    VkPhysicalDevice& getVkPhysicalDevice();
+    VkPhysicalDevice getVkPhysicalDevice() const;
 
-    /// @brief 查找队列族索引(当前物理设备)
-    /// @return 队列族索引
-    QueueFamilyIndices findQueueFamilies();
+    /// @brief 构造时缓存的队列族索引
+    const QueueFamilyIndices& getQueueFamilies() const;
+
+    /// @brief 物理设备需求配置
+    const vkEnginePhysicalDeviceReq& getPhysicalDeviceReq() const;
 
 private:
-    friend class vkEngineLogicalDevice;
-    friend class vkEngineCommandPool;
+    vkEnginePhysicalDevice(const vkEnginePhysicalDevice&) = delete;
+    vkEnginePhysicalDevice(vkEnginePhysicalDevice&&) = delete;
+    vkEnginePhysicalDevice& operator=(const vkEnginePhysicalDevice&) = delete;
+    vkEnginePhysicalDevice& operator=(vkEnginePhysicalDevice&&) = delete;
 
-    /// @brief 判断设备是否适合
-    /// @param device 设备
-    /// @return 是否适合
-    bool isDeviceSuitable(VkPhysicalDevice device);
-
-    /// @brief 查找队列族索引
-    /// @param device 设备
-    /// @return 队列族索引
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
-
-    /// @brief 检查设备扩展支持
-    /// @param device 设备
-    /// @return 是否支持
-    bool checkDeviceExtensionSupport(VkPhysicalDevice device);
-
-private:
-    std::shared_ptr<vkEngine> _engine; // 引用成员必须在构造时绑定目标对象，只能通过初始化列表完成 // 引擎 
-    
-    VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;  // 物理设备
-    const std::vector<const char*> _deviceExtensions = { // 设备扩展名称 
-        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME, // 延迟主机操作扩展名称
-        VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME, // 加速结构扩展名称
-        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, // 光线追踪管道扩展名称
-        VK_KHR_RAY_QUERY_EXTENSION_NAME, // 光线查询扩展名称
-        VK_KHR_SPIRV_1_4_EXTENSION_NAME, // SPIR-V 1.4 扩展名称
-        VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // 缓冲区设备地址扩展名称
-    };
+    std::shared_ptr<vkEngineContext> _context;
+    VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;
+    QueueFamilyIndices _queueFamilyIndices;
 };

@@ -1,121 +1,24 @@
 ﻿#include "device/vkEnginePhysicalDevice.h"
 
-vkEnginePhysicalDevice::vkEnginePhysicalDevice(std::shared_ptr<vkEngine> engine)
-    : _engine(engine)
+namespace {
+
+bool checkDeviceExtensionSupport(VkPhysicalDevice device, const std::vector<const char*>& extensions)
 {
-    if(engine->getInstance() == VK_NULL_HANDLE){
-        std::cerr << "vk instance is not create!" << std::endl;
+    uint32_t extensionCount = 0;
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+
+    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+    std::set<std::string> requiredExtensions(extensions.begin(), extensions.end());
+    for (const auto& extension : availableExtensions) {
+        requiredExtensions.erase(extension.extensionName);
     }
 
-    uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(engine->getInstance(), &deviceCount, nullptr);
-
-    if (deviceCount == 0) {
-        throw std::runtime_error("failed to find GPUs with Vulkan support!");
-    }
-
-    std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(engine->getInstance(), &deviceCount, devices.data());
-
-    for (const auto& device : devices) {
-        if (isDeviceSuitable(device)) {
-            _physicalDevice = device;
-            break;
-        }
-    }
-
-    if (_physicalDevice == VK_NULL_HANDLE) {
-        throw std::runtime_error("failed to find a suitable GPU!");
-    }
-
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps{
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR
-    };
-    VkPhysicalDeviceProperties2 props2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-    props2.pNext = &rtProps;
-    vkGetPhysicalDeviceProperties2(_physicalDevice, &props2);
+    return requiredExtensions.empty();
 }
 
-vkEnginePhysicalDevice::~vkEnginePhysicalDevice()
-{
-    _physicalDevice = VK_NULL_HANDLE;
-}
-
-std::shared_ptr<vkEngine> vkEnginePhysicalDevice::getEngine()
-{
-    return _engine;
-}
-
-VkPhysicalDevice &vkEnginePhysicalDevice::getVkPhysicalDevice()
-{
-    return _physicalDevice;
-}
-
-QueueFamilyIndices vkEnginePhysicalDevice::findQueueFamilies()
-{
-    if(_physicalDevice == VK_NULL_HANDLE){
-        std::cerr << "this physical device is nullptr" << std::endl;
-    }
-
-    QueueFamilyIndices indices;
-
-    uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(_physicalDevice, &queueFamilyCount, nullptr);
-
-    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(_physicalDevice, &queueFamilyCount, queueFamilies.data());
-
-    int i = 0;
-    for (const auto& queueFamily : queueFamilies) {
-        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            indices.graphicsFamily = i;
-        }
-
-        if (indices.isComplete()) {
-            break;
-        }
-
-        i++;
-    }
-
-    return indices;
-}
-
-bool vkEnginePhysicalDevice::isDeviceSuitable(VkPhysicalDevice device)
-{
-    if(!findQueueFamilies(device).isComplete()){
-        return false;
-    }
-
-    if(!checkDeviceExtensionSupport(device)){
-        return false;
-    }
-
-    // 检查设备扩展支持
-    VkPhysicalDeviceVulkan12Features vulkan12Features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
-    VkPhysicalDeviceRayQueryFeaturesKHR rqFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR };
-    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR asFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
-
-    rqFeatures.pNext = &vulkan12Features;
-    rtFeatures.pNext = &rqFeatures;
-    asFeatures.pNext = &rtFeatures;
-
-    // 创建物理设备特性2
-    VkPhysicalDeviceFeatures2 features2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-    features2.pNext = &asFeatures;
-
-    // 获取物理设备特性2
-    vkGetPhysicalDeviceFeatures2(device, &features2);
-    
-    return asFeatures.accelerationStructure
-        && rtFeatures.rayTracingPipeline
-        && rqFeatures.rayQuery
-        && vulkan12Features.bufferDeviceAddress
-        && vulkan12Features.scalarBlockLayout;
-}
-
-QueueFamilyIndices vkEnginePhysicalDevice::findQueueFamilies(VkPhysicalDevice device)
+QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, const vkEnginePhysicalDeviceReq& req)
 {
     QueueFamilyIndices indices;
 
@@ -125,35 +28,88 @@ QueueFamilyIndices vkEnginePhysicalDevice::findQueueFamilies(VkPhysicalDevice de
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
-    int i = 0;
-    for (const auto& queueFamily : queueFamilies) {
-        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+    for (uint32_t i = 0; i < queueFamilyCount; ++i) {
+        const auto& queueFamily = queueFamilies[i];
+
+        if (req.enableGraphicsFamily
+            && (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+            && !indices.graphicsFamily) {
             indices.graphicsFamily = i;
         }
 
-        if (indices.isComplete()) {
+        if (indices.isComplete(req)) {
             break;
         }
-
-        i++;
     }
 
     return indices;
 }
 
-bool vkEnginePhysicalDevice::checkDeviceExtensionSupport(VkPhysicalDevice device)
+bool isDeviceSuitable(VkPhysicalDevice device, const vkEnginePhysicalDeviceReq& req)
 {
-    uint32_t extensionCount;
-    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
-
-    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
-
-    std::set<std::string> requiredExtensions(_deviceExtensions.begin(), _deviceExtensions.end());
-
-    for (const auto& extension : availableExtensions) {
-        requiredExtensions.erase(extension.extensionName);
+    if (!findQueueFamilies(device, req).isComplete(req)) {
+        return false;
     }
 
-    return requiredExtensions.empty();
+    return checkDeviceExtensionSupport(device, req.extensions);
+}
+
+} // namespace
+
+vkEnginePhysicalDevice::vkEnginePhysicalDevice(std::shared_ptr<vkEngineContext> context)
+    : _context(std::move(context))
+{
+    if (_context->getVkInstance() == VK_NULL_HANDLE) {
+        throw std::runtime_error("Vulkan instantiation not created!");
+    }
+
+    uint32_t deviceCount = 0;
+    vkEnumeratePhysicalDevices(_context->getVkInstance(), &deviceCount, nullptr);
+
+    if (deviceCount == 0) {
+        throw std::runtime_error("Failed to find GPUs with Vulkan support!");
+    }
+
+    std::vector<VkPhysicalDevice> devices(deviceCount);
+    vkEnumeratePhysicalDevices(_context->getVkInstance(), &deviceCount, devices.data());
+
+    const auto& req = getPhysicalDeviceReq();
+
+    for (const auto& device : devices) {
+        if (isDeviceSuitable(device, req)) {
+            _physicalDevice = device;
+            break;
+        }
+    }
+
+    if (_physicalDevice == VK_NULL_HANDLE) {
+        throw std::runtime_error("Failed to find a suitable GPU!");
+    }
+
+    _queueFamilyIndices = findQueueFamilies(_physicalDevice, req);
+}
+
+vkEnginePhysicalDevice::~vkEnginePhysicalDevice()
+{
+    _physicalDevice = VK_NULL_HANDLE;
+}
+
+std::shared_ptr<vkEngineContext> vkEnginePhysicalDevice::getContext() const
+{
+    return _context;
+}
+
+VkPhysicalDevice vkEnginePhysicalDevice::getVkPhysicalDevice() const
+{
+    return _physicalDevice;
+}
+
+const QueueFamilyIndices& vkEnginePhysicalDevice::getQueueFamilies() const
+{
+    return _queueFamilyIndices;
+}
+
+const vkEnginePhysicalDeviceReq& vkEnginePhysicalDevice::getPhysicalDeviceReq() const
+{
+    return _context->getConfig().physicalDeviceReq;
 }

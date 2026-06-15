@@ -12,14 +12,13 @@
 #include <sstream>
 #include <functional>
 #include <cstddef>
+#include <cstring>
 
 #ifdef _WIN32
 #include <Windows.h>
 #endif
 
 #include <glm/glm.hpp>
-
-#define MAX_FRAMES_IN_FLIGHT 1
 
 /// @brief 查找内存类型
 /// @param physDev 物理设备
