@@ -1,9 +1,9 @@
 ﻿#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb/stb_image_write.h>
 
-#include "vkEngineImage.h"
-#include "vkEngineBuffer.h"
-#include "vkEngineHelp.h"
+#include "resource/vkEngineImage.h"
+#include "resource/vkEngineBuffer.h"
+#include "common/vkEngineHelp.h"
 
 #include <vector>
 

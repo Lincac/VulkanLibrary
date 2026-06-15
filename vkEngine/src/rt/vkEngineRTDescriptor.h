@@ -1,8 +1,8 @@
 ﻿#pragma once
 
-#include "vkEngineAccelerationStructure.h"
-#include "vkEngineImage.h"
-#include "vkEngineTexture.h"
+#include "rt/vkEngineAccelerationStructure.h"
+#include "resource/vkEngineImage.h"
+#include "resource/vkEngineTexture.h"
 
 /// @brief RT 描述符集（TLAS + Storage Image + Vertex Buffer）
 class vkEngineRTDescriptor

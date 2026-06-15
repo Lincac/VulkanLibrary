@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "vkEngineHelp.h"
+#include "common/vkEngineHelp.h"
 
 /// @brief 路径追踪 uniform（std430，binding = 5，与 pathtrace.glsl PathTraceSettings 一致）
 struct PathTraceSettingsGPU {

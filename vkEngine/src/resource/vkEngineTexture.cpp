@@ -1,9 +1,9 @@
 ﻿#define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
-#include "vkEngineTexture.h"
-#include "vkEngineBuffer.h"
-#include "vkEngineHelp.h"
+#include "resource/vkEngineTexture.h"
+#include "resource/vkEngineBuffer.h"
+#include "common/vkEngineHelp.h"
 
 #include <algorithm>
 #include <cmath>

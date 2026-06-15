@@ -1,18 +1,23 @@
-set(VKENGINE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vkEngine")
+set(VKENGINE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-file(GLOB VKENGINE_SOURCES CONFIGURE_DEPENDS
-    "${VKENGINE_SOURCE_DIR}/*.cpp"
-    "${VKENGINE_SOURCE_DIR}/*.h"
-    "${VKENGINE_SOURCE_DIR}/RT/*.cpp"
-    "${VKENGINE_SOURCE_DIR}/RT/*.h"
+set(VKENGINE_SOURCES
+    ${VKENGINE_ROOT}/core/vkEngine.cpp
+    ${VKENGINE_ROOT}/device/vkEnginePhysicalDevice.cpp
+    ${VKENGINE_ROOT}/device/vkEngineLogicalDevice.cpp
+    ${VKENGINE_ROOT}/device/vkEngineCommandPool.cpp
+    ${VKENGINE_ROOT}/resource/vkEngineBuffer.cpp
+    ${VKENGINE_ROOT}/resource/vkEngineImage.cpp
+    ${VKENGINE_ROOT}/resource/vkEngineTexture.cpp
+    ${VKENGINE_ROOT}/rt/vkEngineAccelerationStructure.cpp
+    ${VKENGINE_ROOT}/rt/vkEngineRTDescriptor.cpp
+    ${VKENGINE_ROOT}/rt/vkEngineRayTracingPipeline.cpp
 )
 
 add_library(vkEngine STATIC ${VKENGINE_SOURCES})
 
 target_include_directories(vkEngine
     PUBLIC
-        $<BUILD_INTERFACE:${VKENGINE_SOURCE_DIR}>
-        $<BUILD_INTERFACE:${VKENGINE_SOURCE_DIR}/RT>
+        $<BUILD_INTERFACE:${VKENGINE_ROOT}>
 )
 
 # volk: compile from Vulkan SDK (Include/Volk/volk.c + volk.h), not Lib/volk*.lib

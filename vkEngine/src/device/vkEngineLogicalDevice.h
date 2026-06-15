@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "vkEnginePhysicalDevice.h"
+#include "device/vkEnginePhysicalDevice.h"
 
 /// @brief 逻辑设备类
 class vkEngineLogicalDevice

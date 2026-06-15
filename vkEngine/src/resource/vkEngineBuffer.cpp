@@ -1,4 +1,4 @@
-﻿#include "vkEngineBuffer.h"
+﻿#include "resource/vkEngineBuffer.h"
 
 vkEngineBuffer::vkEngineBuffer(std::shared_ptr<vkEngineLogicalDevice> device)
     : _device(device)

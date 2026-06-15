@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-#include "vkEngineLogicalDevice.h"
-#include "vkEngineCommandPool.h"
+#include "device/vkEngineLogicalDevice.h"
+#include "device/vkEngineCommandPool.h"
 
 /// @brief Sampled texture (HDR environment maps, etc.)
 class vkEngineTexture

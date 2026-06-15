@@ -3,8 +3,7 @@
         {
             "name": "MSVC",
             "includePath": [
-                "${workspaceFolder}/vkEngine/vkEngine",
-                "${workspaceFolder}/vkEngine/vkEngine/RT",
+                "${workspaceFolder}/vkEngine/src",
                 "${workspaceFolder}/Dependence/include",
                 "${env:VULKAN_SDK}/Include"
             ],
@@ -23,8 +22,7 @@
         {
             "name": "MinGW",
             "includePath": [
-                "${workspaceFolder}/vkEngine/vkEngine",
-                "${workspaceFolder}/vkEngine/vkEngine/RT",
+                "${workspaceFolder}/vkEngine/src",
                 "${workspaceFolder}/Dependence/include",
                 "${env:VULKAN_SDK}/Include",
                 "E:/mingw64/include"

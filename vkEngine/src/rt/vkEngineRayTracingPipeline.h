@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-#include "vkEngineBuffer.h"
-#include "vkEngineLogicalDevice.h"
+#include "resource/vkEngineBuffer.h"
+#include "device/vkEngineLogicalDevice.h"
 
 /// @brief 光线追踪管线类
 class vkEngineRayTracingPipeline

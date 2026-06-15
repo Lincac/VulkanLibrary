@@ -1,4 +1,4 @@
-﻿#include "vkEnginePhysicalDevice.h"
+﻿#include "device/vkEnginePhysicalDevice.h"
 
 vkEnginePhysicalDevice::vkEnginePhysicalDevice(std::shared_ptr<vkEngine> engine)
     : _engine(engine)

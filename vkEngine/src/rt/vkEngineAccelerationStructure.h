@@ -1,6 +1,6 @@
 ﻿#pragma once 
 
-#include "vkEngineBuffer.h"
+#include "resource/vkEngineBuffer.h"
 
 // BLAS : Bottom Level Acceleration Structure 底层加速结构
 /*

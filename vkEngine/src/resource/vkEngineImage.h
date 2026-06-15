@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-#include "vkEngineLogicalDevice.h"
-#include "vkEngineCommandPool.h"
+#include "device/vkEngineLogicalDevice.h"
+#include "device/vkEngineCommandPool.h"
 
 /// @brief 图像类
 class vkEngineImage {

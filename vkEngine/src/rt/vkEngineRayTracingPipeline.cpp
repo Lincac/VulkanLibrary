@@ -1,5 +1,5 @@
-﻿#include "vkEngineRayTracingPipeline.h"
-#include "vkEngineHelp.h"
+﻿#include "rt/vkEngineRayTracingPipeline.h"
+#include "common/vkEngineHelp.h"
 
 #include <cstring>
 #include <stdexcept>

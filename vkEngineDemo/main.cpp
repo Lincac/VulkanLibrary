@@ -1,9 +1,14 @@
-﻿#include "vkEngineImage.h"
-#include "vkEngineTexture.h"
-#include "vkEngineAccelerationStructure.h"
-#include "vkEngineRTDescriptor.h"
-#include "vkEngineRayTracingPipeline.h"
-#include "vkEngineRTHelp.h"
+﻿#include "core/vkEngine.h"
+#include "device/vkEnginePhysicalDevice.h"
+#include "device/vkEngineLogicalDevice.h"
+#include "device/vkEngineCommandPool.h"
+#include "resource/vkEngineBuffer.h"
+#include "resource/vkEngineImage.h"
+#include "resource/vkEngineTexture.h"
+#include "rt/vkEngineAccelerationStructure.h"
+#include "rt/vkEngineRTDescriptor.h"
+#include "rt/vkEngineRayTracingPipeline.h"
+#include "rt/vkEngineRTHelp.h"
 
 #include <iostream>
 
