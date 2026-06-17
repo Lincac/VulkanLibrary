@@ -9,9 +9,11 @@ struct QueueFamilyIndices {
     /// @brief 呈现队列族索引
     std::optional<uint32_t> presentFamily;
 
-    bool isComplete(const vkEnginePhysicalDeviceReq& req) const {
-        if (req.enableGraphicsFamily && !graphicsFamily) return false;
-        if (req.enablePresentFamily && !presentFamily) return false;
+    bool isComplete() const {
+        if (!graphicsFamily /* || !presentFamily */) {
+            return false;
+        }
+        
         return true;
     }
 };
@@ -23,14 +25,20 @@ public:
     explicit vkEnginePhysicalDevice(std::shared_ptr<vkEngineContext> context);
     ~vkEnginePhysicalDevice();
 
+    /// @brief 获取上下文
+    /// @return 上下文
     std::shared_ptr<vkEngineContext> getContext() const;
 
+    /// @brief 获取物理设备
+    /// @return 物理设备
     VkPhysicalDevice getVkPhysicalDevice() const;
 
     /// @brief 构造时缓存的队列族索引
+    /// @return 队列族索引
     const QueueFamilyIndices& getQueueFamilies() const;
 
     /// @brief 物理设备需求配置
+    /// @return 物理设备需求配置
     const vkEnginePhysicalDeviceReq& getPhysicalDeviceReq() const;
 
 private:

@@ -2,13 +2,13 @@
 
 namespace {
 
-bool checkDeviceExtensionSupport(VkPhysicalDevice device, const std::vector<const char*>& extensions)
+bool checkDeviceExtensionSupport(VkPhysicalDevice physicalDevice, const std::vector<const char*>& extensions)
 {
     uint32_t extensionCount = 0;
-    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+    vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr);
 
     std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+    vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, availableExtensions.data());
 
     std::set<std::string> requiredExtensions(extensions.begin(), extensions.end());
     for (const auto& extension : availableExtensions) {
@@ -18,15 +18,15 @@ bool checkDeviceExtensionSupport(VkPhysicalDevice device, const std::vector<cons
     return requiredExtensions.empty();
 }
 
-QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, const vkEnginePhysicalDeviceReq& req)
+QueueFamilyIndices findQueueFamilies(VkPhysicalDevice physicalDevice, const vkEnginePhysicalDeviceReq& req)
 {
     QueueFamilyIndices indices;
 
     uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
 
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
 
     for (uint32_t i = 0; i < queueFamilyCount; ++i) {
         const auto& queueFamily = queueFamilies[i];
@@ -37,7 +37,14 @@ QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, const vkEnginePhys
             indices.graphicsFamily = i;
         }
 
-        if (indices.isComplete(req)) {
+        // VkBool32 enablePresent = false;
+        // vkGetPhysicalDeviceSurfaceSupportKHR(device, i, , &enablePresent);
+        // if(enablePresent)
+        // {
+        //     indices.presentFamily = i;
+        // }
+
+        if (indices.isComplete()) {
             break;
         }
     }
@@ -47,7 +54,7 @@ QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, const vkEnginePhys
 
 bool isDeviceSuitable(VkPhysicalDevice device, const vkEnginePhysicalDeviceReq& req)
 {
-    if (!findQueueFamilies(device, req).isComplete(req)) {
+    if (!findQueueFamilies(device, req).isComplete()) {
         return false;
     }
 

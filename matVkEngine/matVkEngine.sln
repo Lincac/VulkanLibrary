@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.37328.6
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "matVkEngine", "matVkEngine\matVkEngine.vcxproj", "{96DC6313-7D9E-40FF-B02B-CC11F6712B5D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "matVkEngineDemo", "matVkEngineDemo\matVkEngineDemo.vcxproj", "{716208DF-F61C-4DD1-A3F7-FB4F94F14351}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{96DC6313-7D9E-40FF-B02B-CC11F6712B5D}.Debug|x64.ActiveCfg = Debug|x64
+		{96DC6313-7D9E-40FF-B02B-CC11F6712B5D}.Debug|x64.Build.0 = Debug|x64
+		{96DC6313-7D9E-40FF-B02B-CC11F6712B5D}.Release|x64.ActiveCfg = Release|x64
+		{96DC6313-7D9E-40FF-B02B-CC11F6712B5D}.Release|x64.Build.0 = Release|x64
+		{716208DF-F61C-4DD1-A3F7-FB4F94F14351}.Debug|x64.ActiveCfg = Debug|x64
+		{716208DF-F61C-4DD1-A3F7-FB4F94F14351}.Debug|x64.Build.0 = Debug|x64
+		{716208DF-F61C-4DD1-A3F7-FB4F94F14351}.Release|x64.ActiveCfg = Release|x64
+		{716208DF-F61C-4DD1-A3F7-FB4F94F14351}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1E1D7251-2CA8-47BA-99FB-DAB1C6242BC3}
+	EndGlobalSection
+EndGlobal

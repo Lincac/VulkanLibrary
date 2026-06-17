@@ -24,7 +24,8 @@ public:
     void setMemoryProperties(VkMemoryPropertyFlags properties);
 
     /// @brief 创建
-    void create();                              // 只创建，不上传
+    /// @brief 只创建，不上传
+    void create();                              
 
     /// @brief 上传
     /// @param commandPool 命令池
@@ -42,7 +43,7 @@ public:
 
     /// @brief 获取设备地址
     /// @return 设备地址
-    VkDeviceAddress getDeviceAddress();         // AS 必须用到
+    VkDeviceAddress getDeviceAddress();
 
 private:
     std::shared_ptr<vkEngineLogicalDevice> _device; // 逻辑设备

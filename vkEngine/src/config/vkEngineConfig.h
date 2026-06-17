@@ -25,7 +25,6 @@ struct vkEngineConfig {
 
     bool enableValidationLayers = true;
     std::vector<const char*> validationLayers = { "VK_LAYER_KHRONOS_validation" };
-
     bool enableDebugMessenger = true;
     std::vector<const char*> instanceExtensions = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME };  
 
