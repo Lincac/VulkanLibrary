@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -26,8 +26,15 @@
     <ClInclude Include="device\matVkEngineLogicalDevice.h" />
     <ClInclude Include="device\matVkEngineCmdPool.h" />
     <ClInclude Include="common\matVkEngineMesh.h" />
+    <ClInclude Include="shader\matVkEngineDescriptorSet.h" />
+    <ClInclude Include="shader\matVkEngineDescriptorPool.h" />
+    <ClInclude Include="shader\matVkEngineDescriptorSetLayout.h" />
+    <ClInclude Include="shader\matVkEngineShaderModule.h" />
     <ClInclude Include="resource\matVkEngineBuffer.h" />
     <ClInclude Include="resource\matVkEngineImage.h" />
+    <ClInclude Include="resource\matVkEngineTexture.h" />
+    <ClInclude Include="resource\func\stb_image.h" />
+    <ClInclude Include="resource\func\stb_image_write.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="core\matVkEngineContext.cpp" />
@@ -36,8 +43,13 @@
     <ClCompile Include="device\matVkEngineCmdPool.cpp" />
     <ClCompile Include="common\matVkEngineCommon.cpp" />
     <ClCompile Include="common\matVkEngineMesh.cpp" />
+    <ClCompile Include="shader\matVkEngineDescriptorSet.cpp" />
+    <ClCompile Include="shader\matVkEngineDescriptorPool.cpp" />
+    <ClCompile Include="shader\matVkEngineDescriptorSetLayout.cpp" />
+    <ClCompile Include="shader\matVkEngineShaderModule.cpp" />
     <ClCompile Include="resource\matVkEngineBuffer.cpp" />
     <ClCompile Include="resource\matVkEngineImage.cpp" />
+    <ClCompile Include="resource\matVkEngineTexture.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -127,7 +139,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
@@ -154,7 +166,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>

@@ -11,6 +11,7 @@ BreakBeforeBraces: Attach
 AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: Empty
+AllowShortEnumsOnASingleLine: false
 
 PointerAlignment: Left
 ReferenceAlignment: Left
