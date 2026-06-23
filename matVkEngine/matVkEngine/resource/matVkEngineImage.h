@@ -8,9 +8,7 @@
 #include "device/matVkEnginePhysicalDevice.h"
 namespace mat {
 
-    // LDR2D / HDR2D：depth = 1（png、jpg、hdr 等）
-    // Volume3D：体纹理 width × height × depth（原始体数据、多帧 GIF 按 z 轴堆叠等）
-    enum class ImageKind {
+    enum class ImageType {
         LDR2D,
         HDR2D,
         Volume3D,
@@ -27,9 +25,9 @@ namespace mat {
 
         void setVkImageUsageFlags(VkImageUsageFlags usage);
 
-        void loadFromFile(const std::string& path);
+        void load(const std::string& path);
 
-        void loadVolumeFromFile(const std::string& path, uint32_t width, uint32_t height, uint32_t depth);
+        void load(const std::string& path, uint32_t width, uint32_t height, uint32_t depth);
 
         void create(std::shared_ptr<VkEnginePhysicalDevice> physicalDevice,
                     std::shared_ptr<VkEngineLogicalDevice> logicalDevice);
@@ -41,11 +39,7 @@ namespace mat {
 
         VkFormat getVkFormat() const;
 
-        ImageKind getImageKind() const;
-
-        bool hasPixelData() const;
-
-        bool isGpuCreated() const;
+        ImageType getImageType() const;
 
         VkImage getVkImage() const;
 
@@ -61,18 +55,14 @@ namespace mat {
         VkEngineImage& operator=(const VkEngineImage&) = delete;
         VkEngineImage& operator=(VkEngineImage&&) = delete;
 
-        void resetPixelData();
-
-        void adoptPixelData(ImageKind kind, int width, int height, int depth, VkFormat format, const void* data,
+        void adoptPixelData(ImageType kind, int width, int height, int depth, VkFormat format, const void* data,
                             VkDeviceSize size);
 
         uint32_t width, height, depth;
 
         VkFormat _format;
         VkImageUsageFlags _usage;
-        ImageKind _imageKind = ImageKind::LDR2D;
-        bool _hasPixelData = false;
-        bool _gpuCreated = false;
+        ImageType _imageType = ImageType::LDR2D;
         std::vector<uint8_t> _pixelData;
         VkDeviceSize _pixelSize = 0;
 

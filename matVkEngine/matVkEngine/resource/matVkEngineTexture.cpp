@@ -8,48 +8,19 @@ namespace mat {
 
     VkEngineTexture::~VkEngineTexture() {}
 
-    void VkEngineTexture::createSampler(std::shared_ptr<VkEngineLogicalDevice> logicalDevice, ImageKind kind) {
-        if (_sampler != VK_NULL_HANDLE) {
-            return;
-        }
-
-        VkSamplerCreateInfo samplerInfo{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV =
-            kind == ImageKind::HDR2D ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        samplerInfo.anisotropyEnable = VK_FALSE;
-        samplerInfo.maxAnisotropy = 1.0f;
-        samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-
-        if (kind == ImageKind::Volume3D) {
-            samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-            samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        }
-
-        if (vkCreateSampler(logicalDevice->getVkDevice(), &samplerInfo, nullptr, &_sampler) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create texture sampler!");
-        }
-    }
-
-    void VkEngineTexture::createFromImage(std::shared_ptr<VkEngineLogicalDevice> logicalDevice,
-                                          std::shared_ptr<VkEngineImage> image) {
+    void VkEngineTexture::create(std::shared_ptr<VkEngineLogicalDevice> logicalDevice,
+                                 std::shared_ptr<VkEngineImage> image) {
         if (image == nullptr) {
             throw std::runtime_error("texture source image is null!");
         }
-        if (!image->isGpuCreated()) {
+        if (image->getVkImage() == VK_NULL_HANDLE) {
             throw std::runtime_error("texture source image is not created!");
         }
 
         release(logicalDevice);
 
         _image = image;
-        createSampler(logicalDevice, _image->getImageKind());
+        createSampler(logicalDevice, _image->getImageType());
     }
 
     void VkEngineTexture::release(std::shared_ptr<VkEngineLogicalDevice> logicalDevice) {
@@ -73,14 +44,6 @@ namespace mat {
         return _sampler;
     }
 
-    ImageKind VkEngineTexture::getImageKind() const {
-        if (_image == nullptr) {
-            return ImageKind::LDR2D;
-        }
-
-        return _image->getImageKind();
-    }
-
     void VkEngineTexture::getResolution(uint32_t& w, uint32_t& h, uint32_t& d) const {
         if (_image == nullptr) {
             w = 0;
@@ -92,8 +55,33 @@ namespace mat {
         _image->getResolution(w, h, d);
     }
 
-    bool VkEngineTexture::isReady() const {
-        return _image != nullptr && _image->isGpuCreated() && _sampler != VK_NULL_HANDLE;
+    void VkEngineTexture::createSampler(std::shared_ptr<VkEngineLogicalDevice> logicalDevice, ImageType type) {
+        if (_sampler != VK_NULL_HANDLE) {
+            return;
+        }
+
+        VkSamplerCreateInfo samplerInfo{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV =
+            type == ImageType::HDR2D ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerInfo.anisotropyEnable = VK_FALSE;
+        samplerInfo.maxAnisotropy = 1.0f;
+        samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+
+        if (type == ImageType::Volume3D) {
+            samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        }
+
+        if (vkCreateSampler(logicalDevice->getVkDevice(), &samplerInfo, nullptr, &_sampler) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create texture sampler!");
+        }
     }
 
 };  // namespace mat

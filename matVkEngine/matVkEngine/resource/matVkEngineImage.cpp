@@ -1,6 +1,4 @@
 ﻿#define STB_IMAGE_IMPLEMENTATION
-#include "resource/func/stb_image.h"
-
 #include "matVkEngineImage.h"
 
 #include <cstdio>
@@ -8,45 +6,42 @@
 #include <stdexcept>
 
 #include "common/matVkEngineCommon.h"
+#include "resource/func/stb_image.h"
 #include "resource/matVkEngineBuffer.h"
 
 namespace mat {
 
-    namespace {
-
-        std::vector<unsigned char> readFileToMemory(const std::string& path) {
-            FILE* file = std::fopen(path.c_str(), "rb");
-            if (file == nullptr) {
-                throw std::runtime_error("failed to open image file: " + path);
-            }
-
-            if (std::fseek(file, 0, SEEK_END) != 0) {
-                std::fclose(file);
-                throw std::runtime_error("failed to seek image file: " + path);
-            }
-
-            const long fileSize = std::ftell(file);
-            if (fileSize <= 0) {
-                std::fclose(file);
-                throw std::runtime_error("image file is empty: " + path);
-            }
-
-            std::vector<unsigned char> buffer(static_cast<size_t>(fileSize));
-            if (std::fseek(file, 0, SEEK_SET) != 0) {
-                std::fclose(file);
-                throw std::runtime_error("failed to seek image file: " + path);
-            }
-
-            const size_t readSize = std::fread(buffer.data(), 1, buffer.size(), file);
-            std::fclose(file);
-            if (readSize != buffer.size()) {
-                throw std::runtime_error("failed to read image file: " + path);
-            }
-
-            return buffer;
+    std::vector<unsigned char> readFileToMemory(const std::string& path) {
+        FILE* file = std::fopen(path.c_str(), "rb");
+        if (file == nullptr) {
+            throw std::runtime_error("failed to open image file: " + path);
         }
 
-    }  // namespace
+        if (std::fseek(file, 0, SEEK_END) != 0) {
+            std::fclose(file);
+            throw std::runtime_error("failed to seek image file: " + path);
+        }
+
+        const long fileSize = std::ftell(file);
+        if (fileSize <= 0) {
+            std::fclose(file);
+            throw std::runtime_error("image file is empty: " + path);
+        }
+
+        std::vector<unsigned char> buffer(static_cast<size_t>(fileSize));
+        if (std::fseek(file, 0, SEEK_SET) != 0) {
+            std::fclose(file);
+            throw std::runtime_error("failed to seek image file: " + path);
+        }
+
+        const size_t readSize = std::fread(buffer.data(), 1, buffer.size(), file);
+        std::fclose(file);
+        if (readSize != buffer.size()) {
+            throw std::runtime_error("failed to read image file: " + path);
+        }
+
+        return buffer;
+    }
 
     VkEngineImage::VkEngineImage() : width(1), height(1), depth(1) {
         _format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -69,30 +64,9 @@ namespace mat {
         _usage = usage;
     }
 
-    void VkEngineImage::resetPixelData() {
+    void VkEngineImage::load(const std::string& path) {
         _pixelData.clear();
         _pixelSize = 0;
-        _hasPixelData = false;
-    }
-
-    void VkEngineImage::adoptPixelData(ImageKind kind, int w, int h, int d, VkFormat format, const void* data,
-                                       VkDeviceSize size) {
-        _imageKind = kind;
-        _pixelSize = size;
-        _pixelData.resize(static_cast<size_t>(size));
-        std::memcpy(_pixelData.data(), data, static_cast<size_t>(size));
-
-        width = static_cast<uint32_t>(w);
-        height = static_cast<uint32_t>(h);
-        depth = static_cast<uint32_t>(d);
-        _format = format;
-        _usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        _hasPixelData = true;
-        _gpuCreated = false;
-    }
-
-    void VkEngineImage::loadFromFile(const std::string& path) {
-        resetPixelData();
 
         int w = 0;
         int h = 0;
@@ -106,7 +80,7 @@ namespace mat {
             }
 
             const VkDeviceSize pixelBytes = static_cast<VkDeviceSize>(w) * h * 4 * sizeof(float);
-            adoptPixelData(ImageKind::HDR2D, w, h, 1, VK_FORMAT_R32G32B32A32_SFLOAT, pixels, pixelBytes);
+            adoptPixelData(ImageType::HDR2D, w, h, 1, VK_FORMAT_R32G32B32A32_SFLOAT, pixels, pixelBytes);
             stbi_image_free(pixels);
             return;
         }
@@ -123,7 +97,7 @@ namespace mat {
 
         if (volumePixels != nullptr && d > 1) {
             const VkDeviceSize pixelBytes = static_cast<VkDeviceSize>(w) * h * d * 4;
-            adoptPixelData(ImageKind::Volume3D, w, h, d, VK_FORMAT_R8G8B8A8_UNORM, volumePixels, pixelBytes);
+            adoptPixelData(ImageType::Volume3D, w, h, d, VK_FORMAT_R8G8B8A8_UNORM, volumePixels, pixelBytes);
             stbi_image_free(volumePixels);
             return;
         }
@@ -138,16 +112,17 @@ namespace mat {
         }
 
         const VkDeviceSize pixelBytes = static_cast<VkDeviceSize>(w) * h * 4;
-        adoptPixelData(ImageKind::LDR2D, w, h, 1, VK_FORMAT_R8G8B8A8_UNORM, pixels, pixelBytes);
+        adoptPixelData(ImageType::LDR2D, w, h, 1, VK_FORMAT_R8G8B8A8_UNORM, pixels, pixelBytes);
         stbi_image_free(pixels);
     }
 
-    void VkEngineImage::loadVolumeFromFile(const std::string& path, uint32_t w, uint32_t h, uint32_t d) {
+    void VkEngineImage::load(const std::string& path, uint32_t w, uint32_t h, uint32_t d) {
         if (w == 0 || h == 0 || d == 0) {
             throw std::runtime_error("invalid volume dimension!");
         }
 
-        resetPixelData();
+        _pixelData.clear();
+        _pixelSize = 0;
 
         const std::vector<unsigned char> fileData = readFileToMemory(path);
         const VkDeviceSize expectedSize = static_cast<VkDeviceSize>(w) * h * d * 4;
@@ -155,13 +130,13 @@ namespace mat {
             throw std::runtime_error("volume file size mismatch: " + path);
         }
 
-        adoptPixelData(ImageKind::Volume3D, static_cast<int>(w), static_cast<int>(h), static_cast<int>(d),
+        adoptPixelData(ImageType::Volume3D, static_cast<int>(w), static_cast<int>(h), static_cast<int>(d),
                        VK_FORMAT_R8G8B8A8_UNORM, fileData.data(), expectedSize);
     }
 
     void VkEngineImage::create(std::shared_ptr<VkEnginePhysicalDevice> physicalDevice,
                                std::shared_ptr<VkEngineLogicalDevice> logicalDevice) {
-        if (_gpuCreated) {
+        if (_imageView != VK_NULL_HANDLE) {
             return;
         }
 
@@ -207,17 +182,15 @@ namespace mat {
         if (vkCreateImageView(logicalDevice->getVkDevice(), &viewInfo, nullptr, &_imageView) != VK_SUCCESS) {
             throw std::runtime_error("failed to create image view!");
         }
-
-        _gpuCreated = true;
     }
 
     void VkEngineImage::upload(std::shared_ptr<VkEnginePhysicalDevice> physicalDevice,
                                std::shared_ptr<VkEngineLogicalDevice> logicalDevice,
                                std::shared_ptr<VkEngineCmdPool> cmdPool) {
-        if (!_hasPixelData) {
+        if (_pixelData.size() == 0) {
             throw std::runtime_error("image pixel data is not loaded!");
         }
-        if (!_gpuCreated) {
+        if (_imageView == VK_NULL_HANDLE) {
             throw std::runtime_error("image gpu resources are not created!");
         }
         if (cmdPool == nullptr) {
@@ -252,7 +225,9 @@ namespace mat {
         });
 
         stagingBuffer.release(logicalDevice);
-        resetPixelData();
+
+        _pixelData.clear();
+        _pixelSize = 0;
     }
 
     void VkEngineImage::getResolution(uint32_t& w, uint32_t& h, uint32_t& d) const {
@@ -265,16 +240,8 @@ namespace mat {
         return _format;
     }
 
-    ImageKind VkEngineImage::getImageKind() const {
-        return _imageKind;
-    }
-
-    bool VkEngineImage::hasPixelData() const {
-        return _hasPixelData;
-    }
-
-    bool VkEngineImage::isGpuCreated() const {
-        return _gpuCreated;
+    ImageType VkEngineImage::getImageType() const {
+        return _imageType;
     }
 
     VkImage VkEngineImage::getVkImage() const {
@@ -294,7 +261,8 @@ namespace mat {
             throw std::runtime_error("Logical Device is nullptr!");
         }
 
-        resetPixelData();
+        _pixelData.clear();
+        _pixelSize = 0;
 
         width = 1;
         height = 1;
@@ -302,8 +270,7 @@ namespace mat {
 
         _format = VK_FORMAT_R8G8B8A8_UNORM;
         _usage = VK_IMAGE_USAGE_STORAGE_BIT;
-        _imageKind = ImageKind::LDR2D;
-        _gpuCreated = false;
+        _imageType = ImageType::LDR2D;
 
         if (_imageView != VK_NULL_HANDLE) {
             vkDestroyImageView(logicalDevice->getVkDevice(), _imageView, nullptr);
@@ -319,6 +286,20 @@ namespace mat {
             vkFreeMemory(logicalDevice->getVkDevice(), _memory, nullptr);
             _memory = VK_NULL_HANDLE;
         }
+    }
+
+    void VkEngineImage::adoptPixelData(ImageType kind, int w, int h, int d, VkFormat format, const void* data,
+                                       VkDeviceSize size) {
+        _imageType = kind;
+        _pixelSize = size;
+        _pixelData.resize(static_cast<size_t>(size));
+        std::memcpy(_pixelData.data(), data, static_cast<size_t>(size));
+
+        width = static_cast<uint32_t>(w);
+        height = static_cast<uint32_t>(h);
+        depth = static_cast<uint32_t>(d);
+        _format = format;
+        _usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     }
 
 };  // namespace mat
