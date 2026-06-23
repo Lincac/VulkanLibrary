@@ -1,8 +1,14 @@
 # matVkEngine
 
-Vulkan 渲染引擎，核心目标是 **Forward 光栅管线可自定义**：用户通过配置文件描述 Pass 链、材质与 Shader，引擎编译并调度为 Vulkan 对象，无需修改 C++ 渲染代码即可切换前向渲染方案。
+Vulkan **光栅渲染引擎**，核心目标是 **自由可配置管线**：用户用 **C++ struct** 描述 Pass 链、Pass 间资源、材质与 Shader，引擎编译为 Vulkan 对象并按序调度。**Forward、Deferred 都不是写死在引擎里的固定路径**，只是两种（或多种）管线 preset 配置。
 
-光追（Ray Tracing）作为独立后端保留，不参与 Forward 管线自定义体系。
+**当前范围：**
+
+- **光栅 Pass 链可配置**：Draw Pass（场景网格）、Fullscreen Pass（全屏三角/quad）可组合；通过 Pass 输入/输出衔接，可搭 Forward，也可搭 Deferred（GBuffer → Lighting）。
+- **C++ struct 配置**：不做 JSON；日后 JSON 仅填充同一套 struct。
+- **离屏验证**：Color/Depth attachment → readback PNG；不做 Swapchain。
+
+**暂不做：** 光追、JSON SceneLoader、窗口呈现、可视化管线编辑器。
 
 ---
 
@@ -10,262 +16,279 @@ Vulkan 渲染引擎，核心目标是 **Forward 光栅管线可自定义**：用
 
 | 记号 | 含义 |
 |------|------|
-| Forward 管线 | 光栅化前向渲染路径（非 Deferred、非 RT） |
-| Pass | 一次 RenderPass 录制：若干 attachment + 一批 draw |
-| 管线配置 | 描述 Pass 顺序、attachment、混合/深度等状态的 JSON / struct |
-| 材质（Material） | 引用 vert/frag shader、descriptor binding、渲染状态；Entity 通过材质决定如何绘制 |
-| 场景配置 | Entity / Camera / Light 与所用管线配置、材质路径 |
+| 渲染管线（Render Pipeline） | 有序 Pass 列表 + Pass 间资源声明；Forward / Deferred 均为其实例 |
+| Pass | 一次 `VkRenderPass` 录制单元，含 attachment 与执行方式 |
+| Draw Pass | 遍历场景 Entity，按 `passName` / `drawGroup` 筛选并 `vkCmdDraw` |
+| Fullscreen Pass | 全屏 draw，用于 Deferred lighting、后处理等 |
+| 管线资源（Pipeline Resource） | Pass 间传递的离屏 Image（如 GBuffer 的 albedo/normal） |
+| 材质（Material） | shader、descriptor、渲染状态；绑定到特定 Pass |
+| 场景（Scene） | Entity、Camera、Light；与管线配置分离 |
 
 ---
 
-## 设计目标：Forward 管线可自定义
+## 设计原则
+
+### 引擎不提供「固定 Forward / 固定 Deferred 类」
+
+| 错误做法 | 本工程做法 |
+|----------|------------|
+| `ForwardRenderer` 内写死单 Pass draw | `RasterRenderer` 只执行 `RenderPipelineConfig` 中的 Pass 序 |
+| `DeferredRenderer` 内写死 GBuffer + Light | Demo 用 preset 描述 GBuffer Pass + Fullscreen Pass |
+| 换渲染方案改 C++ Renderer 源码 | 换 `RenderPipelineConfig` + 对应 Material / Shader |
 
 ### 用户可配置项
 
-| 类别 | 可配置内容 | 配置入口 |
-|------|------------|----------|
-| Pass 链 | Pass 数量、顺序、每 Pass 的 color/depth attachment、clear 值 | `pipelines/*.json` |
-| Shader | 每材质独立的 vert/frag `.spv` 路径 | `materials/*.json` |
-| Descriptor | binding 槽位与 UBO / 贴图 / StorageBuffer 映射 | `materials/*.json` |
-| 渲染状态 | cull mode、depth test/write、blend、polygon mode | `materials/*.json` |
-| 场景 | mesh 路径、transform、引用哪份材质、相机与光源 | `scenes/*.json` |
-| 输出 | 分辨率、离屏/窗口、输出 PNG 路径 | `RenderConfig` |
+| 类别 | 内容 | 配置 |
+|------|------|------|
+| Pass 链 | Pass 数量、顺序、类型（Draw / Fullscreen） | `RenderPipelineConfig` |
+| Attachment | 每 Pass 的 color 数量与 format、depth、clear | `PassConfig` |
+| Pass 间资源 | 上一 Pass 输出 → 下一 Pass shader 输入 | `PassResourceConfig` |
+| 材质 / Shader | 每 Pass 用哪套 vert/frag、binding、渲染状态 | `MaterialConfig`（含 `targetPass`） |
+| 场景 | mesh、transform、材质引用、相机、光 | `SceneConfig` |
+| 输出 | 分辨率、最终 PNG 取自哪个 Pass 的哪个 attachment | `RenderConfig` |
 
-### 引擎固定项（不在此版本自定义）
+### 引擎固定项
 
-- 顶点布局：统一 `Vertex { pos, normal }`（见 `matVkEngineTypes.h`）
-- Shader 入口点名：`main`
-- 后端类型：Forward 与 RT 二选一，Forward Pass 链与 RT 不混用
-- 完整 Render Graph 编辑器、Shader Graph 节点编辑：不在范围内
+- 顶点布局：`Vertex { pos, normal }`（`matVkEngineTypes.h`）
+- Shader 入口：`main`
+- 呈现：离屏 + PNG
+- Pass 执行器类型：仅 **Draw** 与 **Fullscreen** 两种（可扩展，但不写死 Forward/Deferred 逻辑）
 
-### 数据流
+---
+
+## Forward vs Deferred：同一套机制
+
+### Forward preset（单 Draw Pass）
 
 ```
-pipelines/forward_*.json     materials/*.json     scenes/*.json
-         │                          │                    │
-         └──────────┬───────────────┴────────────────────┘
+Pass "forward"
+  attachments: color0 + depth
+  type: Draw
+  drawGroups: Opaque, Transparent
+  materials: forward lit / unlit（targetPass = "forward"）
+  → 输出 color0 → PNG
+```
+
+### Deferred preset（GBuffer Draw + Lighting Fullscreen）
+
+```
+Pass "gbuffer"
+  attachments: color0=albedo, color1=normal, color2=material, depth
+  type: Draw
+  drawGroups: Opaque
+  materials: gbuffer write（targetPass = "gbuffer"）
+
+Pass "deferred_light"
+  attachments: color0=hdr
+  type: Fullscreen
+  inputs: gbuffer.albedo, gbuffer.normal, gbuffer.depth, ...（Pipeline Resource 引用）
+  material: deferred_light.frag（targetPass = "deferred_light"）
+
+  → 输出 hdr → PNG
+```
+
+**切换 Forward ↔ Deferred = 换 `RenderPipelineConfig` + 换 Material/Shader preset，不改 `RasterRenderer`。**
+
+---
+
+## 数据流
+
+```
+RenderPipelineConfig    MaterialConfig[]    SceneConfig
+         │                     │                  │
+         └──────────┬──────────┴──────────────────┘
                     ▼
-           VkEngineForwardPipeline（解析 + 编译）
-                    │
-      ┌─────────────┼─────────────┐
-      ▼             ▼             ▼
- RenderPass[]  PipelineCache  DescriptorLayouts
-      │             │             │
-      └─────────────┴─────────────┘
+         VkEngineRenderPipeline::build()
+           · 分配/别名 Pipeline Resource（Pass 间 Image）
+           · 为每 Pass 创建 RenderPass + Framebuffer
+           · 注册 Material → PipelineCache
                     ▼
-         VkEngineForwardRenderer::render(scene)
-                    │
+         VkEngineRasterRenderer::render(scene, pipeline)
+           for (pass : pipeline.passesInOrder)
+               if DrawPass      → draw 匹配 targetPass 的 entities
+               if FullscreenPass → draw 全屏 + 绑定 inputs
                     ▼
-              CommandBuffer（按 Pass 顺序 draw）
+         pipeline.getOutputImage() → saveToPng()
 ```
 
 ---
 
 ## 目标目录结构
 
-根目录保持 `matVkEngine/`（解决方案）不变。**`✓` = 已有，`+` = 待新增**。
+**`✓` = 已有，`+` = 待新增，`—` = 暂不做**
 
 ```
 matVkEngine/
-├── matVkEngine.sln
-├── .clang-format
-├── README.md
-│
-├── matVkEngine/                          # 静态库（引擎本体）
-│   ├── matVkEngine.vcxproj
-│   ├── matVkEngine.vcxproj.filters
-│   │
+├── matVkEngine/
 │   ├── config/
-│   │   ├── matVkEngineConfig.h               ✓ Instance / 设备扩展
-│   │   ├── matVkEngineRenderConfig.h         + 分辨率、帧数、后端枚举、输出路径
-│   │   ├── matVkEngineForwardPipelineConfig.h + Pass 链、attachment 描述 struct
-│   │   ├── matVkEngineMaterialConfig.h       + shader 路径、binding、渲染状态 struct
-│   │   └── matVkEngineSceneConfig.h          + Entity / Camera / Light struct
+│   │   ├── matVkEngineConfig.h                 ✓
+│   │   ├── matVkEngineRenderConfig.h           + 分辨率、最终输出 Pass/attachment
+│   │   ├── matVkEngineRenderPipelineConfig.h   + Pass 链、Pass 类型、资源 IO
+│   │   ├── matVkEnginePassConfig.h             + 单 Pass attachment / clear / inputs
+│   │   ├── matVkEngineMaterialConfig.h         + shader、binding、state、targetPass
+│   │   └── matVkEngineSceneConfig.h            + Entity / Camera / Light
 │   │
-│   ├── core/
-│   │   ├── matVkEngineContext.h              ✓
-│   │   └── matVkEngineContext.cpp            ✓
-│   │
-│   ├── device/
-│   │   ├── matVkEnginePhysicalDevice.h       ✓
-│   │   ├── matVkEnginePhysicalDevice.cpp     ✓
-│   │   ├── matVkEngineLogicalDevice.h        ✓
-│   │   ├── matVkEngineLogicalDevice.cpp      ✓
-│   │   ├── matVkEngineCmdPool.h              ✓
-│   │   ├── matVkEngineCmdPool.cpp            ✓
-│   │   ├── matVkEngineFrameSync.h            + Semaphore / Fence / 多帧 in-flight
-│   │   └── matVkEngineFrameSync.cpp          +
-│   │
-│   ├── platform/                             # 窗口与呈现（可后做）
-│   │   ├── matVkEngineSurface.h              +
-│   │   ├── matVkEngineSurface.cpp            +
-│   │   ├── matVkEngineSwapchain.h            +
-│   │   └── matVkEngineSwapchain.cpp          +
+│   ├── core/                                     ✓
+│   ├── device/                                   ✓（FrameSync + 可选）
+│   ├── platform/                                 — 暂不做
 │   │
 │   ├── resource/
-│   │   ├── matVkEngineBuffer.h               ✓
-│   │   ├── matVkEngineBuffer.cpp               ✓
-│   │   ├── matVkEngineImage.h                  ✓
-│   │   ├── matVkEngineImage.cpp                ✓
-│   │   ├── matVkEngineTexture.h                ✓ 2D 贴图 / HDR
-│   │   ├── matVkEngineTexture.cpp              ✓
-│   │   ├── matVkEngineGpuMesh.h                + CPU Mesh → GPU buffer
-│   │   ├── matVkEngineGpuMesh.cpp              +
-│   │   └── func/                               ✓ stb
+│   │   ├── matVkEngineBuffer/Image/Texture       ✓
+│   │   ├── matVkEngineGpuMesh.*                  +
+│   │   └── func/                                 ✓
 │   │
-│   ├── shader/
-│   │   ├── matVkEngineShaderModule.h           ✓ 加载 .spv
-│   │   ├── matVkEngineShaderModule.cpp         ✓
-│   │   ├── matVkEngineDescriptorSetLayout.h    ✓
-│   │   ├── matVkEngineDescriptorSetLayout.cpp  ✓
-│   │   ├── matVkEngineDescriptorPool.h         ✓
-│   │   ├── matVkEngineDescriptorPool.cpp       ✓
-│   │   ├── matVkEngineDescriptorSet.h          ✓ 绑定 buffer / image / sampler
-│   │   ├── matVkEngineDescriptorSet.cpp        ✓
-│   │   ├── matVkEngineSampler.h                + VkSampler 封装
-│   │   └── matVkEngineSampler.cpp              +
+│   ├── shader/                                   ✓
 │   │
-│   ├── pipeline/                             # Forward 可自定义管线核心
-│   │   ├── matVkEngineRenderPass.h             + 由 PassDesc 创建 RenderPass
-│   │   ├── matVkEngineRenderPass.cpp           +
-│   │   ├── matVkEngineFramebuffer.h            + 绑定 Pass 的 attachment
-│   │   ├── matVkEngineFramebuffer.cpp          +
-│   │   ├── matVkEngineGraphicsPipeline.h       + 由 MaterialConfig + RenderPass 创建
-│   │   ├── matVkEngineGraphicsPipeline.cpp     +
-│   │   ├── matVkEnginePipelineCache.h          + (shader, state, pass) → Pipeline 缓存
-│   │   ├── matVkEnginePipelineCache.cpp        +
-│   │   ├── matVkEngineForwardPipeline.h        + 解析管线配置、持有 Pass 链
-│   │   └── matVkEngineForwardPipeline.cpp      +
+│   ├── pipeline/                                 + 可配置管线核心
+│   │   ├── matVkEngineRenderPass.*               + 由 PassConfig 创建（支持多 color attachment）
+│   │   ├── matVkEngineFramebuffer.*
+│   │   ├── matVkEngineGraphicsPipeline.*
+│   │   ├── matVkEnginePipelineCache.*
+│   │   ├── matVkEnginePipelineResource.*         + Pass 间 Image 注册表与 lifetime
+│   │   └── matVkEngineRenderPipeline.*           + build / 查询 Pass 输出
 │   │
-│   ├── rt/                                   # 光追后端（固定流程，不可自定义 Pass 链）
-│   │   ├── matVkEngineAccelerationStructure.h  +
-│   │   ├── matVkEngineAccelerationStructure.cpp+
-│   │   ├── matVkEngineRayTracingPipeline.h     +
-│   │   ├── matVkEngineRayTracingPipeline.cpp   +
-│   │   ├── matVkEngineRTDescriptor.h           +
-│   │   ├── matVkEngineRTDescriptor.cpp         +
-│   │   └── matVkEngineRTHelp.h                 +
+│   ├── rt/                                       — 暂不做
 │   │
 │   ├── scene/
-│   │   ├── matVkEngineTransform.h              +
-│   │   ├── matVkEngineCamera.h                 +
-│   │   ├── matVkEngineLight.h                  +
-│   │   ├── matVkEngineMaterial.h               + 运行时材质：config + GPU descriptor
-│   │   ├── matVkEngineMaterial.cpp             +
-│   │   ├── matVkEngineEntity.h                 + transform + mesh + materialRef
-│   │   ├── matVkEngineScene.h                  + entities + camera + lights + pipelineRef
-│   │   ├── matVkEngineScene.cpp                + build GPU 资源
-│   │   └── matVkEngineSceneLoader.h            + JSON → SceneConfig / MaterialConfig
+│   │   ├── matVkEngineTransform/Camera/Light     +
+│   │   ├── matVkEngineMaterial.*                 +
+│   │   ├── matVkEngineEntity/Scene.*             +
+│   │   └── matVkEngineSceneLoader.*              — 暂不做
 │   │
 │   ├── renderer/
-│   │   ├── matVkEngineRenderer.h               + 抽象接口
-│   │   ├── matVkEngineForwardRenderer.h        + 按 ForwardPipeline 的 Pass 链调度 draw
-│   │   ├── matVkEngineForwardRenderer.cpp      +
-│   │   ├── matVkEngineRayTracingRenderer.h     +
-│   │   ├── matVkEngineRayTracingRenderer.cpp   +
-│   │   └── matVkEngineRendererFactory.h        + 按 RenderBackend 创建
+│   │   ├── matVkEngineRenderer.h                 + render / release 接口
+│   │   ├── matVkEngineRasterRenderer.*           + 通用 Pass 链调度（非 Forward 专用）
+│   │   └── matVkEngineFullscreenDraw.*           + 全屏 Pass 辅助（可选独立小模块）
 │   │
 │   └── common/
-│       ├── matVkEngineCommon.h                 ✓
-│       ├── matVkEngineCommon.cpp               ✓
-│       ├── matVkEngineMesh.h                   ✓ CPU OBJ/STL
-│       ├── matVkEngineMesh.cpp                 ✓
-│       ├── matVkEngineTypes.h                  + Vertex、ForwardUBO 等
-│       └── matVkEngineFileUtil.h               + 读 JSON / spv、存 PNG
+│       ├── matVkEngineCommon/Mesh                ✓
+│       ├── matVkEngineTypes.h                    + Vertex、SceneUBO 等
+│       └── matVkEngineFileUtil.h                 + PNG
 │
 └── matVkEngineDemo/
-    ├── matVkEngineDemo.vcxproj
-    ├── main.cpp                                --pipeline --scene --backend
-    │
     ├── app/
-    │   ├── DemoApp.h                           +
-    │   └── DemoApp.cpp                         +
-    │
-    ├── pipelines/                              # Forward 管线配置（用户自定义入口 ①）
-    │   ├── forward_single_pass.json            # 单 Pass：color + depth
-    │   └── forward_opaque_transparent.json     # 双 Pass：opaque → transparent
-    │
-    ├── materials/                              # 材质配置（用户自定义入口 ②）
-    │   ├── phong.json
-    │   ├── unlit_color.json
-    │   └── textured.json
-    │
-    ├── scenes/                                 # 场景配置（用户自定义入口 ③）
-    │   ├── forward_default.json
-    │   └── rt_default.json
-    │
+    │   ├── DemoApp.*
+    │   └── DemoPresets.*                         + makeForwardPipeline() / makeDeferredPipeline()
     ├── shaders/
-    │   ├── forward/
-    │   │   ├── phong.vert / phong.frag
-    │   │   ├── unlit.vert / unlit.frag
-    │   │   └── textured.vert / textured.frag
-    │   └── rt/
-    │       ├── raygen.rgen / miss.rmiss / closesthit.rchit
-    │   └── compiled/                           # .spv 输出
-    │
-    ├── models/                                 ✓
-    ├── hdr/                                    +
-    └── output/                                 +
+    │   ├── forward/                              + phong.vert/frag
+    │   ├── deferred/                             + gbuffer.vert/frag, lighting.frag
+    │   └── compiled/
+    ├── models/                                   ✓
+    └── output/                                   + forward.png, deferred.png
 ```
 
 ---
 
-## 配置文件示例
+## 配置 struct 要点
 
-### `pipelines/forward_single_pass.json`
+### `PassConfig`
 
-```json
-{
-  "name": "forward_single_pass",
-  "passes": [
-    {
-      "name": "main",
-      "colorFormat": "RGBA8_UNORM",
-      "depthFormat": "D32_SFLOAT",
-      "clearColor": [0.1, 0.1, 0.12, 1.0],
-      "clearDepth": 1.0,
-      "drawGroups": ["opaque", "transparent"]
-    }
-  ]
+```cpp
+enum class PassType { Draw, Fullscreen };
+
+struct PassAttachmentConfig {
+    std::string name;           // 管线内资源名，如 "albedo", "hdr"
+    VkFormat format;
+};
+
+struct PassConfig {
+    std::string name;           // "forward" / "gbuffer" / "deferred_light"
+    PassType type = PassType::Draw;
+    std::vector<PassAttachmentConfig> colors;
+    std::optional<PassAttachmentConfig> depth;
+    ClearValueConfig clear{};
+    std::vector<DrawGroup> drawGroups;              // Draw Pass 用
+    std::vector<std::string> inputResources;        // Fullscreen / 后续 Pass 引用的上游资源名
+};
+```
+
+### `RenderPipelineConfig`
+
+```cpp
+struct RenderPipelineConfig {
+    std::string name;
+    std::vector<PassConfig> passes;
+    std::string outputPass;     // 最终 PNG 取自哪个 Pass
+    std::string outputColor;    // 该 Pass 的哪个 color attachment 名
+};
+```
+
+### `MaterialConfig`
+
+```cpp
+struct MaterialConfig {
+    std::string name;
+    std::string targetPass;     // 本材质在哪个 Pass 使用
+    std::string vertSpv;
+    std::string fragSpv;
+    DrawGroup drawGroup = DrawGroup::Opaque;
+    std::vector<BindingConfig> bindings;
+    RasterStateConfig state{};
+};
+```
+
+`SceneConfig` 持有 `RenderPipelineConfig`、entities（每个 entity 引用 `MaterialConfig`）、camera、lights。
+
+---
+
+## 配置示例：Forward preset
+
+```cpp
+RenderPipelineConfig makeForwardPipeline() {
+    RenderPipelineConfig cfg{};
+    cfg.name = "forward";
+    cfg.passes = {{
+        .name = "forward",
+        .type = PassType::Draw,
+        .colors = {{.name = "color", .format = VK_FORMAT_R8G8B8A8_UNORM}},
+        .depth = {{.name = "depth", .format = VK_FORMAT_D32_SFLOAT}},
+        .drawGroups = {DrawGroup::Opaque, DrawGroup::Transparent},
+    }};
+    cfg.outputPass = "forward";
+    cfg.outputColor = "color";
+    return cfg;
 }
 ```
 
-### `materials/phong.json`
+## 配置示例：Deferred preset
 
-```json
-{
-  "name": "phong",
-  "vertSpv": "shaders/compiled/forward/phong.vert.spv",
-  "fragSpv": "shaders/compiled/forward/phong.frag.spv",
-  "drawGroup": "opaque",
-  "bindings": [
-    { "binding": 0, "type": "UBO", "stages": ["vertex", "fragment"] }
-  ],
-  "state": {
-    "cullMode": "back",
-    "depthTest": true,
-    "depthWrite": true,
-    "blend": false
-  },
-  "params": {
-    "albedoColor": [0.8, 0.2, 0.2]
-  }
+```cpp
+RenderPipelineConfig makeDeferredPipeline() {
+    RenderPipelineConfig cfg{};
+    cfg.name = "deferred";
+    cfg.passes = {
+        {
+            .name = "gbuffer",
+            .type = PassType::Draw,
+            .colors = {
+                {.name = "albedo", .format = VK_FORMAT_R8G8B8A8_UNORM},
+                {.name = "normal", .format = VK_FORMAT_R16G16B16A16_SFLOAT},
+            },
+            .depth = {{.name = "depth", .format = VK_FORMAT_D32_SFLOAT}},
+            .drawGroups = {DrawGroup::Opaque},
+        },
+        {
+            .name = "deferred_light",
+            .type = PassType::Fullscreen,
+            .colors = {{.name = "hdr", .format = VK_FORMAT_R8G8B8A8_UNORM}},
+            .inputResources = {"gbuffer.albedo", "gbuffer.normal", "gbuffer.depth"},
+        },
+    };
+    cfg.outputPass = "deferred_light";
+    cfg.outputColor = "hdr";
+    return cfg;
 }
 ```
 
-### `scenes/forward_default.json`
+Material 示例：`gbuffer_write` 的 `targetPass = "gbuffer"`；`deferred_light` 的 `targetPass = "deferred_light"`，bindings 引用 GBuffer 纹理。
 
-```json
-{
-  "pipeline": "pipelines/forward_single_pass.json",
-  "camera": { "eye": [0, 1, 3], "target": [0, 0, 0], "fov": 45 },
-  "lights": [{ "direction": [0.3, -1, 0.2], "color": [1, 1, 1], "intensity": 1.0 }],
-  "entities": [
-    { "mesh": "models/bunny.obj", "material": "materials/phong.json", "translation": [0, 0, 0] },
-    { "mesh": "models/quad.obj", "material": "materials/unlit_color.json", "translation": [0, -1, 0] }
-  ]
-}
-```
+---
+
+## 离屏呈现
+
+- 所有 Pass attachment 由 `VkEnginePipelineResource` 统一分配（尺寸 = `RenderConfig` 宽高）。
+- Pass 间 **barrier + layout 转换** 在 `RasterRenderer` 按 Pass 边界自动插入（`SHADER_READ_ONLY` / `COLOR_ATTACHMENT`）。
+- 最终 `outputPass.outputColor` → `TRANSFER_SRC` → `saveToPng()`。
 
 ---
 
@@ -273,17 +296,11 @@ matVkEngine/
 
 | 目录 | 职责 |
 |------|------|
-| `config/` | 引擎、渲染、**Forward 管线**、材质、场景各层配置 struct |
-| `core/` | `VkInstance` |
-| `device/` | 物理/逻辑设备、命令池、帧同步 |
-| `platform/` | Surface / Swapchain（可选） |
-| `resource/` | Buffer、Image、Texture、GpuMesh |
-| `shader/` | ShaderModule、Descriptor、Sampler |
-| `pipeline/` | **Forward 可自定义管线**：Pass 编译、GraphicsPipeline、PipelineCache |
-| `rt/` | 光追固定后端 |
-| `scene/` | Material / Entity / Scene；引用管线与材质配置 |
-| `renderer/` | ForwardRenderer 执行 Pass 链；RTRenderer 独立 |
-| `common/` | 工具、CPU Mesh、公共 GPU struct |
+| `config/` | RenderPipeline / Pass / Material / Scene struct |
+| `pipeline/` | Pass 编译、Pipeline Resource 表、GraphicsPipeline 缓存 |
+| `scene/` | 场景数据；Material 按 `targetPass` 分组 |
+| `renderer/` | **`RasterRenderer`：通用 Pass 链执行器** |
+| 其余 | 与先前相同 |
 
 ---
 
@@ -292,105 +309,66 @@ matVkEngine/
 ```
 config ──► core ──► device ──► resource / shader
                                     │
-                    ┌───────────────┼───────────────┐
-                    ▼               ▼               ▼
-               pipeline          rt            scene
-           (ForwardPipeline)                  (Material/Scene)
-                    │               │               │
-                    └───────► renderer ◄────────────┘
-                                    │
-                              platform（可选）
+                          ┌─────────┴─────────┐
+                          ▼                   ▼
+              pipeline (RenderPipeline)    scene
+                          │                   │
+                          └────► RasterRenderer
+                                      │
+                                 离屏 PNG
 ```
 
-- `pipeline/` 依赖 `config/`、`shader/`、`resource/`，**不依赖** `scene/`
-- `scene/` 依赖 `config/`、`resource/`、`common/`，**不依赖** `renderer/`
-- `renderer/ForwardRenderer` 依赖 `pipeline/VkEngineForwardPipeline` + `scene/VkEngineScene`
-- `matVkEngineDemo` 只依赖 `renderer/` 与配置加载，不写 Vulkan 细节
-
----
-
-## Forward 渲染一帧的逻辑
-
-```
-1. 加载 pipeline JSON → VkEngineForwardPipeline::build()
-      → 为每个 Pass 创建 RenderPass + Framebuffer
-2. 加载 scene JSON → VkEngineScene::build()
-      → GpuMesh、Material（shader + descriptor + pipeline cache 查/建）
-3. ForwardRenderer::render(scene, pipeline)
-      for (pass : pipeline.passes)
-          begin RenderPass(pass)
-          for (drawGroup : pass.drawGroups)
-              for (entity : scene.entitiesInGroup(drawGroup))
-                  bind Material.pipeline + descriptor
-                  push/update UBO（MVP、light、material.params）
-                  draw entity.gpuMesh
-          end RenderPass
-4. 离屏：transition → copy → output.png
-```
+- `RasterRenderer` **不出现** Forward/Deferred 分支；只认 `PassType` 与 `RenderPipelineConfig`
+- Forward / Deferred 逻辑完全在 **preset + shader + material** 侧
 
 ---
 
 ## 建议实现顺序
 
 ```
-阶段 1 — 基础（部分已完成）
-  ✓ shader/*
-  ✓ resource/Buffer, Image, Texture
-  + common/matVkEngineTypes.h
-  + resource/VkEngineGpuMesh
-  + shader/VkEngineSampler
-  + config/matVkEngineRenderConfig.h
-  + config/matVkEngineMaterialConfig.h
-  + config/matVkEngineForwardPipelineConfig.h
+阶段 1 — 基础
+  ✓ shader/*、resource/Buffer, Image, Texture
+  + Types、GpuMesh
+  + PassConfig、RenderPipelineConfig、MaterialConfig、SceneConfig、RenderConfig
 
-阶段 2 — Forward 可自定义管线
-  + pipeline/RenderPass, Framebuffer, GraphicsPipeline
-  + pipeline/PipelineCache
-  + pipeline/VkEngineForwardPipeline（解析配置 + build）
-  + scene/Material, Entity, Scene
-  + renderer/ForwardRenderer
-  → Demo: pipelines/ + materials/ + scenes/ + 至少 2 种 shader（phong / unlit）
+阶段 2 — 可配置管线框架（先 Forward preset 验证）
+  + PipelineResource、RenderPass（多 RT）、Framebuffer
+  + GraphicsPipeline、PipelineCache、RenderPipeline::build
+  + RasterRenderer（仅 Draw Pass）
+  → Demo：makeForwardPipeline() → output/forward.png
 
-阶段 3 — 配置加载与多 Pass
-  + scene/SceneLoader（JSON）
-  + pipelines/forward_opaque_transparent.json（验证双 Pass）
-  + common/FileUtil
+阶段 3 — Pass 间资源 + Fullscreen Pass（打开 Deferred）
+  + Pass 输入资源绑定、Pass 间 barrier
+  + FullscreenDraw、RasterRenderer 支持 PassType::Fullscreen
+  → Demo：makeDeferredPipeline() → output/deferred.png
 
-阶段 4 — 光追后端（独立，不参与 Forward 自定义）
-  + rt/* + renderer/RayTracingRenderer
-  → Demo: scenes/rt_default.json
+阶段 4 —  polish
+  + 多 Draw Pass（opaque → transparent 等）
+  + Demo 切换 preset 即可对比 Forward / Deferred
 
-阶段 5 — 窗口呈现（可选）
-  + platform/*
+— 将来：JSON loader、Swapchain、RT
 ```
 
 ---
 
-## Demo `main.cpp` 目标形态
+## Demo 目标形态
 
 ```cpp
+RenderConfig render = DemoPresets::makeRenderConfig();
+
+// 二选一，或命令行切换 preset 名
+RenderPipelineConfig pipeline = DemoPresets::makeForwardPipeline();
+// RenderPipelineConfig pipeline = DemoPresets::makeDeferredPipeline();
+
+SceneConfig scene = DemoPresets::makeScene(pipeline);  // materials 与 pipeline 匹配
+
 DemoApp app;
-app.init(argc, argv);
-// --backend=forward --pipeline=pipelines/forward_single_pass.json --scene=scenes/forward_default.json
-app.loadForwardPipeline("pipelines/forward_single_pass.json");
-app.loadScene("scenes/forward_default.json");
-app.render();
-app.saveOutput("output/forward.png");
+app.init(render);
+app.loadPipeline(pipeline);
+app.loadScene(scene);
+app.render();       // RasterRenderer
+app.saveOutput(render.outputPath);
 ```
-
-切换为双 Pass 管线时，**只改 `--pipeline` 指向的 JSON**，场景与材质不用改 C++。
-
----
-
-## 与现有代码的迁移点
-
-| 现有 | 迁移到 |
-|------|--------|
-| `main.cpp` 手写 buffer upload | `VkEngineGpuMesh` |
-| `VkEngineMesh` | 留 `common/`，GPU 侧交 `VkEngineGpuMesh` |
-| `Vertex` | `common/matVkEngineTypes.h` |
-| `shader/` 已完成部分 | 作为 Material / PipelineCache 的底层 |
-| `vkEngine/src/rt/*` | `matVkEngine/rt/*`（光追后端，与 Forward 自定义无关） |
 
 ---
 
@@ -398,8 +376,32 @@ app.saveOutput("output/forward.png");
 
 | 项 | 标准 |
 |----|------|
-| 换材质 shader | 改 `materials/*.json` 的 spv 路径，画面变化 |
-| 换 Pass 链 | 改 `pipelines/*.json`，如单 Pass ↔ opaque+transparent 双 Pass，无需改 Renderer 源码 |
-| 换场景 | 改 `scenes/*.json` 的 entity / camera / light |
-| Pipeline 缓存 | 相同 Material 不重复创建 `VkPipeline` |
-| RT 后端 | `--backend=rt` 走固定 RT 路径，不使用 Forward Pass 配置 |
+| Forward preset | `makeForwardPipeline()` 离屏 PNG 正确 |
+| Deferred preset | `makeDeferredPipeline()` 离屏 PNG 正确 |
+| 换 Pass 链 | 改 `RenderPipelineConfig`，**不改 RasterRenderer 源码** |
+| 换材质 / Pass | Material 的 `targetPass` 决定在哪个 Pass draw |
+| Pipeline 缓存 | 相同 Material + Pass attachment 格式不重复建 `VkPipeline` |
+| RT / JSON / 窗口 | 不在当前范围 |
+
+---
+
+## 与现有代码的迁移点
+
+| 现有 | 迁移到 |
+|------|--------|
+| 若已有 `ForwardPipeline*` / `ForwardRenderer` 命名 | 重命名为 `RenderPipeline` / `RasterRenderer` |
+| Demo STORAGE buffer/image | Draw Pass：`VERTEX_BUFFER` + Pass attachment |
+| `Vertex` | `matVkEngineTypes.h` |
+| `shader/` | Material + PipelineCache 底层 |
+
+---
+
+## 命名对照（避免回退成固定 Forward）
+
+| 避免 | 推荐 |
+|------|------|
+| `ForwardPipelineConfig` | `RenderPipelineConfig` |
+| `VkEngineForwardPipeline` | `VkEngineRenderPipeline` |
+| `ForwardRenderer` | `VkEngineRasterRenderer` |
+| `ForwardUBO` | `SceneUBO` / `FrameUBO` |
+| Demo 目录仅 `shaders/forward/` | 增加 `shaders/deferred/`，Forward 只是其中一套 shader |
