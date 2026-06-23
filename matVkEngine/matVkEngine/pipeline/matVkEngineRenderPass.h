@@ -15,7 +15,7 @@ namespace mat {
         VkEngineRenderPass& operator=(const VkEngineRenderPass&) = delete;
         VkEngineRenderPass& operator=(VkEngineRenderPass&&) = delete;
 
-        VkRenderPass _renderPass;
+        VkRenderPass _renderPass = VK_NULL_HANDLE;
         std::vector<VkSubpassDescription> _subpasses;
     };
 
