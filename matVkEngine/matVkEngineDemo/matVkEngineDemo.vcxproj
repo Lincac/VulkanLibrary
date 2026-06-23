@@ -145,6 +145,7 @@
     <ClCompile Include="graph\GraphSerializer.cpp" />
     <ClCompile Include="graph\GraphTypes.cpp" />
     <ClCompile Include="graph\GraphValidator.cpp" />
+    <ClCompile Include="graph\GraphTemplates.cpp" />
     <ClCompile Include="..\dependency\imgui\imgui.cpp" />
     <ClCompile Include="..\dependency\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\dependency\imgui\imgui_tables.cpp" />
@@ -161,6 +162,7 @@
     <ClInclude Include="graph\GraphSerializer.h" />
     <ClInclude Include="graph\GraphTypes.h" />
     <ClInclude Include="graph\GraphValidator.h" />
+    <ClInclude Include="graph\GraphTemplates.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

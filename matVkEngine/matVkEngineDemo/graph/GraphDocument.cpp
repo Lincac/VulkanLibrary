@@ -41,11 +41,48 @@ namespace mat::demo {
                 node.props["height"] = "720";
                 node.props["outputPath"] = "output/render.png";
                 break;
+            case NodeType::RenderPass:
+                node.props["name"] = "forward";
+                node.props["passIndex"] = "1";
+                node.props["loadOp"] = "Clear";
+                node.props["storeOp"] = "Store";
+                node.props["clearColor"] = "0.1,0.1,0.15,1";
+                break;
+            case NodeType::Subpass:
+                node.props["name"] = "main";
+                node.props["index"] = "0";
+                node.props["purpose"] = "Generic";
+                break;
+            case NodeType::GraphicsPipeline:
+                node.props["name"] = "phong";
+                node.props["topology"] = "TriangleList";
+                node.props["cullMode"] = "Back";
+                node.props["polygonMode"] = "Fill";
+                break;
+            case NodeType::Texture:
+                node.props["name"] = "color0";
+                node.props["format"] = "RGBA8_UNORM";
+                node.props["width"] = "1280";
+                node.props["height"] = "720";
+                node.props["usage"] = "ColorAttachment";
+                break;
+            case NodeType::Shader:
+                node.props["name"] = "shader";
+                node.props["stage"] = "Vertex";
+                node.props["spv"] = "shaders/compiled/forward/phong.vert.spv";
+                break;
+            case NodeType::Vertex:
+                node.props["meshPath"] = "models/bunny.obj";
+                node.props["layout"] = "Position,Normal";
+                break;
             case NodeType::DrawPass:
                 node.props["name"] = "forward";
                 break;
             case NodeType::FullscreenPass:
                 node.props["name"] = "lighting";
+                break;
+            case NodeType::UiPass:
+                node.props["name"] = "ui";
                 break;
             case NodeType::Material:
                 node.props["name"] = "material";
@@ -53,12 +90,15 @@ namespace mat::demo {
                 node.props["fragSpv"] = "shaders/compiled/forward/phong.frag.spv";
                 break;
             case NodeType::Entity:
-                node.props["meshPath"] = "models/bunny.obj";
+                node.props["name"] = "entity";
                 break;
             case NodeType::Camera:
                 node.props["eye"] = "0,1,3";
                 node.props["target"] = "0,0,0";
+                node.props["up"] = "0,1,0";
                 node.props["fov"] = "45";
+                node.props["near"] = "0.1";
+                node.props["far"] = "100";
                 break;
             case NodeType::Light:
                 node.props["direction"] = "0.3,-1,0.2";
@@ -175,5 +215,12 @@ namespace mat::demo {
     }
 
     void GraphDocument::syncNodePositionsFromEditor() {}
+
+    void GraphDocument::clear() {
+        _nodes.clear();
+        _links.clear();
+        _nextNodeId = 1;
+        _nextLinkId = 1;
+    }
 
 }  // namespace mat::demo

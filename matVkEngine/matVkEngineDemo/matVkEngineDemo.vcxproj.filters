@@ -37,6 +37,9 @@
     <ClCompile Include="graph\GraphValidator.cpp">
       <Filter>graph</Filter>
     </ClCompile>
+    <ClCompile Include="graph\GraphTemplates.cpp">
+      <Filter>graph</Filter>
+    </ClCompile>
     <ClCompile Include="..\dependency\imgui\imgui.cpp">
       <Filter>dependency</Filter>
     </ClCompile>
@@ -79,6 +82,9 @@
       <Filter>graph</Filter>
     </ClInclude>
     <ClInclude Include="graph\GraphValidator.h">
+      <Filter>graph</Filter>
+    </ClInclude>
+    <ClInclude Include="graph\GraphTemplates.h">
       <Filter>graph</Filter>
     </ClInclude>
   </ItemGroup>

@@ -6,10 +6,24 @@ namespace mat::demo {
         switch (type) {
             case NodeType::RenderConfig:
                 return "RenderConfig";
+            case NodeType::RenderPass:
+                return "RenderPass";
+            case NodeType::Subpass:
+                return "Subpass";
+            case NodeType::GraphicsPipeline:
+                return "GraphicsPipeline";
+            case NodeType::Texture:
+                return "Texture";
+            case NodeType::Shader:
+                return "Shader";
+            case NodeType::Vertex:
+                return "Vertex";
             case NodeType::DrawPass:
                 return "DrawPass";
             case NodeType::FullscreenPass:
                 return "FullscreenPass";
+            case NodeType::UiPass:
+                return "UiPass";
             case NodeType::Material:
                 return "Material";
             case NodeType::Entity:
@@ -28,8 +42,15 @@ namespace mat::demo {
 
     NodeType nodeTypeFromName(const std::string& name) {
         if (name == "RenderConfig") return NodeType::RenderConfig;
+        if (name == "RenderPass") return NodeType::RenderPass;
+        if (name == "Subpass") return NodeType::Subpass;
+        if (name == "GraphicsPipeline") return NodeType::GraphicsPipeline;
+        if (name == "Texture") return NodeType::Texture;
+        if (name == "Shader") return NodeType::Shader;
+        if (name == "Vertex") return NodeType::Vertex;
         if (name == "DrawPass") return NodeType::DrawPass;
         if (name == "FullscreenPass") return NodeType::FullscreenPass;
+        if (name == "UiPass") return NodeType::UiPass;
         if (name == "Material") return NodeType::Material;
         if (name == "Entity") return NodeType::Entity;
         if (name == "Camera") return NodeType::Camera;
@@ -47,26 +68,66 @@ namespace mat::demo {
             case NodeType::RenderConfig:
                 node.outputs.push_back({PinKind::RenderConfig, "render", false});
                 break;
+            case NodeType::RenderPass:
+                node.inputs.push_back({PinKind::Subpass, "subpass", true});
+                node.inputs.push_back({PinKind::Texture, "color", true});
+                node.inputs.push_back({PinKind::Texture, "depth", false});
+                node.outputs.push_back({PinKind::RenderPass, "renderPass", false});
+                break;
+            case NodeType::Subpass:
+                node.outputs.push_back({PinKind::Subpass, "subpass", false});
+                break;
+            case NodeType::GraphicsPipeline:
+                node.inputs.push_back({PinKind::Subpass, "subpass", false});
+                node.inputs.push_back({PinKind::Shader, "vert", false});
+                node.inputs.push_back({PinKind::Shader, "frag", false});
+                node.inputs.push_back({PinKind::Vertex, "vertex", false});
+                node.outputs.push_back({PinKind::Pipeline, "pipeline", false});
+                break;
+            case NodeType::Texture:
+                node.outputs.push_back({PinKind::Texture, "texture", false});
+                break;
+            case NodeType::Shader:
+                node.outputs.push_back({PinKind::Shader, "shader", false});
+                break;
+            case NodeType::Vertex:
+                node.outputs.push_back({PinKind::Vertex, "vertex", false});
+                break;
             case NodeType::DrawPass:
                 node.inputs.push_back({PinKind::Exec, "exec", false});
-                node.inputs.push_back({PinKind::Material, "material", true});
+                node.inputs.push_back({PinKind::RenderPass, "renderPass", false});
+                node.inputs.push_back({PinKind::Subpass, "subpass", false});
+                node.inputs.push_back({PinKind::Pipeline, "pipeline", false});
+                node.inputs.push_back({PinKind::Scene, "scene", false});
                 node.outputs.push_back({PinKind::Exec, "exec", false});
                 node.outputs.push_back({PinKind::Color, "color", false});
                 node.outputs.push_back({PinKind::Depth, "depth", false});
                 break;
             case NodeType::FullscreenPass:
                 node.inputs.push_back({PinKind::Exec, "exec", false});
+                node.inputs.push_back({PinKind::RenderPass, "renderPass", false});
+                node.inputs.push_back({PinKind::Subpass, "subpass", false});
+                node.inputs.push_back({PinKind::Pipeline, "pipeline", false});
                 node.inputs.push_back({PinKind::Resource, "in0", true});
                 node.inputs.push_back({PinKind::Resource, "in1", true});
                 node.inputs.push_back({PinKind::Resource, "in2", true});
                 node.outputs.push_back({PinKind::Exec, "exec", false});
-                node.outputs.push_back({PinKind::Color, "hdr", false});
+                node.outputs.push_back({PinKind::Color, "color", false});
+                break;
+            case NodeType::UiPass:
+                node.inputs.push_back({PinKind::Exec, "exec", false});
+                node.inputs.push_back({PinKind::RenderPass, "renderPass", false});
+                node.inputs.push_back({PinKind::Subpass, "subpass", false});
+                node.inputs.push_back({PinKind::Pipeline, "pipeline", false});
+                node.outputs.push_back({PinKind::Exec, "exec", false});
+                node.outputs.push_back({PinKind::Color, "color", false});
                 break;
             case NodeType::Material:
                 node.outputs.push_back({PinKind::Material, "material", false});
                 break;
             case NodeType::Entity:
-                node.inputs.push_back({PinKind::Material, "material", false});
+                node.inputs.push_back({PinKind::Vertex, "vertex", false});
+                node.inputs.push_back({PinKind::Pipeline, "pipeline", false});
                 node.outputs.push_back({PinKind::Entity, "entity", false});
                 break;
             case NodeType::Camera:

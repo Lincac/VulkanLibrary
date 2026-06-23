@@ -2,6 +2,7 @@
 
 #include "editor/NodeRegistry.h"
 #include "graph/GraphSerializer.h"
+#include "graph/GraphTemplates.h"
 #include "graph/GraphValidator.h"
 
 #include <imnodes.h>
@@ -44,35 +45,21 @@ namespace mat::demo {
             return;
         }
 
-        const int renderConfig = document.addNode(NodeType::RenderConfig, 40.f, 80.f);
-        const int material = document.addNode(NodeType::Material, 40.f, 280.f);
-        const int entity = document.addNode(NodeType::Entity, 280.f, 280.f);
-        const int camera = document.addNode(NodeType::Camera, 40.f, 460.f);
-        const int scene = document.addNode(NodeType::Scene, 520.f, 280.f);
-        const int drawPass = document.addNode(NodeType::DrawPass, 520.f, 80.f);
-        const int output = document.addNode(NodeType::OutputPng, 820.f, 80.f);
+        GraphTemplates::buildForward(document);
+        _lastMessage = "Created starter graph (Forward, single pass)";
+    }
 
-        std::string error;
-        document.tryConnect(NodeRegistry::encodeAttr(material, 0, true), NodeRegistry::encodeAttr(entity, 0, false),
-                            error);
-        document.tryConnect(NodeRegistry::encodeAttr(entity, 0, true), NodeRegistry::encodeAttr(scene, 0, false),
-                            error);
-        document.tryConnect(NodeRegistry::encodeAttr(camera, 0, true), NodeRegistry::encodeAttr(scene, 1, false),
-                            error);
-        document.tryConnect(NodeRegistry::encodeAttr(drawPass, 0, true), NodeRegistry::encodeAttr(output, 0, false),
-                            error);
-        document.tryConnect(NodeRegistry::encodeAttr(drawPass, 1, true), NodeRegistry::encodeAttr(output, 1, false),
-                            error);
-
-        ImNodes::SetNodeGridSpacePos(renderConfig, ImVec2(40.f, 80.f));
-        ImNodes::SetNodeGridSpacePos(material, ImVec2(40.f, 280.f));
-        ImNodes::SetNodeGridSpacePos(entity, ImVec2(280.f, 280.f));
-        ImNodes::SetNodeGridSpacePos(camera, ImVec2(40.f, 460.f));
-        ImNodes::SetNodeGridSpacePos(scene, ImVec2(520.f, 280.f));
-        ImNodes::SetNodeGridSpacePos(drawPass, ImVec2(520.f, 80.f));
-        ImNodes::SetNodeGridSpacePos(output, ImVec2(820.f, 80.f));
-
-        _lastMessage = "Created starter graph";
+    void RenderGraphEditor::loadExampleGraph(GraphDocument& document, const char* path,
+                                             void (*builder)(GraphDocument&)) {
+        document.clear();
+        builder(document);
+        _graphPath = path;
+        std::error_code ec;
+        std::filesystem::create_directories(std::filesystem::path(_graphPath).parent_path(), ec);
+        std::string saveError;
+        GraphSerializer::save(document, _graphPath, saveError);
+        _lastMessage = std::string("Loaded example: ") + path;
+        _validationErrors.clear();
     }
 
     void RenderGraphEditor::drawNode(GraphNode& node) {
@@ -161,32 +148,73 @@ namespace mat::demo {
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("Add Node")) {
                 const ImVec2 mouse = ImGui::GetMousePos();
-                if (ImGui::MenuItem("Render Config")) {
-                    document.addNode(NodeType::RenderConfig, mouse.x, mouse.y);
+                if (ImGui::BeginMenu("Pipeline")) {
+                    if (ImGui::MenuItem("Render Pass")) {
+                        document.addNode(NodeType::RenderPass, mouse.x, mouse.y);
+                    }
+                    if (ImGui::MenuItem("Subpass")) {
+                        document.addNode(NodeType::Subpass, mouse.x, mouse.y);
+                    }
+                    if (ImGui::MenuItem("Graphics Pipeline")) {
+                        document.addNode(NodeType::GraphicsPipeline, mouse.x, mouse.y);
+                    }
+                    if (ImGui::MenuItem("Draw Pass")) {
+                        document.addNode(NodeType::DrawPass, mouse.x, mouse.y);
+                    }
+                    if (ImGui::MenuItem("Fullscreen Pass")) {
+                        document.addNode(NodeType::FullscreenPass, mouse.x, mouse.y);
+                    }
+                    if (ImGui::MenuItem("UI Pass")) {
+                        document.addNode(NodeType::UiPass, mouse.x, mouse.y);
+                    }
+                    ImGui::EndMenu();
                 }
-                if (ImGui::MenuItem("Draw Pass")) {
-                    document.addNode(NodeType::DrawPass, mouse.x, mouse.y);
+                if (ImGui::BeginMenu("Resources")) {
+                    if (ImGui::MenuItem("Texture")) {
+                        document.addNode(NodeType::Texture, mouse.x, mouse.y);
+                    }
+                    if (ImGui::MenuItem("Shader")) {
+                        document.addNode(NodeType::Shader, mouse.x, mouse.y);
+                    }
+                    if (ImGui::MenuItem("Vertex Buffer")) {
+                        document.addNode(NodeType::Vertex, mouse.x, mouse.y);
+                    }
+                    ImGui::EndMenu();
                 }
-                if (ImGui::MenuItem("Fullscreen Pass")) {
-                    document.addNode(NodeType::FullscreenPass, mouse.x, mouse.y);
+                if (ImGui::BeginMenu("Scene")) {
+                    if (ImGui::MenuItem("Entity")) {
+                        document.addNode(NodeType::Entity, mouse.x, mouse.y);
+                    }
+                    if (ImGui::MenuItem("Camera")) {
+                        document.addNode(NodeType::Camera, mouse.x, mouse.y);
+                    }
+                    if (ImGui::MenuItem("Light")) {
+                        document.addNode(NodeType::Light, mouse.x, mouse.y);
+                    }
+                    if (ImGui::MenuItem("Scene")) {
+                        document.addNode(NodeType::Scene, mouse.x, mouse.y);
+                    }
+                    ImGui::EndMenu();
                 }
-                if (ImGui::MenuItem("Material")) {
-                    document.addNode(NodeType::Material, mouse.x, mouse.y);
+                if (ImGui::BeginMenu("I/O")) {
+                    if (ImGui::MenuItem("Render Config")) {
+                        document.addNode(NodeType::RenderConfig, mouse.x, mouse.y);
+                    }
+                    if (ImGui::MenuItem("Output PNG")) {
+                        document.addNode(NodeType::OutputPng, mouse.x, mouse.y);
+                    }
+                    ImGui::EndMenu();
                 }
-                if (ImGui::MenuItem("Entity")) {
-                    document.addNode(NodeType::Entity, mouse.x, mouse.y);
+                ImGui::EndMenu();
+            }
+
+            if (ImGui::BeginMenu("Examples")) {
+                if (ImGui::MenuItem("Forward (single pass)")) {
+                    loadExampleGraph(document, "graphs/forward.graph.json", GraphTemplates::buildForward);
                 }
-                if (ImGui::MenuItem("Camera")) {
-                    document.addNode(NodeType::Camera, mouse.x, mouse.y);
-                }
-                if (ImGui::MenuItem("Light")) {
-                    document.addNode(NodeType::Light, mouse.x, mouse.y);
-                }
-                if (ImGui::MenuItem("Scene")) {
-                    document.addNode(NodeType::Scene, mouse.x, mouse.y);
-                }
-                if (ImGui::MenuItem("Output PNG")) {
-                    document.addNode(NodeType::OutputPng, mouse.x, mouse.y);
+                if (ImGui::MenuItem("Deferred + Post + UI (multi pass)")) {
+                    loadExampleGraph(document, "graphs/deferred_multi_pass.graph.json",
+                                     GraphTemplates::buildDeferredMultiPass);
                 }
                 ImGui::EndMenu();
             }

@@ -32,6 +32,7 @@ namespace mat::demo {
 
         void setNodePosition(int nodeId, float x, float y);
         void syncNodePositionsFromEditor();
+        void clear();
 
     private:
         std::vector<GraphNode> _nodes;

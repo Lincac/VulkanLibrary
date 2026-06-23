@@ -25,6 +25,7 @@ namespace mat::demo {
         void drawNode(GraphNode& node);
         void handleInteraction(GraphDocument& document);
         void createStarterGraph(GraphDocument& document);
+        void loadExampleGraph(GraphDocument& document, const char* path, void (*builder)(GraphDocument&));
 
         int _selectedNodeId = -1;
         std::string _graphPath = "graphs/default.graph.json";
