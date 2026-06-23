@@ -26,6 +26,7 @@
     <ClInclude Include="device\matVkEngineLogicalDevice.h" />
     <ClInclude Include="device\matVkEngineCmdPool.h" />
     <ClInclude Include="common\matVkEngineMesh.h" />
+    <ClInclude Include="pipeline\matVkEngineRenderPass.h" />
     <ClInclude Include="shader\matVkEngineDescriptorSet.h" />
     <ClInclude Include="shader\matVkEngineDescriptorPool.h" />
     <ClInclude Include="shader\matVkEngineDescriptorSetLayout.h" />
@@ -43,6 +44,7 @@
     <ClCompile Include="device\matVkEngineCmdPool.cpp" />
     <ClCompile Include="common\matVkEngineCommon.cpp" />
     <ClCompile Include="common\matVkEngineMesh.cpp" />
+    <ClCompile Include="pipeline\matVkEngineRenderPass.cpp" />
     <ClCompile Include="shader\matVkEngineDescriptorSet.cpp" />
     <ClCompile Include="shader\matVkEngineDescriptorPool.cpp" />
     <ClCompile Include="shader\matVkEngineDescriptorSetLayout.cpp" />

@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "nextNodeId": 8,
+  "nextLinkId": 6,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "RenderConfig",
+      "x": 40,
+      "y": 80,
+      "props": {
+        "width": "1280",
+        "height": "720",
+        "outputPath": "output/render.png"
+      }
+    },
+    {
+      "id": 2,
+      "type": "Material",
+      "x": -25,
+      "y": 271,
+      "props": {
+        "name": "material",
+        "vertSpv": "shaders/compiled/forward/phong.vert.spv",
+        "fragSpv": "shaders/compiled/forward/phong.frag.spv"
+      }
+    },
+    {
+      "id": 3,
+      "type": "Entity",
+      "x": 278,
+      "y": 209,
+      "props": {
+        "meshPath": "models/bunny.obj"
+      }
+    },
+    {
+      "id": 4,
+      "type": "Camera",
+      "x": -19,
+      "y": 441,
+      "props": {
+        "eye": "0,1,3",
+        "target": "0,0,0",
+        "fov": "45"
+      }
+    },
+    {
+      "id": 5,
+      "type": "Scene",
+      "x": 520,
+      "y": 280,
+      "props": {
+        "name": "scene"
+      }
+    },
+    {
+      "id": 6,
+      "type": "DrawPass",
+      "x": 520,
+      "y": 80,
+      "props": {
+        "name": "forward"
+      }
+    },
+    {
+      "id": 7,
+      "type": "OutputPng",
+      "x": 820,
+      "y": 80,
+      "props": {
+        "outputPath": "output/render.png"
+      }
+    }
+  ],
+  "links": [
+    { "id": 1, "from": 129, "to": 192 },
+    { "id": 2, "from": 193, "to": 320 },
+    { "id": 3, "from": 257, "to": 322 },
+    { "id": 4, "from": 385, "to": 448 },
+    { "id": 5, "from": 387, "to": 450 }
+  ]
+}
