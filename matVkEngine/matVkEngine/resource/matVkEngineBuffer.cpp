@@ -63,50 +63,6 @@ namespace mat {
         vkBindBufferMemory(logicalDevice->getVkDevice(), _buffer, _memory, 0);
     }
 
-    void VkEngineBuffer::upload(std::shared_ptr<VkEnginePhysicalDevice> physicalDevice,
-                                std::shared_ptr<VkEngineLogicalDevice> logicalDevice,
-                                std::shared_ptr<VkEngineCmdPool> cmd, const void* data, VkDeviceSize size) {
-        if (size > _size) {
-            throw std::runtime_error("upload size exceeds buffer size!");
-        }
-
-        VkBuffer stagingBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-
-        VkBufferCreateInfo bufferInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-        bufferInfo.size = size;
-        bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        vkCreateBuffer(logicalDevice->getVkDevice(), &bufferInfo, nullptr, &stagingBuffer);
-
-        VkMemoryRequirements memReq{};
-        vkGetBufferMemoryRequirements(logicalDevice->getVkDevice(), stagingBuffer, &memReq);
-
-        VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-        allocInfo.allocationSize = memReq.size;
-        allocInfo.memoryTypeIndex =
-            findMemoryType(physicalDevice->getVkPhysicalDevice(), memReq.memoryTypeBits,
-                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-        vkAllocateMemory(logicalDevice->getVkDevice(), &allocInfo, nullptr, &stagingMemory);
-
-        vkBindBufferMemory(logicalDevice->getVkDevice(), stagingBuffer, stagingMemory, 0);
-
-        void* mapped = nullptr;
-        vkMapMemory(logicalDevice->getVkDevice(), stagingMemory, 0, size, 0, &mapped);
-        memcpy(mapped, data, static_cast<size_t>(size));
-        vkUnmapMemory(logicalDevice->getVkDevice(), stagingMemory);
-
-        cmd->submitOneTimeCommands(logicalDevice, [&](VkCommandBuffer cmd) {
-            VkBufferCopy copyRegion{};
-            copyRegion.size = size;
-            vkCmdCopyBuffer(cmd, stagingBuffer, _buffer, 1, &copyRegion);
-        });
-
-        vkDestroyBuffer(logicalDevice->getVkDevice(), stagingBuffer, nullptr);
-        vkFreeMemory(logicalDevice->getVkDevice(), stagingMemory, nullptr);
-    }
-
     VkBuffer& VkEngineBuffer::getVkBuffer() {
         return _buffer;
     }

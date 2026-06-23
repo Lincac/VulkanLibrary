@@ -19,10 +19,6 @@ namespace mat {
         void create(std::shared_ptr<VkEnginePhysicalDevice> physicalDevice,
                     std::shared_ptr<VkEngineLogicalDevice> logicalDevice);
 
-        void upload(std::shared_ptr<VkEnginePhysicalDevice> physicalDevice,
-                    std::shared_ptr<VkEngineLogicalDevice> logicalDevice, std::shared_ptr<VkEngineCmdPool> mandPool,
-                    const void* data, VkDeviceSize size);
-
         VkBuffer& getVkBuffer();
 
         VkDeviceMemory& getVkDeviceMemory();

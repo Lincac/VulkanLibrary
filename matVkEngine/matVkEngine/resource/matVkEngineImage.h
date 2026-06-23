@@ -3,9 +3,11 @@
 #include <string>
 #include <vector>
 
+#include "common/matVkEngineCommon.h"
 #include "device/matVkEngineCmdPool.h"
 #include "device/matVkEngineLogicalDevice.h"
 #include "device/matVkEnginePhysicalDevice.h"
+
 namespace mat {
 
     enum class ImageType {
@@ -31,9 +33,6 @@ namespace mat {
 
         void create(std::shared_ptr<VkEnginePhysicalDevice> physicalDevice,
                     std::shared_ptr<VkEngineLogicalDevice> logicalDevice);
-
-        void upload(std::shared_ptr<VkEnginePhysicalDevice> physicalDevice,
-                    std::shared_ptr<VkEngineLogicalDevice> logicalDevice, std::shared_ptr<VkEngineCmdPool> cmdPool);
 
         void getResolution(uint32_t& w, uint32_t& h, uint32_t& d) const;
 

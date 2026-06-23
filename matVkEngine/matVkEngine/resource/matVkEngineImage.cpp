@@ -184,52 +184,6 @@ namespace mat {
         }
     }
 
-    void VkEngineImage::upload(std::shared_ptr<VkEnginePhysicalDevice> physicalDevice,
-                               std::shared_ptr<VkEngineLogicalDevice> logicalDevice,
-                               std::shared_ptr<VkEngineCmdPool> cmdPool) {
-        if (_pixelData.size() == 0) {
-            throw std::runtime_error("image pixel data is not loaded!");
-        }
-        if (_imageView == VK_NULL_HANDLE) {
-            throw std::runtime_error("image gpu resources are not created!");
-        }
-        if (cmdPool == nullptr) {
-            throw std::runtime_error("command pool is null!");
-        }
-
-        VkEngineBuffer stagingBuffer;
-        stagingBuffer.setVkDeviceSize(_pixelSize);
-        stagingBuffer.setVkBufferUsageFlags(VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-        stagingBuffer.setVkMemoryPropertyFlags(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        stagingBuffer.create(physicalDevice, logicalDevice);
-
-        void* mapped = nullptr;
-        vkMapMemory(logicalDevice->getVkDevice(), stagingBuffer.getVkDeviceMemory(), 0, _pixelSize, 0, &mapped);
-        std::memcpy(mapped, _pixelData.data(), static_cast<size_t>(_pixelSize));
-        vkUnmapMemory(logicalDevice->getVkDevice(), stagingBuffer.getVkDeviceMemory());
-
-        cmdPool->submitOneTimeCommands(logicalDevice, [&](VkCommandBuffer cmd) {
-            transitionImageLayout(cmd, _image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                  ImageShaderDomain::Fragment);
-
-            VkBufferImageCopy region{};
-            region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-            region.imageExtent = {width, height, depth};
-
-            vkCmdCopyBufferToImage(cmd, stagingBuffer.getVkBuffer(), _image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
-                                   &region);
-
-            transitionImageLayout(cmd, _image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, ImageShaderDomain::Fragment);
-        });
-
-        stagingBuffer.release(logicalDevice);
-
-        _pixelData.clear();
-        _pixelSize = 0;
-    }
-
     void VkEngineImage::getResolution(uint32_t& w, uint32_t& h, uint32_t& d) const {
         w = width;
         h = height;
