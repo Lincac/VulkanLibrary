@@ -18,6 +18,8 @@
     <ClInclude Include="shader\matVkEngineDescriptorPool.h" />
     <ClInclude Include="shader\matVkEngineDescriptorSet.h" />
     <ClInclude Include="pipeline\matVkEngineRenderPass.h" />
+    <ClInclude Include="pipeline\matVkEngineRenderPipeline.h" />
+    <ClInclude Include="pipeline\matVkEngineFramebuffer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="core\matVkEngineContext.cpp" />
@@ -34,5 +36,7 @@
     <ClCompile Include="shader\matVkEngineDescriptorPool.cpp" />
     <ClCompile Include="shader\matVkEngineDescriptorSet.cpp" />
     <ClCompile Include="pipeline\matVkEngineRenderPass.cpp" />
+    <ClCompile Include="pipeline\matVkEngineRenderPipeline.cpp" />
+    <ClCompile Include="pipeline\matVkEngineFramebuffer.cpp" />
   </ItemGroup>
 </Project>
