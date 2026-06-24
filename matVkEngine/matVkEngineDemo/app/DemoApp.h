@@ -2,8 +2,6 @@
 
 namespace mat::demo {
 
-    class RenderGraphEditor;
-
     class DemoApp {
     public:
         DemoApp();

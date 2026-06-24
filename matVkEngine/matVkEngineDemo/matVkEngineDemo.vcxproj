@@ -74,13 +74,13 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);..\dependency\imgui;..\dependency\imgui\backends;..\dependency\imnodes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);..\dependency\imgui;..\dependency\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
@@ -91,13 +91,13 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);..\dependency\imgui;..\dependency\imgui\backends;..\dependency\imnodes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);..\dependency\imgui;..\dependency\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
@@ -106,14 +106,14 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir);..\dependency\imgui;..\dependency\imgui\backends;..\dependency\imnodes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);..\dependency\imgui;..\dependency\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
@@ -124,14 +124,14 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir);..\dependency\imgui;..\dependency\imgui\backends;..\dependency\imnodes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);..\dependency\imgui;..\dependency\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
@@ -139,30 +139,15 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="app\DemoApp.cpp" />
-    <ClCompile Include="editor\NodeRegistry.cpp" />
-    <ClCompile Include="editor\RenderGraphEditor.cpp" />
-    <ClCompile Include="graph\GraphDocument.cpp" />
-    <ClCompile Include="graph\GraphSerializer.cpp" />
-    <ClCompile Include="graph\GraphTypes.cpp" />
-    <ClCompile Include="graph\GraphValidator.cpp" />
-    <ClCompile Include="graph\GraphTemplates.cpp" />
     <ClCompile Include="..\dependency\imgui\imgui.cpp" />
     <ClCompile Include="..\dependency\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\dependency\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\dependency\imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\dependency\imgui\backends\imgui_impl_opengl3.cpp" />
     <ClCompile Include="..\dependency\imgui\backends\imgui_impl_win32.cpp" />
-    <ClCompile Include="..\dependency\imnodes\imnodes.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="app\DemoApp.h" />
-    <ClInclude Include="editor\NodeRegistry.h" />
-    <ClInclude Include="editor\RenderGraphEditor.h" />
-    <ClInclude Include="graph\GraphDocument.h" />
-    <ClInclude Include="graph\GraphSerializer.h" />
-    <ClInclude Include="graph\GraphTypes.h" />
-    <ClInclude Include="graph\GraphValidator.h" />
-    <ClInclude Include="graph\GraphTemplates.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

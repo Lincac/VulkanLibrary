@@ -4,12 +4,6 @@
     <Filter Include="app">
       <UniqueIdentifier>{a1b2c3d4-e5f6-7890-abcd-ef1234567890}</UniqueIdentifier>
     </Filter>
-    <Filter Include="editor">
-      <UniqueIdentifier>{b2c3d4e5-f6a7-8901-bcde-f12345678901}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="graph">
-      <UniqueIdentifier>{c3d4e5f6-a7b8-9012-cdef-123456789012}</UniqueIdentifier>
-    </Filter>
     <Filter Include="dependency">
       <UniqueIdentifier>{d4e5f6a7-b8c9-0123-def0-234567890123}</UniqueIdentifier>
     </Filter>
@@ -18,27 +12,6 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="app\DemoApp.cpp">
       <Filter>app</Filter>
-    </ClCompile>
-    <ClCompile Include="editor\NodeRegistry.cpp">
-      <Filter>editor</Filter>
-    </ClCompile>
-    <ClCompile Include="editor\RenderGraphEditor.cpp">
-      <Filter>editor</Filter>
-    </ClCompile>
-    <ClCompile Include="graph\GraphDocument.cpp">
-      <Filter>graph</Filter>
-    </ClCompile>
-    <ClCompile Include="graph\GraphSerializer.cpp">
-      <Filter>graph</Filter>
-    </ClCompile>
-    <ClCompile Include="graph\GraphTypes.cpp">
-      <Filter>graph</Filter>
-    </ClCompile>
-    <ClCompile Include="graph\GraphValidator.cpp">
-      <Filter>graph</Filter>
-    </ClCompile>
-    <ClCompile Include="graph\GraphTemplates.cpp">
-      <Filter>graph</Filter>
     </ClCompile>
     <ClCompile Include="..\dependency\imgui\imgui.cpp">
       <Filter>dependency</Filter>
@@ -58,34 +31,10 @@
     <ClCompile Include="..\dependency\imgui\backends\imgui_impl_win32.cpp">
       <Filter>dependency</Filter>
     </ClCompile>
-    <ClCompile Include="..\dependency\imnodes\imnodes.cpp">
-      <Filter>dependency</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="app\DemoApp.h">
       <Filter>app</Filter>
-    </ClInclude>
-    <ClInclude Include="editor\NodeRegistry.h">
-      <Filter>editor</Filter>
-    </ClInclude>
-    <ClInclude Include="editor\RenderGraphEditor.h">
-      <Filter>editor</Filter>
-    </ClInclude>
-    <ClInclude Include="graph\GraphDocument.h">
-      <Filter>graph</Filter>
-    </ClInclude>
-    <ClInclude Include="graph\GraphSerializer.h">
-      <Filter>graph</Filter>
-    </ClInclude>
-    <ClInclude Include="graph\GraphTypes.h">
-      <Filter>graph</Filter>
-    </ClInclude>
-    <ClInclude Include="graph\GraphValidator.h">
-      <Filter>graph</Filter>
-    </ClInclude>
-    <ClInclude Include="graph\GraphTemplates.h">
-      <Filter>graph</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
