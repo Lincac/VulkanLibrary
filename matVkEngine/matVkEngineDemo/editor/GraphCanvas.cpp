@@ -6,15 +6,15 @@
 #include <imgui.h>
 
 #include <cmath>
+#include <algorithm>
+#include <cstdio>
+#include <cfloat>
 
 namespace mat::demo {
 
     namespace {
 
         constexpr float kDragThreshold = 4.f;
-        constexpr float kNodeWidth = 200.f;
-        constexpr float kNodeHeaderHeight = 30.f;
-        constexpr float kNodeBodyHeight = 28.f;
         constexpr float kNodeRounding = 8.f;
 
         struct NodeTheme {
@@ -23,6 +23,7 @@ namespace mat::demo {
             ImU32 border;
             ImU32 selectedBorder;
             ImU32 title;
+            ImU32 pinLabel;
         };
 
         ImVec2 screenCenter(const ImVec2& displaySize) {
@@ -44,20 +45,17 @@ namespace mat::demo {
             switch (type) {
                 case NodeType::VkPipeline:
                     return {IM_COL32(62, 102, 152, 255), IM_COL32(48, 48, 56, 255), IM_COL32(72, 72, 84, 255),
-                            IM_COL32(232, 196, 118, 255), IM_COL32(245, 245, 250, 255)};
+                            IM_COL32(232, 196, 118, 255), IM_COL32(245, 245, 250, 255),
+                            IM_COL32(190, 200, 215, 255)};
             }
             return {IM_COL32(90, 90, 100, 255), IM_COL32(48, 48, 56, 255), IM_COL32(72, 72, 84, 255),
-                    IM_COL32(232, 196, 118, 255), IM_COL32(245, 245, 250, 255)};
-        }
-
-        ImVec2 nodeWorldSize() {
-            return ImVec2(kNodeWidth, kNodeHeaderHeight + kNodeBodyHeight);
+                    IM_COL32(232, 196, 118, 255), IM_COL32(245, 245, 250, 255), IM_COL32(175, 175, 190, 255)};
         }
 
         void nodeScreenBounds(const GraphNode& node, const GridViewState& view, const ImVec2& displaySize,
                               ImVec2& topLeft, ImVec2& bottomRight) {
             const ImVec2 screenPos = worldToScreen(ImVec2(node.worldX, node.worldY), view, displaySize);
-            const ImVec2 worldSize = nodeWorldSize();
+            const ImVec2 worldSize = nodeWorldSize(node.type);
             const ImVec2 nodeSize(worldSize.x * view.zoom, worldSize.y * view.zoom);
             topLeft = ImVec2(screenPos.x - nodeSize.x * 0.5f, screenPos.y - nodeSize.y * 0.5f);
             bottomRight = ImVec2(topLeft.x + nodeSize.x, topLeft.y + nodeSize.y);
@@ -76,6 +74,164 @@ namespace mat::demo {
                 }
             }
             return -1;
+        }
+
+        struct NodeScreenLayout {
+            ImVec2 topLeft;
+            ImVec2 bottomRight;
+            float width = 0.f;
+            float height = 0.f;
+            float headerHeight = 0.f;
+            float pinRowHeight = 0.f;
+            float fontSize = 0.f;
+            float zoom = 1.f;
+        };
+
+        NodeScreenLayout buildNodeScreenLayout(float worldX, float worldY, NodeType type, const GridViewState& view,
+                                               const ImVec2& displaySize) {
+            const float zoom = view.zoom;
+            const ImVec2 worldSize = nodeWorldSize(type);
+            const ImVec2 screenPos = worldToScreen(ImVec2(worldX, worldY), view, displaySize);
+            const float width = worldSize.x * zoom;
+            const float height = worldSize.y * zoom;
+
+            NodeScreenLayout layout{};
+            layout.width = width;
+            layout.height = height;
+            layout.topLeft = ImVec2(screenPos.x - width * 0.5f, screenPos.y - height * 0.5f);
+            layout.bottomRight = ImVec2(layout.topLeft.x + width, layout.topLeft.y + height);
+            layout.headerHeight = kNodeHeaderHeight * zoom;
+            layout.pinRowHeight = kNodePinRowHeight * zoom;
+            layout.fontSize = ImGui::GetFontSize() * zoom;
+            layout.zoom = zoom;
+            return layout;
+        }
+
+        float vkPipelineIndexRowCenterY(const NodeScreenLayout& layout) {
+            return layout.topLeft.y + layout.headerHeight + (kVkPipelineInputPinCount + 0.5f) * layout.pinRowHeight;
+        }
+
+        void drawScaledText(ImDrawList* drawList, const ImVec2& pos, ImU32 color, const char* text, float fontSize) {
+            drawList->AddText(ImGui::GetFont(), fontSize, pos, color, text);
+        }
+
+        void drawPin(ImDrawList* drawList, const ImVec2& center, float zoom, ImU32 fillColor) {
+            const float slotRadius = 5.f * zoom;
+            drawList->AddCircleFilled(center, slotRadius + 1.2f * zoom, IM_COL32(18, 18, 22, 255));
+            drawList->AddCircleFilled(center, slotRadius, fillColor);
+        }
+
+        void drawNodeChrome(ImDrawList* drawList, const ImVec2& topLeft, const ImVec2& bottomRight, float headerHeight,
+                            float rounding, const NodeTheme& theme, bool selected) {
+            const ImVec2 headerBottomRight(bottomRight.x, topLeft.y + headerHeight);
+
+            if (selected) {
+                const float glowPad = 3.f;
+                drawList->AddRectFilled(ImVec2(topLeft.x - glowPad, topLeft.y - glowPad),
+                                        ImVec2(bottomRight.x + glowPad, bottomRight.y + glowPad),
+                                        IM_COL32(232, 196, 118, 36), rounding + glowPad);
+            }
+
+            drawList->AddRectFilled(ImVec2(topLeft.x + 1.f, topLeft.y + 2.f),
+                                    ImVec2(bottomRight.x + 1.f, bottomRight.y + 2.f), IM_COL32(0, 0, 0, 70), rounding);
+            drawList->AddRectFilled(topLeft, bottomRight, theme.body, rounding);
+            drawList->AddRectFilled(topLeft, headerBottomRight, theme.header, rounding, ImDrawFlags_RoundCornersTop);
+            drawList->AddRectFilled(ImVec2(topLeft.x, topLeft.y + headerHeight - 1.f), headerBottomRight, theme.header);
+
+            const float borderThickness = selected ? 2.5f : 1.2f;
+            const ImU32 borderColor = selected ? theme.selectedBorder : theme.border;
+            drawList->AddRect(topLeft, bottomRight, borderColor, rounding, 0, borderThickness);
+        }
+
+        void drawComfyNode(ImDrawList* drawList, const GraphNode& node, const GridViewState& view,
+                           const ImVec2& displaySize, bool selected) {
+            const NodeTheme theme = nodeTheme(node.type);
+            const NodeScreenLayout layout = buildNodeScreenLayout(node.worldX, node.worldY, node.type, view, displaySize);
+            const float rounding = kNodeRounding * layout.zoom;
+            const ImVec2& topLeft = layout.topLeft;
+            const ImVec2& bottomRight = layout.bottomRight;
+
+            drawNodeChrome(drawList, topLeft, bottomRight, layout.headerHeight, rounding, theme, selected);
+
+            const char* title = nodeTypeName(node.type);
+            const float titlePadX = 10.f * layout.zoom;
+            const float titleY = topLeft.y + (layout.headerHeight - layout.fontSize) * 0.5f;
+            drawScaledText(drawList, ImVec2(topLeft.x + titlePadX, titleY), theme.title, title, layout.fontSize);
+
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+
+            if (node.type == NodeType::VkPipeline) {
+                for (int pinIndex = 0; pinIndex < kVkPipelineInputPinCount; ++pinIndex) {
+                    const VkPipelineInputPinDef* pinDef = vkPipelineInputPin(pinIndex);
+                    if (pinDef == nullptr) {
+                        continue;
+                    }
+
+                    const float rowCenterY = topLeft.y + layout.headerHeight + (pinIndex + 0.5f) * layout.pinRowHeight;
+                    drawPin(drawList, ImVec2(topLeft.x, rowCenterY), layout.zoom, pinColor);
+                    drawScaledText(drawList,
+                                   ImVec2(topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
+                                   pinDef->label, layout.fontSize);
+                }
+
+                const float indexRowCenterY = vkPipelineIndexRowCenterY(layout);
+                drawScaledText(drawList,
+                               ImVec2(topLeft.x + labelPadX, indexRowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
+                               "VkRenderPass Index", layout.fontSize);
+
+                constexpr float kMinWidgetZoom = 0.35f;
+                if (layout.zoom < kMinWidgetZoom) {
+                    char indexText[16];
+                    std::snprintf(indexText, sizeof(indexText), "%d", node.renderPassIndex);
+                    const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, indexText);
+                    drawScaledText(drawList,
+                                   ImVec2(bottomRight.x - 10.f * layout.zoom - textSize.x,
+                                          indexRowCenterY - layout.fontSize * 0.5f),
+                                   theme.pinLabel, indexText, layout.fontSize);
+                }
+            } else if (nodeHasOutputPin(node.type)) {
+                const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
+                drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor);
+            }
+        }
+
+        void drawNodeWidgets(GraphDocument& document, const GridViewState& view, const ImVec2& displaySize,
+                             bool& blockGraphDrag) {
+            blockGraphDrag = false;
+            constexpr float kMinWidgetZoom = 0.35f;
+
+            for (const GraphNode& node : document.nodes()) {
+                if (node.type != NodeType::VkPipeline || view.zoom < kMinWidgetZoom) {
+                    continue;
+                }
+
+                GraphNode* editable = document.findNode(node.id);
+                if (editable == nullptr) {
+                    continue;
+                }
+
+                const NodeScreenLayout layout =
+                    buildNodeScreenLayout(node.worldX, node.worldY, node.type, view, displaySize);
+                const float indexRowCenterY = vkPipelineIndexRowCenterY(layout);
+                const float fieldWidth = std::max(56.f * layout.zoom, layout.fontSize * 3.5f);
+                const float fieldHeight = layout.fontSize + 4.f * layout.zoom;
+                const float fieldX = layout.bottomRight.x - 10.f * layout.zoom - fieldWidth;
+                const float fieldY = indexRowCenterY - fieldHeight * 0.5f;
+
+                ImGui::PushID(node.id);
+                ImGui::SetCursorScreenPos(ImVec2(fieldX, fieldY));
+                ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+                ImGui::SetNextItemWidth(fieldWidth);
+                ImGui::InputInt("##renderPassIndex", &editable->renderPassIndex, 0, 0);
+                if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+                    blockGraphDrag = true;
+                }
+                ImGui::PopStyleVar();
+                ImGui::PopFont();
+                ImGui::PopID();
+            }
         }
 
         void drawInfiniteGrid(const ImVec2& origin, const ImVec2& size, const GridViewState& view) {
@@ -163,51 +319,6 @@ namespace mat::demo {
             }
         }
 
-        void drawComfyNode(ImDrawList* drawList, const GraphNode& node, const GridViewState& view,
-                           const ImVec2& displaySize, bool selected) {
-            const NodeTheme theme = nodeTheme(node.type);
-            const ImVec2 screenPos = worldToScreen(ImVec2(node.worldX, node.worldY), view, displaySize);
-            const float zoom = view.zoom;
-            const float width = kNodeWidth * zoom;
-            const float headerHeight = kNodeHeaderHeight * zoom;
-            const float bodyHeight = kNodeBodyHeight * zoom;
-            const float height = headerHeight + bodyHeight;
-            const float rounding = kNodeRounding * zoom;
-            const ImVec2 topLeft(screenPos.x - width * 0.5f, screenPos.y - height * 0.5f);
-            const ImVec2 bottomRight(topLeft.x + width, topLeft.y + height);
-            const ImVec2 headerBottomRight(bottomRight.x, topLeft.y + headerHeight);
-
-            if (selected) {
-                const float glowPad = 3.f * zoom;
-                drawList->AddRectFilled(ImVec2(topLeft.x - glowPad, topLeft.y - glowPad),
-                                        ImVec2(bottomRight.x + glowPad, bottomRight.y + glowPad),
-                                        IM_COL32(232, 196, 118, 36), rounding + glowPad);
-            }
-
-            drawList->AddRectFilled(ImVec2(topLeft.x + 1.f, topLeft.y + 2.f),
-                                    ImVec2(bottomRight.x + 1.f, bottomRight.y + 2.f), IM_COL32(0, 0, 0, 70), rounding);
-            drawList->AddRectFilled(topLeft, bottomRight, theme.body, rounding);
-            drawList->AddRectFilled(topLeft, headerBottomRight, theme.header, rounding, ImDrawFlags_RoundCornersTop);
-            drawList->AddRectFilled(ImVec2(topLeft.x, topLeft.y + headerHeight - 1.f), headerBottomRight, theme.header);
-
-            const float borderThickness = selected ? 2.5f * zoom : 1.2f * zoom;
-            const ImU32 borderColor = selected ? theme.selectedBorder : theme.border;
-            drawList->AddRect(topLeft, bottomRight, borderColor, rounding, 0, borderThickness);
-
-            const char* title = nodeTypeName(node.type);
-            const float titlePadX = 10.f * zoom;
-            const float titleY = topLeft.y + (headerHeight - ImGui::GetFontSize()) * 0.5f;
-            drawList->AddText(ImVec2(topLeft.x + titlePadX, titleY), theme.title, title);
-
-            const float slotRadius = 5.f * zoom;
-            const ImVec2 inputSlot(topLeft.x, topLeft.y + headerHeight + bodyHeight * 0.5f);
-            const ImVec2 outputSlot(bottomRight.x, topLeft.y + headerHeight + bodyHeight * 0.5f);
-            drawList->AddCircleFilled(inputSlot, slotRadius + 1.2f * zoom, IM_COL32(18, 18, 22, 255));
-            drawList->AddCircleFilled(inputSlot, slotRadius, IM_COL32(170, 170, 185, 255));
-            drawList->AddCircleFilled(outputSlot, slotRadius + 1.2f * zoom, IM_COL32(18, 18, 22, 255));
-            drawList->AddCircleFilled(outputSlot, slotRadius, IM_COL32(170, 170, 185, 255));
-        }
-
         void drawGraphNodes(const GraphDocument& document, const GridViewState& view, const ImVec2& displaySize,
                             int selectedNodeId) {
             ImDrawList* drawList = ImGui::GetBackgroundDrawList();
@@ -227,11 +338,11 @@ namespace mat::demo {
         }
 
         void handleNodeInteraction(GraphPanelState& panel, GraphDocument& document, const GridViewState& view,
-                                   const ImVec2& displaySize) {
+                                   const ImVec2& displaySize, bool blockGraphDrag) {
             ImGuiIO& io = ImGui::GetIO();
             const int hitNode = hitTestNode(io.MousePos, document, view, displaySize);
 
-            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !blockGraphDrag) {
                 if (hitNode >= 0) {
                     panel.selectedNodeId = hitNode;
                     panel.draggingNodeId = hitNode;
@@ -254,7 +365,7 @@ namespace mat::demo {
                 panel.draggingNodeId = -1;
             }
 
-            if (panel.draggingNodeId >= 0 && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+            if (panel.draggingNodeId >= 0 && io.MouseDown[ImGuiMouseButton_Left] && !blockGraphDrag) {
                 const ImVec2 mouseWorld = screenToWorld(io.MousePos, view, displaySize);
                 document.setNodePosition(panel.draggingNodeId, mouseWorld.x + panel.nodeDragGrabOffset.x,
                                          mouseWorld.y + panel.nodeDragGrabOffset.y);
@@ -314,7 +425,9 @@ namespace mat::demo {
                              ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBringToFrontOnFocus |
                              ImGuiWindowFlags_NoBackground);
 
-            handleNodeInteraction(panel, document, view, displaySize);
+            bool blockGraphDrag = false;
+            drawNodeWidgets(document, view, displaySize, blockGraphDrag);
+            handleNodeInteraction(panel, document, view, displaySize, blockGraphDrag);
             updateGridView(view, displaySize, panel);
 
             if (ImGui::IsWindowHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&

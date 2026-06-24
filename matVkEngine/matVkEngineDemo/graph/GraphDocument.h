@@ -11,6 +11,7 @@ namespace mat::demo {
         NodeType type = NodeType::VkPipeline;
         float worldX = 0.f;
         float worldY = 0.f;
+        int renderPassIndex = 0;
     };
 
     class GraphDocument {
