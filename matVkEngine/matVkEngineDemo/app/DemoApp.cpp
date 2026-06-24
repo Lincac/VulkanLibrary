@@ -1,5 +1,8 @@
 #include "app/DemoApp.h"
 
+#include "editor/GraphCanvas.h"
+#include "graph/GraphDocument.h"
+
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_win32.h>
@@ -10,129 +13,11 @@
 #include <windows.h>
 #include <GL/gl.h>
 
-#include <cmath>
-
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 namespace mat::demo {
 
     namespace {
-
-        struct GridViewState {
-            ImVec2 pan{0.f, 0.f};
-            float zoom = 1.f;
-        };
-
-        void drawInfiniteGrid(const ImVec2& origin, const ImVec2& size, const GridViewState& view) {
-            ImDrawList* drawList = ImGui::GetBackgroundDrawList();
-
-            const ImU32 bgColor = IM_COL32(28, 28, 34, 255);
-            const ImU32 minorColor = IM_COL32(52, 52, 62, 255);
-            const ImU32 majorColor = IM_COL32(78, 78, 94, 255);
-            const ImU32 axisColor = IM_COL32(110, 90, 140, 255);
-
-            drawList->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y), bgColor);
-
-            const ImVec2 center(origin.x + size.x * 0.5f, origin.y + size.y * 0.5f);
-
-            float worldStep = 32.f;
-            float screenStep = worldStep * view.zoom;
-            constexpr float kMinStep = 12.f;
-            constexpr float kMaxStep = 128.f;
-            while (screenStep < kMinStep) {
-                worldStep *= 2.f;
-                screenStep *= 2.f;
-            }
-            while (screenStep > kMaxStep) {
-                worldStep *= 0.5f;
-                screenStep *= 0.5f;
-            }
-
-            const int majorEvery = 5;
-
-            const float worldLeft = (origin.x - center.x - view.pan.x) / view.zoom;
-            const float worldRight = (origin.x + size.x - center.x - view.pan.x) / view.zoom;
-            const float worldTop = (origin.y - center.y - view.pan.y) / view.zoom;
-            const float worldBottom = (origin.y + size.y - center.y - view.pan.y) / view.zoom;
-
-            auto drawAxisLine = [&](bool vertical, float screenPos) {
-                if (vertical) {
-                    drawList->AddLine(ImVec2(screenPos, origin.y), ImVec2(screenPos, origin.y + size.y), axisColor,
-                                      1.5f);
-                } else {
-                    drawList->AddLine(ImVec2(origin.x, screenPos), ImVec2(origin.x + size.x, screenPos), axisColor,
-                                      1.5f);
-                }
-            };
-
-            const float startX = std::floor(worldLeft / worldStep) * worldStep;
-            for (float worldX = startX; worldX <= worldRight + worldStep; worldX += worldStep) {
-                const float screenX = center.x + worldX * view.zoom + view.pan.x;
-                if (screenX < origin.x - 1.f || screenX > origin.x + size.x + 1.f) {
-                    continue;
-                }
-
-                const int index = static_cast<int>(std::llround(worldX / worldStep));
-                const bool onAxis = std::fabs(worldX) < worldStep * 0.5f;
-                const bool isMajor = (index % majorEvery) == 0;
-
-                if (onAxis) {
-                    drawAxisLine(true, screenX);
-                    continue;
-                }
-
-                const ImU32 color = isMajor ? majorColor : minorColor;
-                const float thickness = isMajor ? 1.2f : 1.f;
-                drawList->AddLine(ImVec2(screenX, origin.y), ImVec2(screenX, origin.y + size.y), color, thickness);
-            }
-
-            const float startY = std::floor(worldTop / worldStep) * worldStep;
-            for (float worldY = startY; worldY <= worldBottom + worldStep; worldY += worldStep) {
-                const float screenY = center.y + worldY * view.zoom + view.pan.y;
-                if (screenY < origin.y - 1.f || screenY > origin.y + size.y + 1.f) {
-                    continue;
-                }
-
-                const int index = static_cast<int>(std::llround(worldY / worldStep));
-                const bool onAxis = std::fabs(worldY) < worldStep * 0.5f;
-                const bool isMajor = (index % majorEvery) == 0;
-
-                if (onAxis) {
-                    drawAxisLine(false, screenY);
-                    continue;
-                }
-
-                const ImU32 color = isMajor ? majorColor : minorColor;
-                const float thickness = isMajor ? 1.2f : 1.f;
-                drawList->AddLine(ImVec2(origin.x, screenY), ImVec2(origin.x + size.x, screenY), color, thickness);
-            }
-        }
-
-        void updateGridView(GridViewState& view, const ImVec2& displaySize) {
-            ImGuiIO& io = ImGui::GetIO();
-            const ImVec2 center(displaySize.x * 0.5f, displaySize.y * 0.5f);
-
-            if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-                view.pan.x += io.MouseDelta.x;
-                view.pan.y += io.MouseDelta.y;
-            }
-
-            if (io.MouseWheel != 0.f) {
-                const float zoomFactor = std::pow(1.12f, io.MouseWheel);
-                const ImVec2 mouse = io.MousePos;
-                const float worldX = (mouse.x - center.x - view.pan.x) / view.zoom;
-                const float worldY = (mouse.y - center.y - view.pan.y) / view.zoom;
-                view.zoom *= zoomFactor;
-                if (view.zoom < 0.15f) {
-                    view.zoom = 0.15f;
-                }
-                if (view.zoom > 8.f) {
-                    view.zoom = 8.f;
-                }
-                view.pan.x = mouse.x - center.x - worldX * view.zoom;
-                view.pan.y = mouse.y - center.y - worldY * view.zoom;
-            }
-        }
 
         struct WglWindowData {
             HDC hDC = nullptr;
@@ -205,6 +90,8 @@ namespace mat::demo {
         HWND hwnd = nullptr;
         WglWindowData windowData{};
         GridViewState gridView{};
+        GraphPanelState panel{};
+        GraphDocument document;
         bool running = false;
     };
 
@@ -287,9 +174,8 @@ namespace mat::demo {
             ImGui_ImplWin32_NewFrame();
             ImGui::NewFrame();
 
-            updateGridView(_impl->gridView, ImGui::GetIO().DisplaySize);
             const ImVec2 display = ImGui::GetIO().DisplaySize;
-            drawInfiniteGrid(ImVec2(0.f, 0.f), display, _impl->gridView);
+            drawGraphPanel(_impl->gridView, _impl->panel, _impl->document, display);
 
             ImGui::Render();
             glViewport(0, 0, g_width, g_height);

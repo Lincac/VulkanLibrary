@@ -139,6 +139,10 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="app\DemoApp.cpp" />
+    <ClCompile Include="editor\GraphCanvas.cpp" />
+    <ClCompile Include="editor\NodeSearchPopup.cpp" />
+    <ClCompile Include="graph\GraphDocument.cpp" />
+    <ClCompile Include="graph\GraphTypes.cpp" />
     <ClCompile Include="..\dependency\imgui\imgui.cpp" />
     <ClCompile Include="..\dependency\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\dependency\imgui\imgui_tables.cpp" />
@@ -148,6 +152,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="app\DemoApp.h" />
+    <ClInclude Include="editor\FuzzySearch.h" />
+    <ClInclude Include="editor\GraphCanvas.h" />
+    <ClInclude Include="editor\NodeSearchPopup.h" />
+    <ClInclude Include="graph\GraphDocument.h" />
+    <ClInclude Include="graph\GraphTypes.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
