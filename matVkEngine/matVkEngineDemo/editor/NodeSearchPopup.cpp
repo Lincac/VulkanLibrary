@@ -31,6 +31,9 @@ namespace mat::demo {
             {NodeType::VkPipelineDynamicState, "VkPipelineDynamicState"},
             {NodeType::VkPipelineLayout, "VkPipelineLayout"},
             {NodeType::VkRenderPass, "VkRenderPass"},
+            {NodeType::VkAttachmentDescription, "VkAttachmentDescription"},
+            {NodeType::VkSubpassDescription, "VkSubpassDescription"},
+            {NodeType::VkSubpassDependency, "VkSubpassDependency"},
         };
 
     }  // namespace

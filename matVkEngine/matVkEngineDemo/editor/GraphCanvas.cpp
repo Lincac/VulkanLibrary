@@ -44,14 +44,9 @@ namespace mat::demo {
         }
 
         NodeTheme nodeTheme(NodeType type) {
-            switch (type) {
-                case NodeType::VkPipeline:
-                    return {IM_COL32(62, 102, 152, 255), IM_COL32(48, 48, 56, 255), IM_COL32(72, 72, 84, 255),
-                            IM_COL32(232, 196, 118, 255), IM_COL32(245, 245, 250, 255),
-                            IM_COL32(190, 200, 215, 255)};
-            }
-            return {IM_COL32(90, 90, 100, 255), IM_COL32(48, 48, 56, 255), IM_COL32(72, 72, 84, 255),
-                    IM_COL32(232, 196, 118, 255), IM_COL32(245, 245, 250, 255), IM_COL32(175, 175, 190, 255)};
+            (void)type;
+            return {IM_COL32(62, 102, 152, 255), IM_COL32(48, 48, 56, 255), IM_COL32(72, 72, 84, 255),
+                    IM_COL32(232, 196, 118, 255), IM_COL32(245, 245, 250, 255), IM_COL32(190, 200, 215, 255)};
         }
 
         struct NodeScreenLayout {
@@ -110,7 +105,8 @@ namespace mat::demo {
 
         bool getInputPinScreenPos(const GraphNode& node, int pinIndex, const GridViewState& view,
                                   const ImVec2& displaySize, ImVec2& outPos) {
-            if (node.type != NodeType::VkPipeline || pinIndex < 0 || pinIndex >= kVkPipelineInputPinCount) {
+            const int pinCount = nodeInputPinCount(node.type);
+            if (pinCount <= 0 || pinIndex < 0 || pinIndex >= pinCount) {
                 return false;
             }
 
@@ -132,8 +128,9 @@ namespace mat::demo {
             for (auto iter = document.nodes().rbegin(); iter != document.nodes().rend(); ++iter) {
                 const GraphNode& node = *iter;
 
-                if (node.type == NodeType::VkPipeline) {
-                    for (int pinIndex = 0; pinIndex < kVkPipelineInputPinCount; ++pinIndex) {
+                if (nodeHasInputPins(node.type)) {
+                    const int pinCount = nodeInputPinCount(node.type);
+                    for (int pinIndex = 0; pinIndex < pinCount; ++pinIndex) {
                         ImVec2 pinPos;
                         if (!getInputPinScreenPos(node, pinIndex, view, displaySize, pinPos)) {
                             continue;
@@ -287,14 +284,14 @@ namespace mat::demo {
             }
 
             if (drag.fromInput && !target.isInput) {
-                const GraphNode* pipelineNode = document.findNode(drag.nodeId);
+                const GraphNode* inputNode = document.findNode(drag.nodeId);
                 const GraphNode* sourceNode = document.findNode(target.nodeId);
-                if (pipelineNode == nullptr || sourceNode == nullptr || pipelineNode->type != NodeType::VkPipeline ||
+                if (inputNode == nullptr || sourceNode == nullptr || !nodeHasInputPins(inputNode->type) ||
                     !nodeHasOutputPin(sourceNode->type)) {
                     return false;
                 }
 
-                const VkPipelineInputPinDef* pinDef = vkPipelineInputPin(drag.pinIndex);
+                const NodeInputPinDef* pinDef = nodeInputPin(inputNode->type, drag.pinIndex);
                 if (pinDef == nullptr || pinDef->slotType != sourceNode->type) {
                     return false;
                 }
@@ -305,13 +302,13 @@ namespace mat::demo {
 
             if (!drag.fromInput && target.isInput) {
                 const GraphNode* sourceNode = document.findNode(drag.nodeId);
-                const GraphNode* pipelineNode = document.findNode(target.nodeId);
-                if (sourceNode == nullptr || pipelineNode == nullptr || pipelineNode->type != NodeType::VkPipeline ||
+                const GraphNode* inputNode = document.findNode(target.nodeId);
+                if (sourceNode == nullptr || inputNode == nullptr || !nodeHasInputPins(inputNode->type) ||
                     !nodeHasOutputPin(sourceNode->type)) {
                     return false;
                 }
 
-                const VkPipelineInputPinDef* pinDef = vkPipelineInputPin(target.pinIndex);
+                const NodeInputPinDef* pinDef = nodeInputPin(inputNode->type, target.pinIndex);
                 if (pinDef == nullptr || pinDef->slotType != sourceNode->type) {
                     return false;
                 }
@@ -321,6 +318,16 @@ namespace mat::demo {
             }
 
             return false;
+        }
+
+        NodeType pinLinkTargetNodeTypeForSource(NodeType sourceType) {
+            if (nodeInputPinIndexForType(NodeType::VkPipeline, sourceType) >= 0) {
+                return NodeType::VkPipeline;
+            }
+            if (nodeInputPinIndexForType(NodeType::VkRenderPass, sourceType) >= 0) {
+                return NodeType::VkRenderPass;
+            }
+            return NodeType::VkPipeline;
         }
 
         void openPinLinkSearch(GraphPanelState& panel, const ImVec2& screenPos, const GridViewState& view,
@@ -340,11 +347,12 @@ namespace mat::demo {
 
             panel.searchTypeFilterEnabled = true;
             if (panel.pinLinkDrag.fromInput) {
-                const VkPipelineInputPinDef* pinDef = vkPipelineInputPin(panel.pinLinkDrag.pinIndex);
+                const GraphNode* inputNode = document.findNode(panel.pinLinkDrag.nodeId);
+                const NodeInputPinDef* pinDef =
+                    inputNode != nullptr ? nodeInputPin(inputNode->type, panel.pinLinkDrag.pinIndex) : nullptr;
                 panel.searchTypeFilter = pinDef != nullptr ? pinDef->slotType : NodeType::VkPipeline;
             } else if (const GraphNode* sourceNode = document.findNode(panel.pinLinkDrag.nodeId)) {
-                panel.searchTypeFilter = NodeType::VkPipeline;
-                (void)sourceNode;
+                panel.searchTypeFilter = pinLinkTargetNodeTypeForSource(sourceNode->type);
             } else {
                 panel.searchTypeFilter = NodeType::VkPipeline;
             }
@@ -357,8 +365,8 @@ namespace mat::demo {
                 document.addLink(newNodeId, panel.pinLinkFromNodeId, panel.pinLinkFromPinIndex);
             } else {
                 const GraphNode* sourceNode = document.findNode(panel.pinLinkFromNodeId);
-                if (sourceNode != nullptr && selectedType == NodeType::VkPipeline) {
-                    const int pinIndex = vkPipelineInputPinIndexForType(sourceNode->type);
+                if (sourceNode != nullptr && nodeHasInputPins(selectedType)) {
+                    const int pinIndex = nodeInputPinIndexForType(selectedType, sourceNode->type);
                     if (pinIndex >= 0) {
                         document.addLink(panel.pinLinkFromNodeId, newNodeId, pinIndex);
                     }
@@ -529,9 +537,9 @@ namespace mat::demo {
             const float labelPadX = 14.f * layout.zoom;
             const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
 
-            if (node.type == NodeType::VkPipeline) {
-                for (int pinIndex = 0; pinIndex < kVkPipelineInputPinCount; ++pinIndex) {
-                    const VkPipelineInputPinDef* pinDef = vkPipelineInputPin(pinIndex);
+            if (nodeHasInputPins(node.type)) {
+                for (int pinIndex = 0; pinIndex < nodeInputPinCount(node.type); ++pinIndex) {
+                    const NodeInputPinDef* pinDef = nodeInputPin(node.type, pinIndex);
                     if (pinDef == nullptr) {
                         continue;
                     }
@@ -544,7 +552,9 @@ namespace mat::demo {
                                    ImVec2(topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
                                    pinDef->label, layout.fontSize);
                 }
+            }
 
+            if (node.type == NodeType::VkPipeline) {
                 const float indexRowCenterY = vkPipelineIndexRowCenterY(layout);
                 drawScaledText(drawList,
                                ImVec2(topLeft.x + labelPadX, indexRowCenterY - layout.fontSize * 0.5f), theme.pinLabel,

@@ -29,7 +29,10 @@ namespace mat::demo {
     }
 
     int GraphDocument::addLink(int fromNodeId, int toNodeId, int toPinIndex) {
-        removeLinksToInput(toNodeId, toPinIndex);
+        const GraphNode* toNode = findNode(toNodeId);
+        if (toNode == nullptr || !nodeInputPinAllowsMultipleLinks(toNode->type)) {
+            removeLinksToInput(toNodeId, toPinIndex);
+        }
         removeLinksFromOutput(fromNodeId);
 
         GraphLink link{};
