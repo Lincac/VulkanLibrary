@@ -41,6 +41,9 @@ namespace mat::demo {
         int descriptorSetLayoutBindingDescriptorCount = 1;
         int descriptorSetLayoutBindingDescriptorType = 1;
         int descriptorSetLayoutBindingStageFlags = 4;
+        int shaderStage = 0;
+        char shaderStageEntryName[kMaxShaderStageEntryNameLen] = "main";
+        char shaderModulePath[kMaxShaderModulePathLen]{};
     };
 
     struct GraphLink {

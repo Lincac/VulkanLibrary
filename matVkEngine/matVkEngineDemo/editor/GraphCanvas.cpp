@@ -1472,6 +1472,130 @@ namespace mat::demo {
             ImGui::PopFont();
         }
 
+        void drawVkPipelineShaderStageContent(ImDrawList* drawList, const GraphNode& node,
+                                              const NodeScreenLayout& layout, const NodeTheme& theme,
+                                              const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+            const ImVec2& topLeft = layout.topLeft;
+
+            drawSTypeParamRow(drawList, layout, theme, labelPadX, kVkPipelineShaderStageSType);
+
+            const float stageRowY = nodeParamRowCenterY(layout, 1);
+            drawScaledText(drawList, ImVec2(topLeft.x + labelPadX, stageRowY - layout.fontSize * 0.5f), theme.pinLabel,
+                           "stage", layout.fontSize);
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            if (layout.zoom < kMinWidgetZoom) {
+                const char* stageText = vkShaderStageFlagOptionName(node.shaderStage);
+                const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, stageText);
+                const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+                const float valueRightX = fieldLayout.comboFieldX + fieldLayout.comboFieldWidth - 4.f * layout.zoom;
+                drawScaledText(drawList, ImVec2(valueRightX - textSize.x, stageRowY - layout.fontSize * 0.5f),
+                               theme.pinLabel, stageText, layout.fontSize);
+            }
+
+            drawNodeInputPinRow(drawList, node, 0, layout, theme, panel, hoveredPin, labelPadX, pinColor);
+
+            const int pNameRowIndex =
+                kVkPipelineShaderStagePrefixParamCount + kVkPipelineShaderStageInputPinCount;
+            const float pNameRowY = nodeParamRowCenterY(layout, pNameRowIndex);
+            drawScaledText(drawList, ImVec2(topLeft.x + labelPadX, pNameRowY - layout.fontSize * 0.5f), theme.pinLabel,
+                           "pName", layout.fontSize);
+
+            if (layout.zoom < kMinWidgetZoom) {
+                const ImVec2 textSize =
+                    ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, node.shaderStageEntryName);
+                const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+                const float valueRightX = fieldLayout.comboFieldX + fieldLayout.comboFieldWidth - 4.f * layout.zoom;
+                drawScaledText(drawList, ImVec2(valueRightX - textSize.x, pNameRowY - layout.fontSize * 0.5f),
+                               theme.pinLabel, node.shaderStageEntryName, layout.fontSize);
+            }
+
+            drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
+        }
+
+        void drawVkPipelineShaderStageWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                                              bool& blockGraphDrag) {
+            const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            drawSTypeParamWidget(kVkPipelineShaderStageSType, layout, interactive, blockGraphDrag);
+
+            const float stageRowY = nodeParamRowCenterY(layout, 1) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, stageRowY));
+            if (beginNodeCombo("##stage", vkShaderStageFlagOptionName(node.shaderStage), fieldLayout.comboFieldWidth)) {
+                for (int optionIndex = 0; optionIndex < kVkShaderStageFlagOptionCount; ++optionIndex) {
+                    const bool selected = node.shaderStage == optionIndex;
+                    if (ImGui::Selectable(vkShaderStageFlagOptionName(optionIndex), selected)) {
+                        node.shaderStage = optionIndex;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            const int pNameRowIndex =
+                kVkPipelineShaderStagePrefixParamCount + kVkPipelineShaderStageInputPinCount;
+            const float pNameRowY = nodeParamRowCenterY(layout, pNameRowIndex) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, pNameRowY));
+            ImGui::SetNextItemWidth(fieldLayout.comboFieldWidth);
+            ImGui::InputText("##pName", node.shaderStageEntryName, kMaxShaderStageEntryNameLen);
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
+        void drawVkShaderModuleContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
+                                       const NodeTheme& theme, const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+            const ImVec2& topLeft = layout.topLeft;
+            const ImVec2& bottomRight = layout.bottomRight;
+
+            const float pathRowY = nodeParamRowCenterY(layout, 0);
+            drawScaledText(drawList, ImVec2(topLeft.x + labelPadX, pathRowY - layout.fontSize * 0.5f), theme.pinLabel,
+                           "path", layout.fontSize);
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            if (layout.zoom < kMinWidgetZoom && node.shaderModulePath[0] != '\0') {
+                const ImVec2 textSize =
+                    ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, node.shaderModulePath);
+                const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+                const float valueRightX = fieldLayout.comboFieldX + fieldLayout.comboFieldWidth - 4.f * layout.zoom;
+                drawScaledText(drawList, ImVec2(valueRightX - textSize.x, pathRowY - layout.fontSize * 0.5f),
+                               theme.pinLabel, node.shaderModulePath, layout.fontSize);
+            }
+
+            const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
+            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
+                                     isPinLinkSource(panel, node.id, 0, false);
+            drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
+        }
+
+        void drawVkShaderModuleWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                                       bool& blockGraphDrag) {
+            const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            const float pathRowY = nodeParamRowCenterY(layout, 0) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, pathRowY));
+            ImGui::SetNextItemWidth(fieldLayout.comboFieldWidth);
+            ImGui::InputText("##shaderModulePath", node.shaderModulePath, kMaxShaderModulePathLen);
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
         void drawVkPipelineLayoutContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
                                          const NodeTheme& theme, const GraphPanelState& panel, const PinHit& hoveredPin) {
             const float labelPadX = 14.f * layout.zoom;
@@ -1488,9 +1612,9 @@ namespace mat::demo {
             drawSTypeParamWidget(kVkPipelineLayoutSType, layout, interactive, blockGraphDrag);
         }
 
-        void drawVkDescriptorSetLayoutContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
-                                              const NodeTheme& theme, const GraphPanelState& panel,
-                                              const PinHit& hoveredPin) {
+        void drawVkDescriptorSetLayoutContent(ImDrawList* drawList, const GraphNode& node,
+                                              const NodeScreenLayout& layout, const NodeTheme& theme,
+                                              const GraphPanelState& panel, const PinHit& hoveredPin) {
             const float labelPadX = 14.f * layout.zoom;
             const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
 
@@ -1719,6 +1843,10 @@ namespace mat::demo {
                 }
             } else if (node.type == NodeType::VkPipelineInputAssemblyState) {
                 drawVkPipelineInputAssemblyStateContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkPipelineShaderStage) {
+                drawVkPipelineShaderStageContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkShaderModule) {
+                drawVkShaderModuleContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::VkPipelineViewportState) {
                 drawVkPipelineViewportStateContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::VkPipelineRasterizationState) {
@@ -1792,6 +1920,10 @@ namespace mat::demo {
                     ImGui::PopFont();
                 } else if (node.type == NodeType::VkPipelineInputAssemblyState) {
                     drawVkPipelineInputAssemblyStateWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkPipelineShaderStage) {
+                    drawVkPipelineShaderStageWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkShaderModule) {
+                    drawVkShaderModuleWidgets(*editable, layout, interactive, blockGraphDrag);
                 } else if (node.type == NodeType::VkPipelineViewportState) {
                     drawVkPipelineViewportStateWidgets(*editable, layout, interactive, blockGraphDrag);
                 } else if (node.type == NodeType::VkPipelineRasterizationState) {

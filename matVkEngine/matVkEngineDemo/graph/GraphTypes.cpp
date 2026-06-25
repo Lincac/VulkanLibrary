@@ -123,6 +123,10 @@ namespace mat::demo {
             {"pDynamicStates", NodeType::VkDynamicState},
         };
 
+        constexpr NodeInputPinDef kVkPipelineShaderStageInputs[kVkPipelineShaderStageInputPinCount] = {
+            {"module", NodeType::VkShaderModule},
+        };
+
         constexpr NodeInputPinDef kVkPipelineLayoutInputs[kVkPipelineLayoutInputPinCount] = {
             {"pSetLayouts", NodeType::VkDescriptorSetLayout},
         };
@@ -158,6 +162,7 @@ namespace mat::demo {
         constexpr NodeType kPinLinkTargetNodeTypes[] = {
             NodeType::VkPipeline,
             NodeType::VkRenderPass,
+            NodeType::VkPipelineShaderStage,
             NodeType::VkPipelineColorBlendState,
             NodeType::VkPipelineColorBlendAttachmentState,
             NodeType::VkPipelineDynamicState,
@@ -169,6 +174,8 @@ namespace mat::demo {
 
     const char kVkPipelineInputAssemblyStateSType[] =
         "VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO";
+
+    const char kVkPipelineShaderStageSType[] = "VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO";
 
     const char kVkPipelineViewportStateSType[] = "VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO";
 
@@ -196,6 +203,8 @@ namespace mat::demo {
                 return "VkPipeline";
             case NodeType::VkPipelineShaderStage:
                 return "VkPipelineShaderStage";
+            case NodeType::VkShaderModule:
+                return "VkShaderModule";
             case NodeType::VkPipelineVertexInputState:
                 return "VkPipelineVertexInputState";
             case NodeType::VkPipelineInputAssemblyState:
@@ -244,6 +253,16 @@ namespace mat::demo {
         }
         if (type == NodeType::VkRenderPass) {
             return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkRenderPassInputPinCount * kNodePinRowHeight);
+        }
+        if (type == NodeType::VkPipelineShaderStage) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight +
+                              (kVkPipelineShaderStagePrefixParamCount + kVkPipelineShaderStageInputPinCount +
+                               kVkPipelineShaderStageSuffixParamCount) *
+                                  kNodePinRowHeight);
+        }
+        if (type == NodeType::VkShaderModule) {
+            return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkShaderModuleParamCount * kNodePinRowHeight);
         }
         if (type == NodeType::VkPipelineInputAssemblyState) {
             return ImVec2(kNodeWidth,
@@ -363,6 +382,9 @@ namespace mat::demo {
         if (type == NodeType::VkDescriptorSetLayout) {
             return kVkDescriptorSetLayoutInputPinCount;
         }
+        if (type == NodeType::VkPipelineShaderStage) {
+            return kVkPipelineShaderStageInputPinCount;
+        }
         return 0;
     }
 
@@ -387,6 +409,9 @@ namespace mat::demo {
         }
         if (type == NodeType::VkDescriptorSetLayout) {
             return kVkDescriptorSetLayoutParamCount + pinIndex;
+        }
+        if (type == NodeType::VkPipelineShaderStage) {
+            return kVkPipelineShaderStagePrefixParamCount + pinIndex;
         }
         return pinIndex;
     }
@@ -433,6 +458,12 @@ namespace mat::demo {
                 return nullptr;
             }
             return &kVkDescriptorSetLayoutInputs[index];
+        }
+        if (type == NodeType::VkPipelineShaderStage) {
+            if (index < 0 || index >= kVkPipelineShaderStageInputPinCount) {
+                return nullptr;
+            }
+            return &kVkPipelineShaderStageInputs[index];
         }
         return nullptr;
     }

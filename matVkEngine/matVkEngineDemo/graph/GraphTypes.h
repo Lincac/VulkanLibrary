@@ -7,6 +7,7 @@ namespace mat::demo {
     enum class NodeType {
         VkPipeline,
         VkPipelineShaderStage,
+        VkShaderModule,
         VkPipelineVertexInputState,
         VkPipelineInputAssemblyState,
         VkPipelineViewportState,
@@ -34,6 +35,12 @@ namespace mat::demo {
     constexpr int kVkPipelineInputPinCount = 11;
     constexpr int kVkRenderPassInputPinCount = 3;
     constexpr int kVkPipelineIndexRowCount = 1;
+    constexpr int kVkPipelineShaderStagePrefixParamCount = 2;
+    constexpr int kVkPipelineShaderStageInputPinCount = 1;
+    constexpr int kVkPipelineShaderStageSuffixParamCount = 1;
+    constexpr int kVkShaderModuleParamCount = 1;
+    constexpr int kMaxShaderModulePathLen = 260;
+    constexpr int kMaxShaderStageEntryNameLen = 64;
     constexpr int kVkPipelineInputAssemblyStateParamCount = 3;
     constexpr int kVkPipelineViewportStateParamCount = 3;
     constexpr int kVkPipelineRasterizationStateParamCount = 8;
@@ -63,6 +70,7 @@ namespace mat::demo {
     constexpr int kVkLogicOpOptionCount = 16;
 
     extern const char kVkPipelineInputAssemblyStateSType[];
+    extern const char kVkPipelineShaderStageSType[];
     extern const char kVkPipelineViewportStateSType[];
     extern const char kVkPipelineRasterizationStateSType[];
     extern const char kVkPipelineMultisampleStateSType[];
