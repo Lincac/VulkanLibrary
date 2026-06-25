@@ -24,7 +24,23 @@ namespace mat::demo {
             {"VkSubpassDependency", NodeType::VkSubpassDependency},
         };
 
+        constexpr const char kVkPrimitiveTopologyOptionNames[kVkPrimitiveTopologyOptionCount][64] = {
+            "VK_PRIMITIVE_TOPOLOGY_POINT_LIST",
+            "VK_PRIMITIVE_TOPOLOGY_LINE_LIST",
+            "VK_PRIMITIVE_TOPOLOGY_LINE_STRIP",
+            "VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY",
+            "VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY",
+            "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST",
+            "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP",
+            "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN",
+            "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY",
+            "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY",
+        };
+
     }  // namespace
+
+    const char kVkPipelineInputAssemblyStateSType[] =
+        "VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO";
 
     const char* nodeTypeName(NodeType type) {
         switch (type) {
@@ -71,6 +87,10 @@ namespace mat::demo {
         if (type == NodeType::VkRenderPass) {
             return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkRenderPassInputPinCount * kNodePinRowHeight);
         }
+        if (type == NodeType::VkPipelineInputAssemblyState) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight + kVkPipelineInputAssemblyStateParamCount * kNodePinRowHeight);
+        }
         return ImVec2(kNodeWidth, kNodeHeaderHeight + kNodeEmptyBodyHeight);
     }
 
@@ -82,8 +102,14 @@ namespace mat::demo {
         return type == NodeType::VkPipeline || type == NodeType::VkRenderPass;
     }
 
-    bool nodeInputPinAllowsMultipleLinks(NodeType type) {
-        return type == NodeType::VkRenderPass;
+    bool nodeInputPinAllowsMultipleLinks(NodeType type, int pinIndex) {
+        if (type == NodeType::VkRenderPass) {
+            return pinIndex >= 0 && pinIndex < kVkRenderPassInputPinCount;
+        }
+        if (type == NodeType::VkPipeline && pinIndex == 0) {
+            return true;
+        }
+        return false;
     }
 
     int nodeInputPinCount(NodeType type) {
@@ -121,6 +147,13 @@ namespace mat::demo {
             }
         }
         return -1;
+    }
+
+    const char* vkPrimitiveTopologyOptionName(int index) {
+        if (index < 0 || index >= kVkPrimitiveTopologyOptionCount) {
+            return "";
+        }
+        return kVkPrimitiveTopologyOptionNames[index];
     }
 
 }  // namespace mat::demo

@@ -29,6 +29,10 @@ namespace mat::demo {
     constexpr int kVkPipelineInputPinCount = 11;
     constexpr int kVkRenderPassInputPinCount = 3;
     constexpr int kVkPipelineIndexRowCount = 1;
+    constexpr int kVkPipelineInputAssemblyStateParamCount = 3;
+    constexpr int kVkPrimitiveTopologyOptionCount = 10;
+
+    extern const char kVkPipelineInputAssemblyStateSType[];
 
     struct NodeInputPinDef {
         const char* label;
@@ -39,9 +43,10 @@ namespace mat::demo {
     ImVec2 nodeWorldSize(NodeType type);
     bool nodeHasOutputPin(NodeType type);
     bool nodeHasInputPins(NodeType type);
-    bool nodeInputPinAllowsMultipleLinks(NodeType type);
+    bool nodeInputPinAllowsMultipleLinks(NodeType type, int pinIndex);
     int nodeInputPinCount(NodeType type);
     const NodeInputPinDef* nodeInputPin(NodeType type, int index);
     int nodeInputPinIndexForType(NodeType nodeType, NodeType slotType);
+    const char* vkPrimitiveTopologyOptionName(int index);
 
 }  // namespace mat::demo

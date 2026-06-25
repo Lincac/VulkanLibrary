@@ -12,6 +12,8 @@ namespace mat::demo {
         float worldX = 0.f;
         float worldY = 0.f;
         int renderPassIndex = 0;
+        int inputAssemblyTopology = 5;
+        bool inputAssemblyprimitiveRestart = false;
     };
 
     struct GraphLink {
