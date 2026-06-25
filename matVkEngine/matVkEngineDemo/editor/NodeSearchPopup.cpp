@@ -22,6 +22,7 @@ namespace mat::demo {
             {NodeType::VkPipeline, "VkPipeline"},
             {NodeType::VkPipelineShaderStage, "VkPipelineShaderStage"},
             {NodeType::VkShaderModule, "VkShaderModule"},
+            {NodeType::Vertex, "Vertex"},
             {NodeType::VkPipelineVertexInputState, "VkPipelineVertexInputState"},
             {NodeType::VkPipelineInputAssemblyState, "VkPipelineInputAssemblyState"},
             {NodeType::VkPipelineViewportState, "VkPipelineViewportState"},

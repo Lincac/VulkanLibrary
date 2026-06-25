@@ -1,8 +1,54 @@
 #include "graph/GraphDocument.h"
 
 #include <algorithm>
+#include <cstdio>
 
 namespace mat::demo {
+
+    namespace {
+
+        void setVertexAttributeName(VertexAttribute& attribute, const char* name) {
+            std::snprintf(attribute.name, sizeof(attribute.name), "%s", name);
+        }
+
+    }  // namespace
+
+    int vertexNodeBodyRowCount(const GraphNode& node) {
+        return static_cast<int>(node.vertexAttributes.size()) + kVertexAddItemRowCount + kVertexOutputPinCount;
+    }
+
+    ImVec2 vertexNodeWorldSize(const GraphNode& node) {
+        return ImVec2(kNodeWidth, kNodeHeaderHeight + vertexNodeBodyRowCount(node) * kNodePinRowHeight);
+    }
+
+    ImVec2 nodeWorldSize(const GraphNode& node) {
+        if (node.type == NodeType::Vertex) {
+            return vertexNodeWorldSize(node);
+        }
+        return nodeWorldSize(node.type);
+    }
+
+    void initDefaultVertexAttributes(GraphNode& node) {
+        node.vertexAttributes.clear();
+
+        VertexAttribute position{};
+        setVertexAttributeName(position, "position");
+        position.channelCount = 3;
+        node.vertexAttributes.push_back(position);
+
+        VertexAttribute color{};
+        setVertexAttributeName(color, "color");
+        color.channelCount = 3;
+        color.values[0] = 1.f;
+        color.values[1] = 1.f;
+        color.values[2] = 1.f;
+        node.vertexAttributes.push_back(color);
+
+        VertexAttribute texcoord{};
+        setVertexAttributeName(texcoord, "texcoord");
+        texcoord.channelCount = 2;
+        node.vertexAttributes.push_back(texcoord);
+    }
 
     int GraphDocument::addNode(NodeType type, float worldX, float worldY) {
         GraphNode node{};
@@ -10,6 +56,9 @@ namespace mat::demo {
         node.type = type;
         node.worldX = worldX;
         node.worldY = worldY;
+        if (type == NodeType::Vertex) {
+            initDefaultVertexAttributes(node);
+        }
         _nodes.push_back(node);
         return node.id;
     }

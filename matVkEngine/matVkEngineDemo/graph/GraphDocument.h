@@ -6,6 +6,12 @@
 
 namespace mat::demo {
 
+    struct VertexAttribute {
+        char name[kMaxVertexAttributeNameLen] = "attr";
+        int channelCount = 1;
+        float values[kMaxVertexAttributeChannels]{};
+    };
+
     struct GraphNode {
         int id = 0;
         NodeType type = NodeType::VkPipeline;
@@ -44,6 +50,7 @@ namespace mat::demo {
         int shaderStage = 0;
         char shaderStageEntryName[kMaxShaderStageEntryNameLen] = "main";
         char shaderModulePath[kMaxShaderModulePathLen]{};
+        std::vector<VertexAttribute> vertexAttributes;
     };
 
     struct GraphLink {
@@ -76,5 +83,10 @@ namespace mat::demo {
         int _nextNodeId = 1;
         int _nextLinkId = 1;
     };
+
+    int vertexNodeBodyRowCount(const GraphNode& node);
+    ImVec2 vertexNodeWorldSize(const GraphNode& node);
+    ImVec2 nodeWorldSize(const GraphNode& node);
+    void initDefaultVertexAttributes(GraphNode& node);
 
 }  // namespace mat::demo

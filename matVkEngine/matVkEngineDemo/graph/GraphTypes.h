@@ -8,6 +8,7 @@ namespace mat::demo {
         VkPipeline,
         VkPipelineShaderStage,
         VkShaderModule,
+        Vertex,
         VkPipelineVertexInputState,
         VkPipelineInputAssemblyState,
         VkPipelineViewportState,
@@ -39,6 +40,13 @@ namespace mat::demo {
     constexpr int kVkPipelineShaderStageInputPinCount = 1;
     constexpr int kVkPipelineShaderStageSuffixParamCount = 1;
     constexpr int kVkShaderModuleParamCount = 1;
+    constexpr int kVkPipelineVertexInputStateParamCount = 1;
+    constexpr int kVkPipelineVertexInputStateInputPinCount = 2;
+    constexpr int kVertexAddItemRowCount = 1;
+    constexpr int kVertexOutputPinCount = 2;
+    constexpr int kMaxVertexAttributeNameLen = 32;
+    constexpr int kMaxVertexAttributeChannels = 4;
+    constexpr int kMinVertexAttributeChannels = 1;
     constexpr int kMaxShaderModulePathLen = 260;
     constexpr int kMaxShaderStageEntryNameLen = 64;
     constexpr int kVkPipelineInputAssemblyStateParamCount = 3;
@@ -69,6 +77,7 @@ namespace mat::demo {
     constexpr int kVkCompareOpOptionCount = 8;
     constexpr int kVkLogicOpOptionCount = 16;
 
+    extern const char kVkPipelineVertexInputStateSType[];
     extern const char kVkPipelineInputAssemblyStateSType[];
     extern const char kVkPipelineShaderStageSType[];
     extern const char kVkPipelineViewportStateSType[];
@@ -84,6 +93,7 @@ namespace mat::demo {
     struct NodeInputPinDef {
         const char* label;
         NodeType slotType;
+        int slotSourcePinIndex = -1;
     };
 
     const char* nodeTypeName(NodeType type);
@@ -94,7 +104,9 @@ namespace mat::demo {
     int nodeInputPinCount(NodeType type);
     int nodeInputPinBodyRow(NodeType type, int pinIndex);
     const NodeInputPinDef* nodeInputPin(NodeType type, int index);
-    int nodeInputPinIndexForType(NodeType nodeType, NodeType slotType);
+    bool nodeInputPinAcceptsSource(NodeType inputNodeType, int inputPinIndex, NodeType sourceType,
+                                   int sourcePinIndex);
+    int nodeInputPinIndexForType(NodeType nodeType, NodeType slotType, int slotSourcePinIndex = -1);
     int nodeOutputPinCount(NodeType type);
     const char* nodeOutputPinLabel(NodeType type, int pinIndex);
     NodeType pinLinkTargetNodeTypeForSource(NodeType sourceType);

@@ -110,6 +110,11 @@ namespace mat::demo {
             "VK_DYNAMIC_STATE_DEPTH_BIAS",
         };
 
+        constexpr NodeInputPinDef kVkPipelineVertexInputStateInputs[kVkPipelineVertexInputStateInputPinCount] = {
+            {"pVertexBindingDescriptions", NodeType::Vertex, 0},
+            {"pVertexAttributeDescriptions", NodeType::Vertex, 1},
+        };
+
         constexpr NodeInputPinDef kVkPipelineColorBlendStateInputs[kVkPipelineColorBlendStateInputPinCount] = {
             {"pAttachments", NodeType::VkPipelineColorBlendAttachmentState},
         };
@@ -159,10 +164,16 @@ namespace mat::demo {
             "VK_SHADER_STAGE_ALL",
         };
 
+        constexpr const char kVertexOutputPinLabels[kVertexOutputPinCount][40] = {
+            "pVertexBindingDescriptions",
+            "pVertexAttributeDescriptions",
+        };
+
         constexpr NodeType kPinLinkTargetNodeTypes[] = {
             NodeType::VkPipeline,
             NodeType::VkRenderPass,
             NodeType::VkPipelineShaderStage,
+            NodeType::VkPipelineVertexInputState,
             NodeType::VkPipelineColorBlendState,
             NodeType::VkPipelineColorBlendAttachmentState,
             NodeType::VkPipelineDynamicState,
@@ -171,6 +182,9 @@ namespace mat::demo {
         };
 
     }  // namespace
+
+    const char kVkPipelineVertexInputStateSType[] =
+        "VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO";
 
     const char kVkPipelineInputAssemblyStateSType[] =
         "VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO";
@@ -205,6 +219,8 @@ namespace mat::demo {
                 return "VkPipelineShaderStage";
             case NodeType::VkShaderModule:
                 return "VkShaderModule";
+            case NodeType::Vertex:
+                return "Vertex";
             case NodeType::VkPipelineVertexInputState:
                 return "VkPipelineVertexInputState";
             case NodeType::VkPipelineInputAssemblyState:
@@ -263,6 +279,17 @@ namespace mat::demo {
         }
         if (type == NodeType::VkShaderModule) {
             return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkShaderModuleParamCount * kNodePinRowHeight);
+        }
+        if (type == NodeType::Vertex) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight +
+                              (3 + kVertexAddItemRowCount + kVertexOutputPinCount) * kNodePinRowHeight);
+        }
+        if (type == NodeType::VkPipelineVertexInputState) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight +
+                              (kVkPipelineVertexInputStateParamCount + kVkPipelineVertexInputStateInputPinCount) *
+                                  kNodePinRowHeight);
         }
         if (type == NodeType::VkPipelineInputAssemblyState) {
             return ImVec2(kNodeWidth,
@@ -367,6 +394,9 @@ namespace mat::demo {
         if (type == NodeType::VkRenderPass) {
             return kVkRenderPassInputPinCount;
         }
+        if (type == NodeType::VkPipelineVertexInputState) {
+            return kVkPipelineVertexInputStateInputPinCount;
+        }
         if (type == NodeType::VkPipelineColorBlendState) {
             return kVkPipelineColorBlendStateInputPinCount;
         }
@@ -394,6 +424,9 @@ namespace mat::demo {
         }
         if (type == NodeType::VkPipeline || type == NodeType::VkRenderPass) {
             return pinIndex;
+        }
+        if (type == NodeType::VkPipelineVertexInputState) {
+            return kVkPipelineVertexInputStateParamCount + pinIndex;
         }
         if (type == NodeType::VkPipelineColorBlendState) {
             return kVkPipelineColorBlendStateParamCount + pinIndex;
@@ -428,6 +461,12 @@ namespace mat::demo {
                 return nullptr;
             }
             return &kVkRenderPassInputs[index];
+        }
+        if (type == NodeType::VkPipelineVertexInputState) {
+            if (index < 0 || index >= kVkPipelineVertexInputStateInputPinCount) {
+                return nullptr;
+            }
+            return &kVkPipelineVertexInputStateInputs[index];
         }
         if (type == NodeType::VkPipelineColorBlendState) {
             if (index < 0 || index >= kVkPipelineColorBlendStateInputPinCount) {
@@ -475,6 +514,9 @@ namespace mat::demo {
         if (type == NodeType::VkColorWriteMask) {
             return kVkColorWriteMaskOutputPinCount;
         }
+        if (type == NodeType::Vertex) {
+            return kVertexOutputPinCount;
+        }
         if (type == NodeType::VkDynamicState) {
             return kVkDynamicStateOutputPinCount;
         }
@@ -494,7 +536,26 @@ namespace mat::demo {
             }
             return kVkDynamicStateOutputPinLabels[pinIndex];
         }
+        if (type == NodeType::Vertex) {
+            if (pinIndex < 0 || pinIndex >= kVertexOutputPinCount) {
+                return "";
+            }
+            return kVertexOutputPinLabels[pinIndex];
+        }
         return nodeTypeName(type);
+    }
+
+    bool nodeInputPinAcceptsSource(NodeType inputNodeType, int inputPinIndex, NodeType sourceType,
+                                   int sourcePinIndex) {
+        const NodeInputPinDef* pinDef = nodeInputPin(inputNodeType, inputPinIndex);
+        if (pinDef == nullptr || pinDef->slotType != sourceType) {
+            return false;
+        }
+        if (pinDef->slotSourcePinIndex >= 0 && sourcePinIndex >= 0 &&
+            pinDef->slotSourcePinIndex != sourcePinIndex) {
+            return false;
+        }
+        return true;
     }
 
     NodeType pinLinkTargetNodeTypeForSource(NodeType sourceType) {
@@ -506,11 +567,10 @@ namespace mat::demo {
         return NodeType::VkPipeline;
     }
 
-    int nodeInputPinIndexForType(NodeType nodeType, NodeType slotType) {
+    int nodeInputPinIndexForType(NodeType nodeType, NodeType slotType, int slotSourcePinIndex) {
         const int pinCount = nodeInputPinCount(nodeType);
         for (int index = 0; index < pinCount; ++index) {
-            const NodeInputPinDef* pinDef = nodeInputPin(nodeType, index);
-            if (pinDef != nullptr && pinDef->slotType == slotType) {
+            if (nodeInputPinAcceptsSource(nodeType, index, slotType, slotSourcePinIndex)) {
                 return index;
             }
         }

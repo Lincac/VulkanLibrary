@@ -1,6 +1,7 @@
 #include "editor/GraphCanvas.h"
 
 #include "editor/NodeSearchPopup.h"
+#include "graph/GraphDocument.h"
 #include "graph/GraphTypes.h"
 
 #include <imgui.h>
@@ -60,11 +61,11 @@ namespace mat::demo {
             float zoom = 1.f;
         };
 
-        NodeScreenLayout buildNodeScreenLayout(float worldX, float worldY, NodeType type, const GridViewState& view,
+        NodeScreenLayout buildNodeScreenLayout(const GraphNode& node, const GridViewState& view,
                                                const ImVec2& displaySize) {
             const float zoom = view.zoom;
-            const ImVec2 worldSize = nodeWorldSize(type);
-            const ImVec2 screenPos = worldToScreen(ImVec2(worldX, worldY), view, displaySize);
+            const ImVec2 worldSize = nodeWorldSize(node);
+            const ImVec2 screenPos = worldToScreen(ImVec2(node.worldX, node.worldY), view, displaySize);
             const float width = worldSize.x * zoom;
             const float height = worldSize.y * zoom;
 
@@ -107,10 +108,16 @@ namespace mat::demo {
                 return false;
             }
 
-            const NodeScreenLayout layout = buildNodeScreenLayout(node.worldX, node.worldY, node.type, view, displaySize);
-            if (node.type == NodeType::VkColorWriteMask || node.type == NodeType::VkDynamicState) {
+            const NodeScreenLayout layout = buildNodeScreenLayout(node, view, displaySize);
+            if (node.type == NodeType::VkColorWriteMask || node.type == NodeType::VkDynamicState ||
+                node.type == NodeType::Vertex) {
+                int bodyRow = resolvedPinIndex;
+                if (node.type == NodeType::Vertex) {
+                    bodyRow = static_cast<int>(node.vertexAttributes.size()) + kVertexAddItemRowCount +
+                              resolvedPinIndex;
+                }
                 const float rowCenterY =
-                    layout.topLeft.y + layout.headerHeight + (resolvedPinIndex + 0.5f) * layout.pinRowHeight;
+                    layout.topLeft.y + layout.headerHeight + (bodyRow + 0.5f) * layout.pinRowHeight;
                 outPos = ImVec2(layout.bottomRight.x, rowCenterY);
                 return true;
             }
@@ -127,7 +134,7 @@ namespace mat::demo {
                 return false;
             }
 
-            const NodeScreenLayout layout = buildNodeScreenLayout(node.worldX, node.worldY, node.type, view, displaySize);
+            const NodeScreenLayout layout = buildNodeScreenLayout(node, view, displaySize);
             const int bodyRow = nodeInputPinBodyRow(node.type, pinIndex);
             const float rowCenterY = layout.topLeft.y + layout.headerHeight + (bodyRow + 0.5f) * layout.pinRowHeight;
             outPos = ImVec2(layout.topLeft.x, rowCenterY);
@@ -315,7 +322,9 @@ namespace mat::demo {
                 }
 
                 const NodeInputPinDef* pinDef = nodeInputPin(inputNode->type, drag.pinIndex);
-                return pinDef != nullptr && pinDef->slotType == sourceNode->type;
+                const int sourcePinIndex = target.pinIndex < 0 ? 0 : target.pinIndex;
+                return pinDef != nullptr &&
+                       nodeInputPinAcceptsSource(inputNode->type, drag.pinIndex, sourceNode->type, sourcePinIndex);
             }
 
             if (!drag.fromInput && target.isInput) {
@@ -326,8 +335,8 @@ namespace mat::demo {
                     return false;
                 }
 
-                const NodeInputPinDef* pinDef = nodeInputPin(inputNode->type, target.pinIndex);
-                return pinDef != nullptr && pinDef->slotType == sourceNode->type;
+                const int sourcePinIndex = drag.pinIndex < 0 ? 0 : drag.pinIndex;
+                return nodeInputPinAcceptsSource(inputNode->type, target.pinIndex, sourceNode->type, sourcePinIndex);
             }
 
             return false;
@@ -380,14 +389,22 @@ namespace mat::demo {
             const int newNodeId = document.addNode(selectedType, panel.spawnWorldPos.x, panel.spawnWorldPos.y);
 
             if (panel.pinLinkFromInput) {
-                document.addLink(newNodeId, 0, panel.pinLinkFromNodeId, panel.pinLinkFromPinIndex);
+                const GraphNode* inputNode = document.findNode(panel.pinLinkFromNodeId);
+                const NodeInputPinDef* pinDef =
+                    inputNode != nullptr ? nodeInputPin(inputNode->type, panel.pinLinkFromPinIndex) : nullptr;
+                int fromPinIndex = 0;
+                if (pinDef != nullptr && pinDef->slotSourcePinIndex >= 0) {
+                    fromPinIndex = pinDef->slotSourcePinIndex;
+                }
+                document.addLink(newNodeId, fromPinIndex, panel.pinLinkFromNodeId, panel.pinLinkFromPinIndex);
             } else {
                 const GraphNode* sourceNode = document.findNode(panel.pinLinkFromNodeId);
                 if (sourceNode != nullptr && nodeHasInputPins(selectedType)) {
-                    const int pinIndex = nodeInputPinIndexForType(selectedType, sourceNode->type);
+                    const int fromPinIndex =
+                        panel.pinLinkFromPinIndex < 0 ? 0 : panel.pinLinkFromPinIndex;
+                    const int pinIndex =
+                        nodeInputPinIndexForType(selectedType, sourceNode->type, fromPinIndex);
                     if (pinIndex >= 0) {
-                        const int fromPinIndex =
-                            panel.pinLinkFromPinIndex < 0 ? 0 : panel.pinLinkFromPinIndex;
                         document.addLink(panel.pinLinkFromNodeId, fromPinIndex, newNodeId, pinIndex);
                     }
                 }
@@ -464,7 +481,7 @@ namespace mat::demo {
         void nodeScreenBounds(const GraphNode& node, const GridViewState& view, const ImVec2& displaySize,
                               ImVec2& topLeft, ImVec2& bottomRight) {
             const ImVec2 screenPos = worldToScreen(ImVec2(node.worldX, node.worldY), view, displaySize);
-            const ImVec2 worldSize = nodeWorldSize(node.type);
+            const ImVec2 worldSize = nodeWorldSize(node);
             const ImVec2 nodeSize(worldSize.x * view.zoom, worldSize.y * view.zoom);
             topLeft = ImVec2(screenPos.x - nodeSize.x * 0.5f, screenPos.y - nodeSize.y * 0.5f);
             bottomRight = ImVec2(topLeft.x + nodeSize.x, topLeft.y + nodeSize.y);
@@ -1176,6 +1193,223 @@ namespace mat::demo {
             drawPin(drawList, ImVec2(layout.bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
+        struct VertexRowLayout {
+            float rowCenterY = 0.f;
+            float deleteButtonCenterX = 0.f;
+            float deleteButtonRadius = 0.f;
+            float nameFieldX = 0.f;
+            float nameFieldWidth = 0.f;
+            float channelFieldWidth = 0.f;
+            float channelFieldGap = 0.f;
+            float firstChannelX = 0.f;
+            float addChannelCenterX = 0.f;
+            float removeChannelCenterX = 0.f;
+            float actionButtonRadius = 0.f;
+            float fieldHeight = 0.f;
+        };
+
+        VertexRowLayout buildVertexRowLayout(const NodeScreenLayout& layout, int rowIndex) {
+            VertexRowLayout result{};
+            result.rowCenterY = nodeParamRowCenterY(layout, rowIndex);
+            result.fieldHeight = layout.fontSize + 4.f * layout.zoom;
+            result.deleteButtonRadius = 7.f * layout.zoom;
+            result.actionButtonRadius = 7.f * layout.zoom;
+
+            const float leftPad = 8.f * layout.zoom;
+            const float rightPad = 10.f * layout.zoom;
+            const float nameGap = 4.f * layout.zoom;
+            const float channelGap = 2.f * layout.zoom;
+            const float channelActionGap = 14.f * layout.zoom;
+            const float actionGap = 3.f * layout.zoom;
+            const float actionButtonDiameter = result.actionButtonRadius * 2.f;
+
+            result.nameFieldWidth = std::max(48.f * layout.zoom, layout.fontSize * 4.2f);
+            result.channelFieldGap = channelGap;
+            result.deleteButtonCenterX = layout.topLeft.x + leftPad + result.deleteButtonRadius;
+            result.nameFieldX = layout.topLeft.x + leftPad + result.deleteButtonRadius * 2.f + nameGap;
+            result.firstChannelX = result.nameFieldX + result.nameFieldWidth + nameGap;
+            result.removeChannelCenterX = layout.bottomRight.x - rightPad - result.actionButtonRadius;
+            result.addChannelCenterX = result.removeChannelCenterX - actionButtonDiameter - actionGap;
+
+            const float channelsAreaRight =
+                result.addChannelCenterX - result.actionButtonRadius - channelActionGap;
+            result.channelFieldWidth =
+                std::max(28.f * layout.zoom,
+                         (channelsAreaRight - result.firstChannelX - channelGap * 3.f) / 4.f);
+            return result;
+        }
+
+        void formatVertexAttributePreview(const VertexAttribute& attribute, char* outText, int outTextSize) {
+            outText[0] = '(';
+            int offset = 1;
+            for (int channelIndex = 0; channelIndex < attribute.channelCount; ++channelIndex) {
+                if (channelIndex > 0) {
+                    offset += std::snprintf(outText + offset, outTextSize - offset, ", ");
+                }
+                offset += std::snprintf(outText + offset, outTextSize - offset, "%.1f", attribute.values[channelIndex]);
+            }
+            std::snprintf(outText + offset, outTextSize - offset, ")");
+        }
+
+        bool vertexCircleButton(const char* id, ImVec2 center, float radius, char glyph, bool enabled, ImU32 fillColor,
+                                bool interactive, bool& blockGraphDrag) {
+            ImGui::SetCursorScreenPos(ImVec2(center.x - radius, center.y - radius));
+            ImGui::PushID(id);
+            ImGui::InvisibleButton("##circle", ImVec2(radius * 2.f, radius * 2.f));
+            const bool hovered = enabled && ImGui::IsItemHovered();
+            const bool clicked = enabled && interactive && ImGui::IsItemClicked();
+            trackWidgetInteraction(interactive, blockGraphDrag);
+            ImGui::PopID();
+
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            const ImU32 background =
+                enabled ? (hovered ? IM_COL32(95, 100, 118, 255) : fillColor) : IM_COL32(52, 52, 60, 180);
+            drawList->AddCircleFilled(center, radius, background);
+            drawList->AddCircle(center, radius, IM_COL32(120, 125, 140, enabled ? 255 : 120), 0, 1.f);
+
+            if (glyph != '\0') {
+                char text[2] = {glyph, '\0'};
+                const ImVec2 textSize = ImGui::CalcTextSize(text);
+                drawList->AddText(ImVec2(center.x - textSize.x * 0.5f, center.y - textSize.y * 0.5f),
+                                  IM_COL32(235, 235, 245, enabled ? 255 : 120), text);
+            }
+            return clicked;
+        }
+
+        void drawVertexContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
+                               const NodeTheme& theme, const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+            const ImVec2& bottomRight = layout.bottomRight;
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            const bool drawStaticPreview = layout.zoom < kMinWidgetZoom;
+            for (int rowIndex = 0; rowIndex < static_cast<int>(node.vertexAttributes.size()); ++rowIndex) {
+                if (!drawStaticPreview) {
+                    continue;
+                }
+
+                const VertexAttribute& attribute = node.vertexAttributes[static_cast<size_t>(rowIndex)];
+                const VertexRowLayout rowLayout = buildVertexRowLayout(layout, rowIndex);
+
+                if (rowIndex > 0) {
+                    drawList->AddCircleFilled(ImVec2(rowLayout.deleteButtonCenterX, rowLayout.rowCenterY),
+                                              rowLayout.deleteButtonRadius, IM_COL32(72, 76, 90, 255));
+                    drawList->AddCircle(ImVec2(rowLayout.deleteButtonCenterX, rowLayout.rowCenterY),
+                                        rowLayout.deleteButtonRadius, IM_COL32(120, 125, 140, 255), 0, 1.f);
+                }
+
+                drawScaledText(drawList,
+                               ImVec2(rowLayout.nameFieldX, rowLayout.rowCenterY - layout.fontSize * 0.5f),
+                               theme.pinLabel, attribute.name, layout.fontSize);
+
+                char valueText[128];
+                formatVertexAttributePreview(attribute, valueText, sizeof(valueText));
+                const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, valueText);
+                const float valueRightX =
+                    rowLayout.addChannelCenterX - rowLayout.actionButtonRadius - 14.f * layout.zoom;
+                drawScaledText(drawList, ImVec2(valueRightX - textSize.x, rowLayout.rowCenterY - layout.fontSize * 0.5f),
+                               theme.pinLabel, valueText, layout.fontSize);
+            }
+
+            const int addItemRowIndex = static_cast<int>(node.vertexAttributes.size());
+            const VertexRowLayout addItemRowLayout = buildVertexRowLayout(layout, addItemRowIndex);
+            if (drawStaticPreview) {
+                drawList->AddCircleFilled(ImVec2(addItemRowLayout.deleteButtonCenterX, addItemRowLayout.rowCenterY),
+                                          addItemRowLayout.actionButtonRadius, IM_COL32(62, 102, 152, 255));
+                drawList->AddCircle(ImVec2(addItemRowLayout.deleteButtonCenterX, addItemRowLayout.rowCenterY),
+                                    addItemRowLayout.actionButtonRadius, IM_COL32(120, 125, 140, 255), 0, 1.f);
+                const ImVec2 addGlyphSize = ImGui::CalcTextSize("+");
+                drawList->AddText(ImVec2(addItemRowLayout.deleteButtonCenterX - addGlyphSize.x * 0.5f,
+                                         addItemRowLayout.rowCenterY - addGlyphSize.y * 0.5f),
+                                  IM_COL32(235, 235, 245, 255), "+");
+            }
+
+            for (int pinIndex = 0; pinIndex < kVertexOutputPinCount; ++pinIndex) {
+                const int bodyRow = addItemRowIndex + kVertexAddItemRowCount + pinIndex;
+                const float rowCenterY =
+                    layout.topLeft.y + layout.headerHeight + (bodyRow + 0.5f) * layout.pinRowHeight;
+                drawScaledText(drawList,
+                               ImVec2(addItemRowLayout.nameFieldX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
+                               nodeOutputPinLabel(node.type, pinIndex), layout.fontSize);
+
+                const bool highlighted = isPinHighlighted(hoveredPin, node.id, pinIndex, false) ||
+                                         isPinLinkSource(panel, node.id, pinIndex, false);
+                drawPin(drawList, ImVec2(bottomRight.x, rowCenterY), layout.zoom, pinColor, highlighted);
+            }
+        }
+
+        void drawVertexWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                               bool& blockGraphDrag) {
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.f * layout.zoom, 1.f * layout.zoom));
+
+            for (int rowIndex = 0; rowIndex < static_cast<int>(node.vertexAttributes.size()); ++rowIndex) {
+                VertexAttribute& attribute = node.vertexAttributes[static_cast<size_t>(rowIndex)];
+                const VertexRowLayout rowLayout = buildVertexRowLayout(layout, rowIndex);
+                const bool canDeleteItem = rowIndex > 0;
+
+                ImGui::PushID(rowIndex);
+                if (canDeleteItem) {
+                    if (vertexCircleButton("##deleteItem", ImVec2(rowLayout.deleteButtonCenterX, rowLayout.rowCenterY),
+                                           rowLayout.deleteButtonRadius, '-', true, IM_COL32(72, 76, 90, 255),
+                                           interactive, blockGraphDrag)) {
+                        node.vertexAttributes.erase(node.vertexAttributes.begin() + rowIndex);
+                        ImGui::PopID();
+                        ImGui::PopStyleVar();
+                        ImGui::PopFont();
+                        return;
+                    }
+                }
+
+                const float nameRowY = rowLayout.rowCenterY - rowLayout.fieldHeight * 0.5f;
+                ImGui::SetCursorScreenPos(ImVec2(rowLayout.nameFieldX, nameRowY));
+                ImGui::SetNextItemWidth(rowLayout.nameFieldWidth);
+                ImGui::InputText("##name", attribute.name, sizeof(attribute.name));
+                trackWidgetInteraction(interactive, blockGraphDrag);
+
+                for (int channelIndex = 0; channelIndex < attribute.channelCount; ++channelIndex) {
+                    const float channelX =
+                        rowLayout.firstChannelX + channelIndex * (rowLayout.channelFieldWidth + rowLayout.channelFieldGap);
+                    ImGui::SetCursorScreenPos(ImVec2(channelX, nameRowY));
+                    ImGui::SetNextItemWidth(rowLayout.channelFieldWidth);
+                    ImGui::PushID(channelIndex);
+                    ImGui::InputFloat("##channel", &attribute.values[channelIndex], 0.f, 0.f, "%.1f");
+                    trackWidgetInteraction(interactive, blockGraphDrag);
+                    ImGui::PopID();
+                }
+
+                const bool canAddChannel = attribute.channelCount < kMaxVertexAttributeChannels;
+                const bool canRemoveChannel = attribute.channelCount > kMinVertexAttributeChannels;
+                if (vertexCircleButton("##addChannel", ImVec2(rowLayout.addChannelCenterX, rowLayout.rowCenterY),
+                                       rowLayout.actionButtonRadius, '+', canAddChannel, IM_COL32(62, 102, 152, 255),
+                                       interactive, blockGraphDrag) &&
+                    canAddChannel) {
+                    ++attribute.channelCount;
+                }
+                if (vertexCircleButton("##removeChannel", ImVec2(rowLayout.removeChannelCenterX, rowLayout.rowCenterY),
+                                       rowLayout.actionButtonRadius, '-', canRemoveChannel, IM_COL32(72, 76, 90, 255),
+                                       interactive, blockGraphDrag) &&
+                    canRemoveChannel) {
+                    --attribute.channelCount;
+                }
+                ImGui::PopID();
+            }
+
+            const int addItemRowIndex = static_cast<int>(node.vertexAttributes.size());
+            const VertexRowLayout addItemRowLayout = buildVertexRowLayout(layout, addItemRowIndex);
+            if (vertexCircleButton("##addItem", ImVec2(addItemRowLayout.deleteButtonCenterX, addItemRowLayout.rowCenterY),
+                                   addItemRowLayout.actionButtonRadius, '+', true, IM_COL32(62, 102, 152, 255),
+                                   interactive, blockGraphDrag)) {
+                VertexAttribute attribute{};
+                std::snprintf(attribute.name, sizeof(attribute.name), "attr%d", addItemRowIndex);
+                attribute.channelCount = 1;
+                node.vertexAttributes.push_back(attribute);
+            }
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
         void drawVkPipelineColorBlendStateContent(ImDrawList* drawList, const GraphNode& node,
                                                   const NodeScreenLayout& layout, const NodeTheme& theme,
                                                   const GraphPanelState& panel, const PinHit& hoveredPin) {
@@ -1470,6 +1704,26 @@ namespace mat::demo {
 
             ImGui::PopStyleVar();
             ImGui::PopFont();
+        }
+
+        void drawVkPipelineVertexInputStateContent(ImDrawList* drawList, const GraphNode& node,
+                                                   const NodeScreenLayout& layout, const NodeTheme& theme,
+                                                   const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+
+            drawSTypeParamRow(drawList, layout, theme, labelPadX, kVkPipelineVertexInputStateSType);
+
+            for (int pinIndex = 0; pinIndex < kVkPipelineVertexInputStateInputPinCount; ++pinIndex) {
+                drawNodeInputPinRow(drawList, node, pinIndex, layout, theme, panel, hoveredPin, labelPadX, pinColor);
+            }
+            drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
+        }
+
+        void drawVkPipelineVertexInputStateWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                                                   bool& blockGraphDrag) {
+            (void)node;
+            drawSTypeParamWidget(kVkPipelineVertexInputStateSType, layout, interactive, blockGraphDrag);
         }
 
         void drawVkPipelineShaderStageContent(ImDrawList* drawList, const GraphNode& node,
@@ -1792,7 +2046,7 @@ namespace mat::demo {
                            const ImVec2& displaySize, bool selected, const GraphPanelState& panel,
                            const PinHit& hoveredPin) {
             const NodeTheme theme = nodeTheme(node.type);
-            const NodeScreenLayout layout = buildNodeScreenLayout(node.worldX, node.worldY, node.type, view, displaySize);
+            const NodeScreenLayout layout = buildNodeScreenLayout(node, view, displaySize);
             const float rounding = kNodeRounding * layout.zoom;
             const ImVec2& topLeft = layout.topLeft;
             const ImVec2& bottomRight = layout.bottomRight;
@@ -1847,6 +2101,10 @@ namespace mat::demo {
                 drawVkPipelineShaderStageContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::VkShaderModule) {
                 drawVkShaderModuleContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::Vertex) {
+                drawVertexContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkPipelineVertexInputState) {
+                drawVkPipelineVertexInputStateContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::VkPipelineViewportState) {
                 drawVkPipelineViewportStateContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::VkPipelineRasterizationState) {
@@ -1899,7 +2157,7 @@ namespace mat::demo {
                 }
 
                 const NodeScreenLayout layout =
-                    buildNodeScreenLayout(node.worldX, node.worldY, node.type, view, displaySize);
+                    buildNodeScreenLayout(node, view, displaySize);
 
                 ImGui::PushID(node.id);
 
@@ -1924,6 +2182,10 @@ namespace mat::demo {
                     drawVkPipelineShaderStageWidgets(*editable, layout, interactive, blockGraphDrag);
                 } else if (node.type == NodeType::VkShaderModule) {
                     drawVkShaderModuleWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::Vertex) {
+                    drawVertexWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkPipelineVertexInputState) {
+                    drawVkPipelineVertexInputStateWidgets(*editable, layout, interactive, blockGraphDrag);
                 } else if (node.type == NodeType::VkPipelineViewportState) {
                     drawVkPipelineViewportStateWidgets(*editable, layout, interactive, blockGraphDrag);
                 } else if (node.type == NodeType::VkPipelineRasterizationState) {
@@ -2100,7 +2362,7 @@ namespace mat::demo {
             }
 
             const NodeScreenLayout layout =
-                buildNodeScreenLayout(node->worldX, node->worldY, node->type, view, displaySize);
+                buildNodeScreenLayout(*node, view, displaySize);
             const float toolbarHeight = kNodeToolbarHeightWorld * layout.zoom;
             const float gap = kNodeToolbarGapWorld * layout.zoom;
             outTopLeft = ImVec2(layout.topLeft.x, layout.topLeft.y - toolbarHeight - gap);
