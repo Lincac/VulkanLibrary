@@ -37,6 +37,10 @@ namespace mat::demo {
         float colorBlendConstantB = 0.f;
         float colorBlendConstantA = 0.f;
         bool colorBlendAttachmentBlendEnable = false;
+        int descriptorSetLayoutBindingBinding = 1;
+        int descriptorSetLayoutBindingDescriptorCount = 1;
+        int descriptorSetLayoutBindingDescriptorType = 1;
+        int descriptorSetLayoutBindingStageFlags = 4;
     };
 
     struct GraphLink {

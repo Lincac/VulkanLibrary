@@ -18,6 +18,8 @@ namespace mat::demo {
         VkColorWriteMask,
         VkDynamicState,
         VkPipelineDynamicState,
+        VkDescriptorSetLayoutBinding,
+        VkDescriptorSetLayout,
         VkPipelineLayout,
         VkRenderPass,
         VkAttachmentDescription,
@@ -45,6 +47,13 @@ namespace mat::demo {
     constexpr int kVkDynamicStateOutputPinCount = 5;
     constexpr int kVkPipelineDynamicStateParamCount = 1;
     constexpr int kVkPipelineDynamicStateInputPinCount = 1;
+    constexpr int kVkPipelineLayoutParamCount = 1;
+    constexpr int kVkPipelineLayoutInputPinCount = 1;
+    constexpr int kVkDescriptorSetLayoutParamCount = 1;
+    constexpr int kVkDescriptorSetLayoutInputPinCount = 1;
+    constexpr int kVkDescriptorSetLayoutBindingParamCount = 5;
+    constexpr int kVkDescriptorTypeOptionCount = 11;
+    constexpr int kVkShaderStageFlagOptionCount = 7;
     constexpr int kVkPrimitiveTopologyOptionCount = 10;
     constexpr int kVkPolygonModeOptionCount = 3;
     constexpr int kVkCullModeOptionCount = 4;
@@ -60,6 +69,9 @@ namespace mat::demo {
     extern const char kVkPipelineDepthStencilStateSType[];
     extern const char kVkPipelineColorBlendStateSType[];
     extern const char kVkPipelineDynamicStateSType[];
+    extern const char kVkPipelineLayoutSType[];
+    extern const char kVkDescriptorSetLayoutSType[];
+    extern const char kVkDescriptorSetLayoutBindingNullSampler[];
 
     struct NodeInputPinDef {
         const char* label;
@@ -86,5 +98,7 @@ namespace mat::demo {
     const char* vkSampleCountOptionName(int index);
     const char* vkCompareOpOptionName(int index);
     const char* vkLogicOpOptionName(int index);
+    const char* vkDescriptorTypeOptionName(int index);
+    const char* vkShaderStageFlagOptionName(int index);
 
 }  // namespace mat::demo

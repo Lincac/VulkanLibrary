@@ -32,6 +32,8 @@ namespace mat::demo {
             {NodeType::VkColorWriteMask, "VkColorWriteMask"},
             {NodeType::VkDynamicState, "VkDynamicState"},
             {NodeType::VkPipelineDynamicState, "VkPipelineDynamicState"},
+            {NodeType::VkDescriptorSetLayoutBinding, "VkDescriptorSetLayoutBinding"},
+            {NodeType::VkDescriptorSetLayout, "VkDescriptorSetLayout"},
             {NodeType::VkPipelineLayout, "VkPipelineLayout"},
             {NodeType::VkRenderPass, "VkRenderPass"},
             {NodeType::VkAttachmentDescription, "VkAttachmentDescription"},

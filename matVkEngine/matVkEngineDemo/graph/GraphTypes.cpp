@@ -123,12 +123,46 @@ namespace mat::demo {
             {"pDynamicStates", NodeType::VkDynamicState},
         };
 
+        constexpr NodeInputPinDef kVkPipelineLayoutInputs[kVkPipelineLayoutInputPinCount] = {
+            {"pSetLayouts", NodeType::VkDescriptorSetLayout},
+        };
+
+        constexpr NodeInputPinDef kVkDescriptorSetLayoutInputs[kVkDescriptorSetLayoutInputPinCount] = {
+            {"pBindings", NodeType::VkDescriptorSetLayoutBinding},
+        };
+
+        constexpr const char kVkDescriptorTypeOptionNames[kVkDescriptorTypeOptionCount][48] = {
+            "VK_DESCRIPTOR_TYPE_SAMPLER",
+            "VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER",
+            "VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE",
+            "VK_DESCRIPTOR_TYPE_STORAGE_IMAGE",
+            "VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER",
+            "VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER",
+            "VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER",
+            "VK_DESCRIPTOR_TYPE_STORAGE_BUFFER",
+            "VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC",
+            "VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC",
+            "VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT",
+        };
+
+        constexpr const char kVkShaderStageFlagOptionNames[kVkShaderStageFlagOptionCount][48] = {
+            "VK_SHADER_STAGE_VERTEX_BIT",
+            "VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT",
+            "VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT",
+            "VK_SHADER_STAGE_GEOMETRY_BIT",
+            "VK_SHADER_STAGE_FRAGMENT_BIT",
+            "VK_SHADER_STAGE_COMPUTE_BIT",
+            "VK_SHADER_STAGE_ALL",
+        };
+
         constexpr NodeType kPinLinkTargetNodeTypes[] = {
             NodeType::VkPipeline,
             NodeType::VkRenderPass,
             NodeType::VkPipelineColorBlendState,
             NodeType::VkPipelineColorBlendAttachmentState,
             NodeType::VkPipelineDynamicState,
+            NodeType::VkPipelineLayout,
+            NodeType::VkDescriptorSetLayout,
         };
 
     }  // namespace
@@ -149,6 +183,12 @@ namespace mat::demo {
     const char kVkPipelineColorBlendStateSType[] = "VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO";
 
     const char kVkPipelineDynamicStateSType[] = "VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO";
+
+    const char kVkPipelineLayoutSType[] = "VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO";
+
+    const char kVkDescriptorSetLayoutSType[] = "VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO";
+
+    const char kVkDescriptorSetLayoutBindingNullSampler[] = "nullptr";
 
     const char* nodeTypeName(NodeType type) {
         switch (type) {
@@ -178,6 +218,10 @@ namespace mat::demo {
                 return "VkDynamicState";
             case NodeType::VkPipelineDynamicState:
                 return "VkPipelineDynamicState";
+            case NodeType::VkDescriptorSetLayoutBinding:
+                return "VkDescriptorSetLayoutBinding";
+            case NodeType::VkDescriptorSetLayout:
+                return "VkDescriptorSetLayout";
             case NodeType::VkPipelineLayout:
                 return "VkPipelineLayout";
             case NodeType::VkRenderPass:
@@ -246,6 +290,21 @@ namespace mat::demo {
                               (kVkPipelineDynamicStateParamCount + kVkPipelineDynamicStateInputPinCount) *
                                   kNodePinRowHeight);
         }
+        if (type == NodeType::VkPipelineLayout) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight +
+                              (kVkPipelineLayoutParamCount + kVkPipelineLayoutInputPinCount) * kNodePinRowHeight);
+        }
+        if (type == NodeType::VkDescriptorSetLayout) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight +
+                              (kVkDescriptorSetLayoutParamCount + kVkDescriptorSetLayoutInputPinCount) *
+                                  kNodePinRowHeight);
+        }
+        if (type == NodeType::VkDescriptorSetLayoutBinding) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight + kVkDescriptorSetLayoutBindingParamCount * kNodePinRowHeight);
+        }
         return ImVec2(kNodeWidth, kNodeHeaderHeight + kNodeEmptyBodyHeight);
     }
 
@@ -273,6 +332,12 @@ namespace mat::demo {
         if (type == NodeType::VkPipelineDynamicState && pinIndex == 0) {
             return true;
         }
+        if (type == NodeType::VkPipelineLayout && pinIndex == 0) {
+            return true;
+        }
+        if (type == NodeType::VkDescriptorSetLayout && pinIndex == 0) {
+            return true;
+        }
         return false;
     }
 
@@ -292,6 +357,12 @@ namespace mat::demo {
         if (type == NodeType::VkPipelineDynamicState) {
             return kVkPipelineDynamicStateInputPinCount;
         }
+        if (type == NodeType::VkPipelineLayout) {
+            return kVkPipelineLayoutInputPinCount;
+        }
+        if (type == NodeType::VkDescriptorSetLayout) {
+            return kVkDescriptorSetLayoutInputPinCount;
+        }
         return 0;
     }
 
@@ -310,6 +381,12 @@ namespace mat::demo {
         }
         if (type == NodeType::VkPipelineDynamicState) {
             return kVkPipelineDynamicStateParamCount + pinIndex;
+        }
+        if (type == NodeType::VkPipelineLayout) {
+            return kVkPipelineLayoutParamCount + pinIndex;
+        }
+        if (type == NodeType::VkDescriptorSetLayout) {
+            return kVkDescriptorSetLayoutParamCount + pinIndex;
         }
         return pinIndex;
     }
@@ -344,6 +421,18 @@ namespace mat::demo {
                 return nullptr;
             }
             return &kVkPipelineDynamicStateInputs[index];
+        }
+        if (type == NodeType::VkPipelineLayout) {
+            if (index < 0 || index >= kVkPipelineLayoutInputPinCount) {
+                return nullptr;
+            }
+            return &kVkPipelineLayoutInputs[index];
+        }
+        if (type == NodeType::VkDescriptorSetLayout) {
+            if (index < 0 || index >= kVkDescriptorSetLayoutInputPinCount) {
+                return nullptr;
+            }
+            return &kVkDescriptorSetLayoutInputs[index];
         }
         return nullptr;
     }
@@ -448,6 +537,20 @@ namespace mat::demo {
             return "";
         }
         return kVkLogicOpOptionNames[index];
+    }
+
+    const char* vkDescriptorTypeOptionName(int index) {
+        if (index < 0 || index >= kVkDescriptorTypeOptionCount) {
+            return "";
+        }
+        return kVkDescriptorTypeOptionNames[index];
+    }
+
+    const char* vkShaderStageFlagOptionName(int index) {
+        if (index < 0 || index >= kVkShaderStageFlagOptionCount) {
+            return "";
+        }
+        return kVkShaderStageFlagOptionNames[index];
     }
 
 }  // namespace mat::demo
