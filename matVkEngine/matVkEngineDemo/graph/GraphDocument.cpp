@@ -14,6 +14,33 @@ namespace mat::demo {
         return node.id;
     }
 
+    void GraphDocument::removeLinksToInput(int toNodeId, int toPinIndex) {
+        _links.erase(std::remove_if(_links.begin(), _links.end(),
+                                    [toNodeId, toPinIndex](const GraphLink& link) {
+                                        return link.toNodeId == toNodeId && link.toPinIndex == toPinIndex;
+                                    }),
+                     _links.end());
+    }
+
+    void GraphDocument::removeLinksFromOutput(int fromNodeId) {
+        _links.erase(std::remove_if(_links.begin(), _links.end(),
+                                    [fromNodeId](const GraphLink& link) { return link.fromNodeId == fromNodeId; }),
+                     _links.end());
+    }
+
+    int GraphDocument::addLink(int fromNodeId, int toNodeId, int toPinIndex) {
+        removeLinksToInput(toNodeId, toPinIndex);
+        removeLinksFromOutput(fromNodeId);
+
+        GraphLink link{};
+        link.id = _nextLinkId++;
+        link.fromNodeId = fromNodeId;
+        link.toNodeId = toNodeId;
+        link.toPinIndex = toPinIndex;
+        _links.push_back(link);
+        return link.id;
+    }
+
     GraphNode* GraphDocument::findNode(int nodeId) {
         auto iter = std::find_if(_nodes.begin(), _nodes.end(),
                                  [nodeId](const GraphNode& node) { return node.id == nodeId; });

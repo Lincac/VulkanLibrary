@@ -13,6 +13,7 @@ namespace mat::demo {
     };
 
     bool drawNodeSearchPopup(const ImVec2& screenPos, char* buffer, int bufferSize, NodeType* outSelectedType,
-                             bool* outHovered = nullptr, bool focusInput = false);
+                             bool* outHovered = nullptr, bool focusInput = false, bool useTypeFilter = false,
+                             NodeType typeFilter = NodeType::VkPipeline);
 
 }  // namespace mat::demo

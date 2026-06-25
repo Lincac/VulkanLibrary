@@ -70,4 +70,13 @@ namespace mat::demo {
         return &kVkPipelineInputs[index];
     }
 
+    int vkPipelineInputPinIndexForType(NodeType type) {
+        for (int index = 0; index < kVkPipelineInputPinCount; ++index) {
+            if (kVkPipelineInputs[index].slotType == type) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
 }  // namespace mat::demo

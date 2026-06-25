@@ -35,5 +35,6 @@ namespace mat::demo {
     ImVec2 nodeWorldSize(NodeType type);
     bool nodeHasOutputPin(NodeType type);
     const VkPipelineInputPinDef* vkPipelineInputPin(int index);
+    int vkPipelineInputPinIndexForType(NodeType type);
 
 }  // namespace mat::demo
