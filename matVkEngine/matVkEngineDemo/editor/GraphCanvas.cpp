@@ -2114,8 +2114,8 @@ namespace mat::demo {
                 }
             }
 
-            if (io.MouseWheel != 0.f && !io.WantCaptureMouse &&
-                !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)) {
+            if (io.MouseWheel != 0.f && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup) &&
+                !ImGui::IsAnyItemHovered() && !ImGui::IsAnyItemActive()) {
                 const float zoomFactor = std::pow(1.12f, io.MouseWheel);
                 const ImVec2 mouse = io.MousePos;
                 const float worldX = (mouse.x - center.x - view.pan.x) / view.zoom;
