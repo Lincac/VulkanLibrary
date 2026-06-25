@@ -30,9 +30,11 @@ namespace mat::demo {
     constexpr int kVkRenderPassInputPinCount = 3;
     constexpr int kVkPipelineIndexRowCount = 1;
     constexpr int kVkPipelineInputAssemblyStateParamCount = 3;
+    constexpr int kVkPipelineViewportStateParamCount = 3;
     constexpr int kVkPrimitiveTopologyOptionCount = 10;
 
     extern const char kVkPipelineInputAssemblyStateSType[];
+    extern const char kVkPipelineViewportStateSType[];
 
     struct NodeInputPinDef {
         const char* label;

@@ -42,6 +42,8 @@ namespace mat::demo {
     const char kVkPipelineInputAssemblyStateSType[] =
         "VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO";
 
+    const char kVkPipelineViewportStateSType[] = "VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO";
+
     const char* nodeTypeName(NodeType type) {
         switch (type) {
             case NodeType::VkPipeline:
@@ -90,6 +92,10 @@ namespace mat::demo {
         if (type == NodeType::VkPipelineInputAssemblyState) {
             return ImVec2(kNodeWidth,
                           kNodeHeaderHeight + kVkPipelineInputAssemblyStateParamCount * kNodePinRowHeight);
+        }
+        if (type == NodeType::VkPipelineViewportState) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight + kVkPipelineViewportStateParamCount * kNodePinRowHeight);
         }
         return ImVec2(kNodeWidth, kNodeHeaderHeight + kNodeEmptyBodyHeight);
     }

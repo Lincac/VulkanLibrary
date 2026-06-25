@@ -643,6 +643,95 @@ namespace mat::demo {
             ImGui::PopFont();
         }
 
+        void drawVkPipelineViewportStateContent(ImDrawList* drawList, const GraphNode& node,
+                                                const NodeScreenLayout& layout, const NodeTheme& theme,
+                                                const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+            const ImVec2& topLeft = layout.topLeft;
+            const ImVec2& bottomRight = layout.bottomRight;
+
+            static const char* kParamLabels[kVkPipelineViewportStateParamCount] = {
+                "sType", "viewportCount", "scissorCount"};
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            for (int rowIndex = 0; rowIndex < kVkPipelineViewportStateParamCount; ++rowIndex) {
+                const float rowCenterY = nodeParamRowCenterY(layout, rowIndex);
+                drawScaledText(drawList,
+                               ImVec2(topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
+                               kParamLabels[rowIndex], layout.fontSize);
+
+                if (layout.zoom >= kMinWidgetZoom) {
+                    continue;
+                }
+
+                char valueText[128];
+                if (rowIndex == 0) {
+                    std::snprintf(valueText, sizeof(valueText), "%s", kVkPipelineViewportStateSType);
+                } else if (rowIndex == 1) {
+                    std::snprintf(valueText, sizeof(valueText), "%d", node.viewportCount);
+                } else {
+                    std::snprintf(valueText, sizeof(valueText), "%d", node.scissorCount);
+                }
+
+                const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, valueText);
+                const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+                const float fieldWidth =
+                    rowIndex == 0 ? fieldLayout.sTypeFieldWidth : fieldLayout.comboFieldWidth;
+                const float fieldX = rowIndex == 0 ? fieldLayout.sTypeFieldX : fieldLayout.comboFieldX;
+                const float valueRightX = fieldX + fieldWidth - 4.f * layout.zoom;
+                drawScaledText(drawList, ImVec2(valueRightX - textSize.x, rowCenterY - layout.fontSize * 0.5f),
+                               theme.pinLabel, valueText, layout.fontSize);
+            }
+
+            const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
+            const bool highlighted = isPinHighlighted(hoveredPin, node.id, -1, false) ||
+                                     isPinLinkSource(panel, node.id, -1, false);
+            drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
+        }
+
+        void drawVkPipelineViewportStateWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                                                bool& blockGraphDrag) {
+            const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            const float sTypeRowY = nodeParamRowCenterY(layout, 0) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.sTypeFieldX, sTypeRowY));
+            ImGui::SetNextItemWidth(fieldLayout.sTypeFieldWidth);
+            char sTypeText[128];
+            std::snprintf(sTypeText, sizeof(sTypeText), "%s", kVkPipelineViewportStateSType);
+            ImGui::BeginDisabled();
+            ImGui::InputText("##sType", sTypeText, sizeof(sTypeText), ImGuiInputTextFlags_ReadOnly);
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("%s", kVkPipelineViewportStateSType);
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            const float viewportCountRowY = nodeParamRowCenterY(layout, 1) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, viewportCountRowY));
+            ImGui::SetNextItemWidth(fieldLayout.comboFieldWidth);
+            ImGui::InputInt("##viewportCount", &node.viewportCount, 0, 0);
+            if (node.viewportCount < 0) {
+                node.viewportCount = 0;
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            const float scissorCountRowY = nodeParamRowCenterY(layout, 2) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, scissorCountRowY));
+            ImGui::SetNextItemWidth(fieldLayout.comboFieldWidth);
+            ImGui::InputInt("##scissorCount", &node.scissorCount, 0, 0);
+            if (node.scissorCount < 0) {
+                node.scissorCount = 0;
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
         void drawNodeChrome(ImDrawList* drawList, const ImVec2& topLeft, const ImVec2& bottomRight, float headerHeight,
                             float rounding, const NodeTheme& theme, bool selected) {
             const ImVec2 headerBottomRight(bottomRight.x, topLeft.y + headerHeight);
@@ -719,6 +808,8 @@ namespace mat::demo {
                 }
             } else if (node.type == NodeType::VkPipelineInputAssemblyState) {
                 drawVkPipelineInputAssemblyStateContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkPipelineViewportState) {
+                drawVkPipelineViewportStateContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (nodeHasOutputPin(node.type)) {
                 const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
                 const bool highlighted = isPinHighlighted(hoveredPin, node.id, -1, false) ||
@@ -768,6 +859,8 @@ namespace mat::demo {
                     ImGui::PopFont();
                 } else if (node.type == NodeType::VkPipelineInputAssemblyState) {
                     drawVkPipelineInputAssemblyStateWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkPipelineViewportState) {
+                    drawVkPipelineViewportStateWidgets(*editable, layout, interactive, blockGraphDrag);
                 }
 
                 ImGui::PopID();

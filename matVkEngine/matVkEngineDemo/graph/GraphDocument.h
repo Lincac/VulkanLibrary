@@ -14,6 +14,8 @@ namespace mat::demo {
         int renderPassIndex = 0;
         int inputAssemblyTopology = 5;
         bool inputAssemblyprimitiveRestart = false;
+        int viewportCount = 1;
+        int scissorCount = 1;
     };
 
     struct GraphLink {
