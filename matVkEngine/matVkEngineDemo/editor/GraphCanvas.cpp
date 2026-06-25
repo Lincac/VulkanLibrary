@@ -732,6 +732,195 @@ namespace mat::demo {
             ImGui::PopFont();
         }
 
+        void drawVkBool32Combo(const char* id, bool& value, float rowCenterY, const InputAssemblyFieldLayout& fieldLayout,
+                               bool interactive, bool& blockGraphDrag) {
+            ImGui::SetCursorScreenPos(
+                ImVec2(fieldLayout.comboFieldX, rowCenterY - fieldLayout.fieldHeight * 0.5f));
+            if (beginNodeCombo(id, vkBool32OptionName(value), fieldLayout.comboFieldWidth)) {
+                for (int optionIndex = 0; optionIndex < 2; ++optionIndex) {
+                    const bool optionValue = optionIndex == 1;
+                    const bool selected = value == optionValue;
+                    if (ImGui::Selectable(vkBool32OptionName(optionValue), selected)) {
+                        value = optionValue;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+        }
+
+        void drawVkPipelineRasterizationStateContent(ImDrawList* drawList, const GraphNode& node,
+                                                     const NodeScreenLayout& layout, const NodeTheme& theme,
+                                                     const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+            const ImVec2& topLeft = layout.topLeft;
+            const ImVec2& bottomRight = layout.bottomRight;
+
+            static const char* kParamLabels[kVkPipelineRasterizationStateParamCount] = {
+                "sType",
+                "depthClampEnable",
+                "rasterizerDiscard",
+                "polygonMode",
+                "lineWidth",
+                "cullMode",
+                "frontFace",
+                "depthBiasEnable",
+            };
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            for (int rowIndex = 0; rowIndex < kVkPipelineRasterizationStateParamCount; ++rowIndex) {
+                const float rowCenterY = nodeParamRowCenterY(layout, rowIndex);
+                drawScaledText(drawList,
+                               ImVec2(topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
+                               kParamLabels[rowIndex], layout.fontSize);
+
+                if (layout.zoom >= kMinWidgetZoom) {
+                    continue;
+                }
+
+                char valueText[128];
+                switch (rowIndex) {
+                    case 0:
+                        std::snprintf(valueText, sizeof(valueText), "%s", kVkPipelineRasterizationStateSType);
+                        break;
+                    case 1:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkBool32OptionName(node.rasterizerDepthClampEnable));
+                        break;
+                    case 2:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkBool32OptionName(node.rasterizerDiscard));
+                        break;
+                    case 3:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkPolygonModeOptionName(node.rasterizerPolygonMode));
+                        break;
+                    case 4:
+                        std::snprintf(valueText, sizeof(valueText), "%.1f", node.rasterizerLineWidth);
+                        break;
+                    case 5:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkCullModeOptionName(node.rasterizerCullMode));
+                        break;
+                    case 6:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkFrontFaceOptionName(node.rasterizerFrontFace));
+                        break;
+                    default:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkBool32OptionName(node.rasterizerDepthBiasEnable));
+                        break;
+                }
+
+                const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, valueText);
+                const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+                const float fieldWidth =
+                    rowIndex == 0 ? fieldLayout.sTypeFieldWidth : fieldLayout.comboFieldWidth;
+                const float fieldX = rowIndex == 0 ? fieldLayout.sTypeFieldX : fieldLayout.comboFieldX;
+                const float valueRightX = fieldX + fieldWidth - 4.f * layout.zoom;
+                drawScaledText(drawList, ImVec2(valueRightX - textSize.x, rowCenterY - layout.fontSize * 0.5f),
+                               theme.pinLabel, valueText, layout.fontSize);
+            }
+
+            const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
+            const bool highlighted = isPinHighlighted(hoveredPin, node.id, -1, false) ||
+                                     isPinLinkSource(panel, node.id, -1, false);
+            drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
+        }
+
+        void drawVkPipelineRasterizationStateWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                                                     bool& blockGraphDrag) {
+            const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            const float sTypeRowY = nodeParamRowCenterY(layout, 0) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.sTypeFieldX, sTypeRowY));
+            ImGui::SetNextItemWidth(fieldLayout.sTypeFieldWidth);
+            char sTypeText[128];
+            std::snprintf(sTypeText, sizeof(sTypeText), "%s", kVkPipelineRasterizationStateSType);
+            ImGui::BeginDisabled();
+            ImGui::InputText("##sType", sTypeText, sizeof(sTypeText), ImGuiInputTextFlags_ReadOnly);
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("%s", kVkPipelineRasterizationStateSType);
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            drawVkBool32Combo("##depthClampEnable", node.rasterizerDepthClampEnable, nodeParamRowCenterY(layout, 1),
+                              fieldLayout, interactive, blockGraphDrag);
+            drawVkBool32Combo("##rasterizerDiscard", node.rasterizerDiscard,
+                              nodeParamRowCenterY(layout, 2), fieldLayout, interactive, blockGraphDrag);
+
+            const float polygonModeRowY = nodeParamRowCenterY(layout, 3) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, polygonModeRowY));
+            if (beginNodeCombo("##polygonMode", vkPolygonModeOptionName(node.rasterizerPolygonMode),
+                               fieldLayout.comboFieldWidth)) {
+                for (int optionIndex = 0; optionIndex < kVkPolygonModeOptionCount; ++optionIndex) {
+                    const bool selected = node.rasterizerPolygonMode == optionIndex;
+                    if (ImGui::Selectable(vkPolygonModeOptionName(optionIndex), selected)) {
+                        node.rasterizerPolygonMode = optionIndex;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            const float lineWidthRowY = nodeParamRowCenterY(layout, 4) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, lineWidthRowY));
+            ImGui::SetNextItemWidth(fieldLayout.comboFieldWidth);
+            ImGui::InputFloat("##lineWidth", &node.rasterizerLineWidth, 0.f, 0.f, "%.1f");
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            const float cullModeRowY = nodeParamRowCenterY(layout, 5) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, cullModeRowY));
+            if (beginNodeCombo("##cullMode", vkCullModeOptionName(node.rasterizerCullMode),
+                               fieldLayout.comboFieldWidth)) {
+                for (int optionIndex = 0; optionIndex < kVkCullModeOptionCount; ++optionIndex) {
+                    const bool selected = node.rasterizerCullMode == optionIndex;
+                    if (ImGui::Selectable(vkCullModeOptionName(optionIndex), selected)) {
+                        node.rasterizerCullMode = optionIndex;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            const float frontFaceRowY = nodeParamRowCenterY(layout, 6) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, frontFaceRowY));
+            if (beginNodeCombo("##frontFace", vkFrontFaceOptionName(node.rasterizerFrontFace),
+                               fieldLayout.comboFieldWidth)) {
+                for (int optionIndex = 0; optionIndex < kVkFrontFaceOptionCount; ++optionIndex) {
+                    const bool selected = node.rasterizerFrontFace == optionIndex;
+                    if (ImGui::Selectable(vkFrontFaceOptionName(optionIndex), selected)) {
+                        node.rasterizerFrontFace = optionIndex;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            drawVkBool32Combo("##depthBiasEnable", node.rasterizerDepthBiasEnable, nodeParamRowCenterY(layout, 7),
+                              fieldLayout, interactive, blockGraphDrag);
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
         void drawNodeChrome(ImDrawList* drawList, const ImVec2& topLeft, const ImVec2& bottomRight, float headerHeight,
                             float rounding, const NodeTheme& theme, bool selected) {
             const ImVec2 headerBottomRight(bottomRight.x, topLeft.y + headerHeight);
@@ -810,6 +999,8 @@ namespace mat::demo {
                 drawVkPipelineInputAssemblyStateContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::VkPipelineViewportState) {
                 drawVkPipelineViewportStateContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkPipelineRasterizationState) {
+                drawVkPipelineRasterizationStateContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (nodeHasOutputPin(node.type)) {
                 const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
                 const bool highlighted = isPinHighlighted(hoveredPin, node.id, -1, false) ||
@@ -861,6 +1052,8 @@ namespace mat::demo {
                     drawVkPipelineInputAssemblyStateWidgets(*editable, layout, interactive, blockGraphDrag);
                 } else if (node.type == NodeType::VkPipelineViewportState) {
                     drawVkPipelineViewportStateWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkPipelineRasterizationState) {
+                    drawVkPipelineRasterizationStateWidgets(*editable, layout, interactive, blockGraphDrag);
                 }
 
                 ImGui::PopID();

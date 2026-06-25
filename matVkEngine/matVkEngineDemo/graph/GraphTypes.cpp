@@ -37,12 +37,33 @@ namespace mat::demo {
             "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY",
         };
 
+        constexpr const char kVkPolygonModeOptionNames[kVkPolygonModeOptionCount][32] = {
+            "VK_POLYGON_MODE_FILL",
+            "VK_POLYGON_MODE_LINE",
+            "VK_POLYGON_MODE_POINT",
+        };
+
+        constexpr const char kVkCullModeOptionNames[kVkCullModeOptionCount][32] = {
+            "VK_CULL_MODE_NONE",
+            "VK_CULL_MODE_FRONT_BIT",
+            "VK_CULL_MODE_BACK_BIT",
+            "VK_CULL_MODE_FRONT_AND_BACK",
+        };
+
+        constexpr const char kVkFrontFaceOptionNames[kVkFrontFaceOptionCount][40] = {
+            "VK_FRONT_FACE_COUNTER_CLOCKWISE",
+            "VK_FRONT_FACE_CLOCKWISE",
+        };
+
     }  // namespace
 
     const char kVkPipelineInputAssemblyStateSType[] =
         "VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO";
 
     const char kVkPipelineViewportStateSType[] = "VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO";
+
+    const char kVkPipelineRasterizationStateSType[] =
+        "VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO";
 
     const char* nodeTypeName(NodeType type) {
         switch (type) {
@@ -96,6 +117,10 @@ namespace mat::demo {
         if (type == NodeType::VkPipelineViewportState) {
             return ImVec2(kNodeWidth,
                           kNodeHeaderHeight + kVkPipelineViewportStateParamCount * kNodePinRowHeight);
+        }
+        if (type == NodeType::VkPipelineRasterizationState) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight + kVkPipelineRasterizationStateParamCount * kNodePinRowHeight);
         }
         return ImVec2(kNodeWidth, kNodeHeaderHeight + kNodeEmptyBodyHeight);
     }
@@ -160,6 +185,31 @@ namespace mat::demo {
             return "";
         }
         return kVkPrimitiveTopologyOptionNames[index];
+    }
+
+    const char* vkPolygonModeOptionName(int index) {
+        if (index < 0 || index >= kVkPolygonModeOptionCount) {
+            return "";
+        }
+        return kVkPolygonModeOptionNames[index];
+    }
+
+    const char* vkCullModeOptionName(int index) {
+        if (index < 0 || index >= kVkCullModeOptionCount) {
+            return "";
+        }
+        return kVkCullModeOptionNames[index];
+    }
+
+    const char* vkFrontFaceOptionName(int index) {
+        if (index < 0 || index >= kVkFrontFaceOptionCount) {
+            return "";
+        }
+        return kVkFrontFaceOptionNames[index];
+    }
+
+    const char* vkBool32OptionName(bool value) {
+        return value ? "VK_TRUE" : "VK_FALSE";
     }
 
 }  // namespace mat::demo

@@ -16,6 +16,13 @@ namespace mat::demo {
         bool inputAssemblyprimitiveRestart = false;
         int viewportCount = 1;
         int scissorCount = 1;
+        bool rasterizerDepthClampEnable = false;
+        bool rasterizerDiscard = false;
+        int rasterizerPolygonMode = 0;
+        float rasterizerLineWidth = 1.0f;
+        int rasterizerCullMode = 2;
+        int rasterizerFrontFace = 0;
+        bool rasterizerDepthBiasEnable = false;
     };
 
     struct GraphLink {

@@ -31,10 +31,15 @@ namespace mat::demo {
     constexpr int kVkPipelineIndexRowCount = 1;
     constexpr int kVkPipelineInputAssemblyStateParamCount = 3;
     constexpr int kVkPipelineViewportStateParamCount = 3;
+    constexpr int kVkPipelineRasterizationStateParamCount = 8;
     constexpr int kVkPrimitiveTopologyOptionCount = 10;
+    constexpr int kVkPolygonModeOptionCount = 3;
+    constexpr int kVkCullModeOptionCount = 4;
+    constexpr int kVkFrontFaceOptionCount = 2;
 
     extern const char kVkPipelineInputAssemblyStateSType[];
     extern const char kVkPipelineViewportStateSType[];
+    extern const char kVkPipelineRasterizationStateSType[];
 
     struct NodeInputPinDef {
         const char* label;
@@ -50,5 +55,9 @@ namespace mat::demo {
     const NodeInputPinDef* nodeInputPin(NodeType type, int index);
     int nodeInputPinIndexForType(NodeType nodeType, NodeType slotType);
     const char* vkPrimitiveTopologyOptionName(int index);
+    const char* vkPolygonModeOptionName(int index);
+    const char* vkCullModeOptionName(int index);
+    const char* vkFrontFaceOptionName(int index);
+    const char* vkBool32OptionName(bool value);
 
 }  // namespace mat::demo
