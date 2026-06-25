@@ -30,11 +30,19 @@ namespace mat::demo {
         int depthStencilDepthCompareOp = 1;
         bool depthStencilDepthBoundsTestEnable = false;
         bool depthStencilStencilTestEnable = false;
+        bool colorBlendLogicOpEnable = false;
+        int colorBlendLogicOp = 3;
+        float colorBlendConstantR = 0.f;
+        float colorBlendConstantG = 0.f;
+        float colorBlendConstantB = 0.f;
+        float colorBlendConstantA = 0.f;
+        bool colorBlendAttachmentBlendEnable = false;
     };
 
     struct GraphLink {
         int id = 0;
         int fromNodeId = 0;
+        int fromPinIndex = 0;
         int toNodeId = 0;
         int toPinIndex = 0;
     };
@@ -42,7 +50,7 @@ namespace mat::demo {
     class GraphDocument {
     public:
         int addNode(NodeType type, float worldX, float worldY);
-        int addLink(int fromNodeId, int toNodeId, int toPinIndex);
+        int addLink(int fromNodeId, int fromPinIndex, int toNodeId, int toPinIndex);
 
         GraphNode* findNode(int nodeId);
         const GraphNode* findNode(int nodeId) const;
@@ -54,7 +62,7 @@ namespace mat::demo {
 
     private:
         void removeLinksToInput(int toNodeId, int toPinIndex);
-        void removeLinksFromOutput(int fromNodeId);
+        void removeLinksFromOutput(int fromNodeId, int fromPinIndex);
 
         std::vector<GraphNode> _nodes;
         std::vector<GraphLink> _links;

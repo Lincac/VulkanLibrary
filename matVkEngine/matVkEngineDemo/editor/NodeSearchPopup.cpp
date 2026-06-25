@@ -28,6 +28,8 @@ namespace mat::demo {
             {NodeType::VkPipelineMultisampleState, "VkPipelineMultisampleState"},
             {NodeType::VkPipelineDepthStencilState, "VkPipelineDepthStencilState"},
             {NodeType::VkPipelineColorBlendState, "VkPipelineColorBlendState"},
+            {NodeType::VkPipelineColorBlendAttachmentState, "VkPipelineColorBlendAttachmentState"},
+            {NodeType::VkColorWriteMask, "VkColorWriteMask"},
             {NodeType::VkPipelineDynamicState, "VkPipelineDynamicState"},
             {NodeType::VkPipelineLayout, "VkPipelineLayout"},
             {NodeType::VkRenderPass, "VkRenderPass"},

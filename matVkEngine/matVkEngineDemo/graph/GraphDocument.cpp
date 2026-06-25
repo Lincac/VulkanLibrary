@@ -22,22 +22,29 @@ namespace mat::demo {
                      _links.end());
     }
 
-    void GraphDocument::removeLinksFromOutput(int fromNodeId) {
+    void GraphDocument::removeLinksFromOutput(int fromNodeId, int fromPinIndex) {
         _links.erase(std::remove_if(_links.begin(), _links.end(),
-                                    [fromNodeId](const GraphLink& link) { return link.fromNodeId == fromNodeId; }),
+                                    [fromNodeId, fromPinIndex](const GraphLink& link) {
+                                        return link.fromNodeId == fromNodeId && link.fromPinIndex == fromPinIndex;
+                                    }),
                      _links.end());
     }
 
-    int GraphDocument::addLink(int fromNodeId, int toNodeId, int toPinIndex) {
+    int GraphDocument::addLink(int fromNodeId, int fromPinIndex, int toNodeId, int toPinIndex) {
+        if (fromPinIndex < 0) {
+            fromPinIndex = 0;
+        }
+
         const GraphNode* toNode = findNode(toNodeId);
         if (toNode == nullptr || !nodeInputPinAllowsMultipleLinks(toNode->type, toPinIndex)) {
             removeLinksToInput(toNodeId, toPinIndex);
         }
-        removeLinksFromOutput(fromNodeId);
+        removeLinksFromOutput(fromNodeId, fromPinIndex);
 
         GraphLink link{};
         link.id = _nextLinkId++;
         link.fromNodeId = fromNodeId;
+        link.fromPinIndex = fromPinIndex;
         link.toNodeId = toNodeId;
         link.toPinIndex = toPinIndex;
         _links.push_back(link);

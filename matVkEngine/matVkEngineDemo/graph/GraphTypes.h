@@ -14,6 +14,8 @@ namespace mat::demo {
         VkPipelineMultisampleState,
         VkPipelineDepthStencilState,
         VkPipelineColorBlendState,
+        VkPipelineColorBlendAttachmentState,
+        VkColorWriteMask,
         VkPipelineDynamicState,
         VkPipelineLayout,
         VkRenderPass,
@@ -34,18 +36,25 @@ namespace mat::demo {
     constexpr int kVkPipelineRasterizationStateParamCount = 8;
     constexpr int kVkPipelineMultisampleStateParamCount = 3;
     constexpr int kVkPipelineDepthStencilStateParamCount = 6;
+    constexpr int kVkPipelineColorBlendStateParamCount = 7;
+    constexpr int kVkPipelineColorBlendStateInputPinCount = 1;
+    constexpr int kVkPipelineColorBlendAttachmentStateParamCount = 1;
+    constexpr int kVkPipelineColorBlendAttachmentStateInputPinCount = 1;
+    constexpr int kVkColorWriteMaskOutputPinCount = 4;
     constexpr int kVkPrimitiveTopologyOptionCount = 10;
     constexpr int kVkPolygonModeOptionCount = 3;
     constexpr int kVkCullModeOptionCount = 4;
     constexpr int kVkFrontFaceOptionCount = 2;
     constexpr int kVkSampleCountOptionCount = 7;
     constexpr int kVkCompareOpOptionCount = 8;
+    constexpr int kVkLogicOpOptionCount = 16;
 
     extern const char kVkPipelineInputAssemblyStateSType[];
     extern const char kVkPipelineViewportStateSType[];
     extern const char kVkPipelineRasterizationStateSType[];
     extern const char kVkPipelineMultisampleStateSType[];
     extern const char kVkPipelineDepthStencilStateSType[];
+    extern const char kVkPipelineColorBlendStateSType[];
 
     struct NodeInputPinDef {
         const char* label;
@@ -58,8 +67,12 @@ namespace mat::demo {
     bool nodeHasInputPins(NodeType type);
     bool nodeInputPinAllowsMultipleLinks(NodeType type, int pinIndex);
     int nodeInputPinCount(NodeType type);
+    int nodeInputPinBodyRow(NodeType type, int pinIndex);
     const NodeInputPinDef* nodeInputPin(NodeType type, int index);
     int nodeInputPinIndexForType(NodeType nodeType, NodeType slotType);
+    int nodeOutputPinCount(NodeType type);
+    const char* nodeOutputPinLabel(NodeType type, int pinIndex);
+    NodeType pinLinkTargetNodeTypeForSource(NodeType sourceType);
     const char* vkPrimitiveTopologyOptionName(int index);
     const char* vkPolygonModeOptionName(int index);
     const char* vkCullModeOptionName(int index);
@@ -67,5 +80,6 @@ namespace mat::demo {
     const char* vkBool32OptionName(bool value);
     const char* vkSampleCountOptionName(int index);
     const char* vkCompareOpOptionName(int index);
+    const char* vkLogicOpOptionName(int index);
 
 }  // namespace mat::demo

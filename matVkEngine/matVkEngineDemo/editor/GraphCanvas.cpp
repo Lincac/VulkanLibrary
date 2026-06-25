@@ -95,13 +95,26 @@ namespace mat::demo {
             bool isInput = false;
         };
 
-        bool getOutputPinScreenPos(const GraphNode& node, const GridViewState& view, const ImVec2& displaySize,
-                                   ImVec2& outPos) {
+        bool getOutputPinScreenPos(const GraphNode& node, int pinIndex, const GridViewState& view,
+                                   const ImVec2& displaySize, ImVec2& outPos) {
             if (!nodeHasOutputPin(node.type)) {
                 return false;
             }
 
+            const int resolvedPinIndex = pinIndex < 0 ? 0 : pinIndex;
+            const int outputPinCount = nodeOutputPinCount(node.type);
+            if (resolvedPinIndex >= outputPinCount) {
+                return false;
+            }
+
             const NodeScreenLayout layout = buildNodeScreenLayout(node.worldX, node.worldY, node.type, view, displaySize);
+            if (node.type == NodeType::VkColorWriteMask) {
+                const float rowCenterY =
+                    layout.topLeft.y + layout.headerHeight + (resolvedPinIndex + 0.5f) * layout.pinRowHeight;
+                outPos = ImVec2(layout.bottomRight.x, rowCenterY);
+                return true;
+            }
+
             const float bodyCenterY = layout.topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
             outPos = ImVec2(layout.bottomRight.x, bodyCenterY);
             return true;
@@ -115,7 +128,8 @@ namespace mat::demo {
             }
 
             const NodeScreenLayout layout = buildNodeScreenLayout(node.worldX, node.worldY, node.type, view, displaySize);
-            const float rowCenterY = layout.topLeft.y + layout.headerHeight + (pinIndex + 0.5f) * layout.pinRowHeight;
+            const int bodyRow = nodeInputPinBodyRow(node.type, pinIndex);
+            const float rowCenterY = layout.topLeft.y + layout.headerHeight + (bodyRow + 0.5f) * layout.pinRowHeight;
             outPos = ImVec2(layout.topLeft.x, rowCenterY);
             return true;
         }
@@ -155,21 +169,24 @@ namespace mat::demo {
                 }
 
                 if (nodeHasOutputPin(node.type)) {
-                    ImVec2 pinPos;
-                    if (!getOutputPinScreenPos(node, view, displaySize, pinPos)) {
-                        continue;
-                    }
+                    const int outputPinCount = nodeOutputPinCount(node.type);
+                    for (int pinIndex = 0; pinIndex < outputPinCount; ++pinIndex) {
+                        ImVec2 pinPos;
+                        if (!getOutputPinScreenPos(node, pinIndex, view, displaySize, pinPos)) {
+                            continue;
+                        }
 
-                    const float radius = pinHitRadius(view.zoom);
-                    const float dx = screenPos.x - pinPos.x;
-                    const float dy = screenPos.y - pinPos.y;
-                    const float distSq = dx * dx + dy * dy;
-                    if (distSq <= radius * radius && distSq < bestDistSq) {
-                        bestDistSq = distSq;
-                        best.valid = true;
-                        best.nodeId = node.id;
-                        best.pinIndex = -1;
-                        best.isInput = false;
+                        const float radius = pinHitRadius(view.zoom);
+                        const float dx = screenPos.x - pinPos.x;
+                        const float dy = screenPos.y - pinPos.y;
+                        const float distSq = dx * dx + dy * dy;
+                        if (distSq <= radius * radius && distSq < bestDistSq) {
+                            bestDistSq = distSq;
+                            best.valid = true;
+                            best.nodeId = node.id;
+                            best.pinIndex = pinIndex;
+                            best.isInput = false;
+                        }
                     }
                 }
             }
@@ -187,7 +204,7 @@ namespace mat::demo {
             if (isInput) {
                 return getInputPinScreenPos(*node, pinIndex, view, displaySize, outPos);
             }
-            return getOutputPinScreenPos(*node, view, displaySize, outPos);
+            return getOutputPinScreenPos(*node, pinIndex, view, displaySize, outPos);
         }
 
         float linkTangent(const ImVec2& start, const ImVec2& end) {
@@ -232,7 +249,7 @@ namespace mat::demo {
 
                 ImVec2 startPos;
                 ImVec2 endPos;
-                if (!getOutputPinScreenPos(*fromNode, view, displaySize, startPos) ||
+                if (!getOutputPinScreenPos(*fromNode, link.fromPinIndex, view, displaySize, startPos) ||
                     !getInputPinScreenPos(*toNode, link.toPinIndex, view, displaySize, endPos)) {
                     continue;
                 }
@@ -322,21 +339,13 @@ namespace mat::demo {
             }
 
             if (drag.fromInput) {
-                document.addLink(target.nodeId, drag.nodeId, drag.pinIndex);
+                const int fromPinIndex = target.pinIndex < 0 ? 0 : target.pinIndex;
+                document.addLink(target.nodeId, fromPinIndex, drag.nodeId, drag.pinIndex);
             } else {
-                document.addLink(drag.nodeId, target.nodeId, target.pinIndex);
+                const int fromPinIndex = drag.pinIndex < 0 ? 0 : drag.pinIndex;
+                document.addLink(drag.nodeId, fromPinIndex, target.nodeId, target.pinIndex);
             }
             return true;
-        }
-
-        NodeType pinLinkTargetNodeTypeForSource(NodeType sourceType) {
-            if (nodeInputPinIndexForType(NodeType::VkPipeline, sourceType) >= 0) {
-                return NodeType::VkPipeline;
-            }
-            if (nodeInputPinIndexForType(NodeType::VkRenderPass, sourceType) >= 0) {
-                return NodeType::VkRenderPass;
-            }
-            return NodeType::VkPipeline;
         }
 
         void openPinLinkSearch(GraphPanelState& panel, const ImVec2& screenPos, const GridViewState& view,
@@ -371,13 +380,15 @@ namespace mat::demo {
             const int newNodeId = document.addNode(selectedType, panel.spawnWorldPos.x, panel.spawnWorldPos.y);
 
             if (panel.pinLinkFromInput) {
-                document.addLink(newNodeId, panel.pinLinkFromNodeId, panel.pinLinkFromPinIndex);
+                document.addLink(newNodeId, 0, panel.pinLinkFromNodeId, panel.pinLinkFromPinIndex);
             } else {
                 const GraphNode* sourceNode = document.findNode(panel.pinLinkFromNodeId);
                 if (sourceNode != nullptr && nodeHasInputPins(selectedType)) {
                     const int pinIndex = nodeInputPinIndexForType(selectedType, sourceNode->type);
                     if (pinIndex >= 0) {
-                        document.addLink(panel.pinLinkFromNodeId, newNodeId, pinIndex);
+                        const int fromPinIndex =
+                            panel.pinLinkFromPinIndex < 0 ? 0 : panel.pinLinkFromPinIndex;
+                        document.addLink(panel.pinLinkFromNodeId, fromPinIndex, newNodeId, pinIndex);
                     }
                 }
             }
@@ -442,7 +453,8 @@ namespace mat::demo {
                             getInputPinScreenPos(*pinNode, pinHit.pinIndex, view, displaySize,
                                                  panel.pinLinkDrag.startScreen);
                         } else {
-                            getOutputPinScreenPos(*pinNode, view, displaySize, panel.pinLinkDrag.startScreen);
+                            getOutputPinScreenPos(*pinNode, pinHit.pinIndex, view, displaySize,
+                                                  panel.pinLinkDrag.startScreen);
                         }
                     }
                 }
@@ -579,8 +591,8 @@ namespace mat::demo {
             }
 
             const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, -1, false) ||
-                                     isPinLinkSource(panel, node.id, -1, false);
+            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
+                                     isPinLinkSource(panel, node.id, 0, false);
             drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
@@ -685,8 +697,8 @@ namespace mat::demo {
             }
 
             const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, -1, false) ||
-                                     isPinLinkSource(panel, node.id, -1, false);
+            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
+                                     isPinLinkSource(panel, node.id, 0, false);
             drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
@@ -827,8 +839,8 @@ namespace mat::demo {
             }
 
             const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, -1, false) ||
-                                     isPinLinkSource(panel, node.id, -1, false);
+            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
+                                     isPinLinkSource(panel, node.id, 0, false);
             drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
@@ -965,8 +977,8 @@ namespace mat::demo {
             }
 
             const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, -1, false) ||
-                                     isPinLinkSource(panel, node.id, -1, false);
+            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
+                                     isPinLinkSource(panel, node.id, 0, false);
             drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
@@ -1081,8 +1093,8 @@ namespace mat::demo {
             }
 
             const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, -1, false) ||
-                                     isPinLinkSource(panel, node.id, -1, false);
+            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
+                                     isPinLinkSource(panel, node.id, 0, false);
             drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
@@ -1137,6 +1149,219 @@ namespace mat::demo {
             ImGui::PopFont();
         }
 
+        void drawNodeInputPinRow(ImDrawList* drawList, const GraphNode& node, int pinIndex, const NodeScreenLayout& layout,
+                                 const NodeTheme& theme, const GraphPanelState& panel, const PinHit& hoveredPin,
+                                 float labelPadX, ImU32 pinColor) {
+            const NodeInputPinDef* pinDef = nodeInputPin(node.type, pinIndex);
+            if (pinDef == nullptr) {
+                return;
+            }
+
+            const int bodyRow = nodeInputPinBodyRow(node.type, pinIndex);
+            const float rowCenterY = layout.topLeft.y + layout.headerHeight + (bodyRow + 0.5f) * layout.pinRowHeight;
+            const bool highlighted = isPinHighlighted(hoveredPin, node.id, pinIndex, true) ||
+                                     isPinLinkSource(panel, node.id, pinIndex, true);
+            drawPin(drawList, ImVec2(layout.topLeft.x, rowCenterY), layout.zoom, pinColor, highlighted);
+            drawScaledText(drawList,
+                           ImVec2(layout.topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
+                           pinDef->label, layout.fontSize);
+        }
+
+        void drawSingleOutputPin(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
+                                 const GraphPanelState& panel, const PinHit& hoveredPin, ImU32 pinColor) {
+            const float bodyCenterY =
+                layout.topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
+            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
+                                     isPinLinkSource(panel, node.id, 0, false);
+            drawPin(drawList, ImVec2(layout.bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
+        }
+
+        void drawVkPipelineColorBlendStateContent(ImDrawList* drawList, const GraphNode& node,
+                                                  const NodeScreenLayout& layout, const NodeTheme& theme,
+                                                  const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+            const ImVec2& topLeft = layout.topLeft;
+
+            static const char* kParamLabels[kVkPipelineColorBlendStateParamCount] = {
+                "sType",
+                "logicOpEnable",
+                "logicOp",
+                "blendConstants R",
+                "blendConstants G",
+                "blendConstants B",
+                "blendConstants A",
+            };
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            for (int rowIndex = 0; rowIndex < kVkPipelineColorBlendStateParamCount; ++rowIndex) {
+                const float rowCenterY = nodeParamRowCenterY(layout, rowIndex);
+                drawScaledText(drawList,
+                               ImVec2(topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
+                               kParamLabels[rowIndex], layout.fontSize);
+
+                if (layout.zoom >= kMinWidgetZoom) {
+                    continue;
+                }
+
+                char valueText[128];
+                switch (rowIndex) {
+                    case 0:
+                        std::snprintf(valueText, sizeof(valueText), "%s", kVkPipelineColorBlendStateSType);
+                        break;
+                    case 1:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkBool32OptionName(node.colorBlendLogicOpEnable));
+                        break;
+                    case 2:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkLogicOpOptionName(node.colorBlendLogicOp));
+                        break;
+                    case 3:
+                        std::snprintf(valueText, sizeof(valueText), "%.1f", node.colorBlendConstantR);
+                        break;
+                    case 4:
+                        std::snprintf(valueText, sizeof(valueText), "%.1f", node.colorBlendConstantG);
+                        break;
+                    case 5:
+                        std::snprintf(valueText, sizeof(valueText), "%.1f", node.colorBlendConstantB);
+                        break;
+                    default:
+                        std::snprintf(valueText, sizeof(valueText), "%.1f", node.colorBlendConstantA);
+                        break;
+                }
+
+                const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, valueText);
+                const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+                const float fieldWidth =
+                    rowIndex == 0 ? fieldLayout.sTypeFieldWidth : fieldLayout.comboFieldWidth;
+                const float fieldX = rowIndex == 0 ? fieldLayout.sTypeFieldX : fieldLayout.comboFieldX;
+                const float valueRightX = fieldX + fieldWidth - 4.f * layout.zoom;
+                drawScaledText(drawList, ImVec2(valueRightX - textSize.x, rowCenterY - layout.fontSize * 0.5f),
+                               theme.pinLabel, valueText, layout.fontSize);
+            }
+
+            drawNodeInputPinRow(drawList, node, 0, layout, theme, panel, hoveredPin, labelPadX, pinColor);
+            drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
+        }
+
+        void drawVkPipelineColorBlendStateWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                                                  bool& blockGraphDrag) {
+            const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            const float sTypeRowY = nodeParamRowCenterY(layout, 0) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.sTypeFieldX, sTypeRowY));
+            ImGui::SetNextItemWidth(fieldLayout.sTypeFieldWidth);
+            char sTypeText[128];
+            std::snprintf(sTypeText, sizeof(sTypeText), "%s", kVkPipelineColorBlendStateSType);
+            ImGui::BeginDisabled();
+            ImGui::InputText("##sType", sTypeText, sizeof(sTypeText), ImGuiInputTextFlags_ReadOnly);
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("%s", kVkPipelineColorBlendStateSType);
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            drawVkBool32Combo("##logicOpEnable", node.colorBlendLogicOpEnable, nodeParamRowCenterY(layout, 1),
+                              fieldLayout, interactive, blockGraphDrag);
+
+            const float logicOpRowY = nodeParamRowCenterY(layout, 2) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, logicOpRowY));
+            if (beginNodeCombo("##logicOp", vkLogicOpOptionName(node.colorBlendLogicOp), fieldLayout.comboFieldWidth)) {
+                for (int optionIndex = 0; optionIndex < kVkLogicOpOptionCount; ++optionIndex) {
+                    const bool selected = node.colorBlendLogicOp == optionIndex;
+                    if (ImGui::Selectable(vkLogicOpOptionName(optionIndex), selected)) {
+                        node.colorBlendLogicOp = optionIndex;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            float* blendConstants[] = {&node.colorBlendConstantR, &node.colorBlendConstantG, &node.colorBlendConstantB,
+                                       &node.colorBlendConstantA};
+            static const char* blendConstantIds[] = {"##blendConstantR", "##blendConstantG", "##blendConstantB",
+                                                     "##blendConstantA"};
+            for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {
+                const float rowY = nodeParamRowCenterY(layout, 3 + channelIndex) - fieldLayout.fieldHeight * 0.5f;
+                ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, rowY));
+                ImGui::SetNextItemWidth(fieldLayout.comboFieldWidth);
+                ImGui::InputFloat(blendConstantIds[channelIndex], blendConstants[channelIndex], 0.f, 0.f, "%.1f");
+                trackWidgetInteraction(interactive, blockGraphDrag);
+            }
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
+        void drawVkPipelineColorBlendAttachmentStateContent(ImDrawList* drawList, const GraphNode& node,
+                                                              const NodeScreenLayout& layout, const NodeTheme& theme,
+                                                              const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+            const ImVec2& topLeft = layout.topLeft;
+
+            const float blendEnableRowY = nodeParamRowCenterY(layout, 0);
+            drawScaledText(drawList,
+                           ImVec2(topLeft.x + labelPadX, blendEnableRowY - layout.fontSize * 0.5f), theme.pinLabel,
+                           "blendEnable", layout.fontSize);
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            if (layout.zoom < kMinWidgetZoom) {
+                const char* valueText = vkBool32OptionName(node.colorBlendAttachmentBlendEnable);
+                const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, valueText);
+                const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+                const float valueRightX =
+                    fieldLayout.comboFieldX + fieldLayout.comboFieldWidth - 4.f * layout.zoom;
+                drawScaledText(drawList,
+                               ImVec2(valueRightX - textSize.x, blendEnableRowY - layout.fontSize * 0.5f),
+                               theme.pinLabel, valueText, layout.fontSize);
+            }
+
+            drawNodeInputPinRow(drawList, node, 0, layout, theme, panel, hoveredPin, labelPadX, pinColor);
+            drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
+        }
+
+        void drawVkPipelineColorBlendAttachmentStateWidgets(GraphNode& node, const NodeScreenLayout& layout,
+                                                            bool interactive, bool& blockGraphDrag) {
+            const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            drawVkBool32Combo("##blendEnable", node.colorBlendAttachmentBlendEnable, nodeParamRowCenterY(layout, 0),
+                              fieldLayout, interactive, blockGraphDrag);
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
+        void drawVkColorWriteMaskContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
+                                         const NodeTheme& theme, const GraphPanelState& panel,
+                                         const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+            const ImVec2& topLeft = layout.topLeft;
+            const ImVec2& bottomRight = layout.bottomRight;
+
+            for (int pinIndex = 0; pinIndex < kVkColorWriteMaskOutputPinCount; ++pinIndex) {
+                const float rowCenterY = topLeft.y + layout.headerHeight + (pinIndex + 0.5f) * layout.pinRowHeight;
+                drawScaledText(drawList,
+                               ImVec2(topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
+                               nodeOutputPinLabel(node.type, pinIndex), layout.fontSize);
+
+                const bool highlighted = isPinHighlighted(hoveredPin, node.id, pinIndex, false) ||
+                                         isPinLinkSource(panel, node.id, pinIndex, false);
+                drawPin(drawList, ImVec2(bottomRight.x, rowCenterY), layout.zoom, pinColor, highlighted);
+            }
+        }
+
         void drawNodeChrome(ImDrawList* drawList, const ImVec2& topLeft, const ImVec2& bottomRight, float headerHeight,
                             float rounding, const NodeTheme& theme, bool selected) {
             const ImVec2 headerBottomRight(bottomRight.x, topLeft.y + headerHeight);
@@ -1178,14 +1403,15 @@ namespace mat::demo {
             const float labelPadX = 14.f * layout.zoom;
             const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
 
-            if (nodeHasInputPins(node.type)) {
+            if (node.type == NodeType::VkPipeline || node.type == NodeType::VkRenderPass) {
                 for (int pinIndex = 0; pinIndex < nodeInputPinCount(node.type); ++pinIndex) {
                     const NodeInputPinDef* pinDef = nodeInputPin(node.type, pinIndex);
                     if (pinDef == nullptr) {
                         continue;
                     }
 
-                    const float rowCenterY = topLeft.y + layout.headerHeight + (pinIndex + 0.5f) * layout.pinRowHeight;
+                    const int bodyRow = nodeInputPinBodyRow(node.type, pinIndex);
+                    const float rowCenterY = topLeft.y + layout.headerHeight + (bodyRow + 0.5f) * layout.pinRowHeight;
                     const bool highlighted = isPinHighlighted(hoveredPin, node.id, pinIndex, true) ||
                                              isPinLinkSource(panel, node.id, pinIndex, true);
                     drawPin(drawList, ImVec2(topLeft.x, rowCenterY), layout.zoom, pinColor, highlighted);
@@ -1221,10 +1447,16 @@ namespace mat::demo {
                 drawVkPipelineMultisampleStateContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::VkPipelineDepthStencilState) {
                 drawVkPipelineDepthStencilStateContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkPipelineColorBlendState) {
+                drawVkPipelineColorBlendStateContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkPipelineColorBlendAttachmentState) {
+                drawVkPipelineColorBlendAttachmentStateContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkColorWriteMask) {
+                drawVkColorWriteMaskContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (nodeHasOutputPin(node.type)) {
                 const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-                const bool highlighted = isPinHighlighted(hoveredPin, node.id, -1, false) ||
-                                         isPinLinkSource(panel, node.id, -1, false);
+                const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
+                                         isPinLinkSource(panel, node.id, 0, false);
                 drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
             }
         }
@@ -1278,6 +1510,10 @@ namespace mat::demo {
                     drawVkPipelineMultisampleStateWidgets(*editable, layout, interactive, blockGraphDrag);
                 } else if (node.type == NodeType::VkPipelineDepthStencilState) {
                     drawVkPipelineDepthStencilStateWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkPipelineColorBlendState) {
+                    drawVkPipelineColorBlendStateWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkPipelineColorBlendAttachmentState) {
+                    drawVkPipelineColorBlendAttachmentStateWidgets(*editable, layout, interactive, blockGraphDrag);
                 }
 
                 ImGui::PopID();
