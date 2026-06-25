@@ -41,6 +41,7 @@ namespace mat::demo {
             {NodeType::VkAttachmentDescription, "VkAttachmentDescription"},
             {NodeType::VkSubpassDescription, "VkSubpassDescription"},
             {NodeType::VkSubpassDependency, "VkSubpassDependency"},
+            {NodeType::VkAttachmentReference, "VkAttachmentReference"},
         };
 
     }  // namespace

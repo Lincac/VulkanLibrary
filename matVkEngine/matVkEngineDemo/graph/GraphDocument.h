@@ -51,6 +51,24 @@ namespace mat::demo {
         char shaderStageEntryName[kMaxShaderStageEntryNameLen] = "main";
         char shaderModulePath[kMaxShaderModulePathLen]{};
         std::vector<VertexAttribute> vertexAttributes;
+        int renderPassAttachmentSlotCount = 1;
+        int attachmentDescriptionFormat = 0;
+        int attachmentDescriptionSamples = 0;
+        int attachmentDescriptionLoadOp = 1;
+        int attachmentDescriptionStoreOp = 0;
+        int attachmentDescriptionStencilLoadOp = 2;
+        int attachmentDescriptionStencilStoreOp = 1;
+        int attachmentDescriptionInitialLayout = 0;
+        int attachmentDescriptionFinalLayout = 9;
+        int subpassDescriptionPipelineBindPoint = 0;
+        int subpassDependencySrcSubpass = -1;
+        int subpassDependencyDstSubpass = 0;
+        int subpassDependencySrcStageMask = 0x00020400;
+        int subpassDependencySrcAccessMask = 0x00000010;
+        int subpassDependencyDstStageMask = 0x00010400;
+        int subpassDependencyDstAccessMask = 0x00000050;
+        int attachmentReferenceAttachment = 0;
+        int attachmentReferenceLayout = 2;
     };
 
     struct GraphLink {
@@ -70,6 +88,8 @@ namespace mat::demo {
         const GraphNode* findNode(int nodeId) const;
         bool setNodePosition(int nodeId, float worldX, float worldY);
         bool removeNode(int nodeId);
+        bool addRenderPassAttachmentSlot(int nodeId);
+        bool removeRenderPassAttachmentSlot(int nodeId, int slotIndex);
 
         const std::vector<GraphNode>& nodes() const { return _nodes; }
         const std::vector<GraphLink>& links() const { return _links; }
@@ -88,5 +108,14 @@ namespace mat::demo {
     ImVec2 vertexNodeWorldSize(const GraphNode& node);
     ImVec2 nodeWorldSize(const GraphNode& node);
     void initDefaultVertexAttributes(GraphNode& node);
+
+    int graphNodeInputPinCount(const GraphNode& node);
+    int graphNodeInputPinBodyRow(const GraphNode& node, int pinIndex);
+    bool graphNodeInputPinAllowsMultipleLinks(const GraphNode& node, int pinIndex);
+    bool graphNodeGetInputPin(const GraphNode& node, int pinIndex, NodeInputPinInfo& out);
+    bool graphNodeInputPinAcceptsSource(const GraphNode& inputNode, int inputPinIndex, NodeType sourceType,
+                                        int sourcePinIndex);
+    int graphNodeInputPinIndexForType(const GraphNode& node, NodeType slotType, int slotSourcePinIndex = -1);
+    int renderPassNodeBodyRowCount(const GraphNode& node);
 
 }  // namespace mat::demo

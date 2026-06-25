@@ -25,7 +25,111 @@ namespace mat::demo {
         if (node.type == NodeType::Vertex) {
             return vertexNodeWorldSize(node);
         }
+        if (node.type == NodeType::VkRenderPass) {
+            return ImVec2(kNodeWidth, kNodeHeaderHeight + renderPassNodeBodyRowCount(node) * kNodePinRowHeight);
+        }
         return nodeWorldSize(node.type);
+    }
+
+    int renderPassNodeBodyRowCount(const GraphNode& node) {
+        return kVkRenderPassAttachmentHeaderRowCount + node.renderPassAttachmentSlotCount +
+               kVkRenderPassAddAttachmentRowCount + kVkRenderPassFixedInputPinCount;
+    }
+
+    int graphNodeInputPinCount(const GraphNode& node) {
+        if (node.type == NodeType::VkRenderPass) {
+            return node.renderPassAttachmentSlotCount + kVkRenderPassFixedInputPinCount;
+        }
+        return nodeInputPinCount(node.type);
+    }
+
+    int graphNodeInputPinBodyRow(const GraphNode& node, int pinIndex) {
+        if (node.type == NodeType::VkRenderPass) {
+            if (pinIndex < 0) {
+                return -1;
+            }
+            if (pinIndex < node.renderPassAttachmentSlotCount) {
+                return kVkRenderPassAttachmentHeaderRowCount + pinIndex;
+            }
+            if (pinIndex == node.renderPassAttachmentSlotCount) {
+                return kVkRenderPassAttachmentHeaderRowCount + node.renderPassAttachmentSlotCount +
+                       kVkRenderPassAddAttachmentRowCount;
+            }
+            if (pinIndex == node.renderPassAttachmentSlotCount + 1) {
+                return kVkRenderPassAttachmentHeaderRowCount + node.renderPassAttachmentSlotCount +
+                       kVkRenderPassAddAttachmentRowCount + 1;
+            }
+            return -1;
+        }
+        return nodeInputPinBodyRow(node.type, pinIndex);
+    }
+
+    bool graphNodeInputPinAllowsMultipleLinks(const GraphNode& node, int pinIndex) {
+        if (node.type == NodeType::VkRenderPass) {
+            if (pinIndex < 0 || pinIndex >= graphNodeInputPinCount(node)) {
+                return false;
+            }
+            return pinIndex >= node.renderPassAttachmentSlotCount;
+        }
+        return nodeInputPinAllowsMultipleLinks(node.type, pinIndex);
+    }
+
+    bool graphNodeGetInputPin(const GraphNode& node, int pinIndex, NodeInputPinInfo& out) {
+        if (pinIndex < 0 || pinIndex >= graphNodeInputPinCount(node)) {
+            return false;
+        }
+        if (node.type == NodeType::VkRenderPass) {
+            if (pinIndex < node.renderPassAttachmentSlotCount) {
+                out.label = "attachment";
+                out.slotType = NodeType::VkAttachmentDescription;
+                out.slotSourcePinIndex = -1;
+                return true;
+            }
+            if (pinIndex == node.renderPassAttachmentSlotCount) {
+                out.label = "VkSubpassDescription";
+                out.slotType = NodeType::VkSubpassDescription;
+                out.slotSourcePinIndex = -1;
+                return true;
+            }
+            out.label = "VkSubpassDependency";
+            out.slotType = NodeType::VkSubpassDependency;
+            out.slotSourcePinIndex = -1;
+            return true;
+        }
+        const NodeInputPinDef* pinDef = nodeInputPin(node.type, pinIndex);
+        if (pinDef == nullptr) {
+            return false;
+        }
+        out.label = pinDef->label;
+        out.slotType = pinDef->slotType;
+        out.slotSourcePinIndex = pinDef->slotSourcePinIndex;
+        return true;
+    }
+
+    bool graphNodeInputPinAcceptsSource(const GraphNode& inputNode, int inputPinIndex, NodeType sourceType,
+                                        int sourcePinIndex) {
+        NodeInputPinInfo pinInfo{};
+        if (!graphNodeGetInputPin(inputNode, inputPinIndex, pinInfo)) {
+            return false;
+        }
+        if (pinInfo.slotType != sourceType) {
+            return false;
+        }
+        if (pinInfo.slotSourcePinIndex >= 0 && sourcePinIndex >= 0 &&
+            pinInfo.slotSourcePinIndex != sourcePinIndex) {
+            return false;
+        }
+        return true;
+    }
+
+    int graphNodeInputPinIndexForType(const GraphNode& node, NodeType slotType, int slotSourcePinIndex) {
+        const int pinCount = graphNodeInputPinCount(node);
+        for (int index = 0; index < pinCount; ++index) {
+            if (graphNodeInputPinAcceptsSource(node, index, slotType, slotSourcePinIndex)) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     void initDefaultVertexAttributes(GraphNode& node) {
@@ -85,7 +189,7 @@ namespace mat::demo {
         }
 
         const GraphNode* toNode = findNode(toNodeId);
-        if (toNode == nullptr || !nodeInputPinAllowsMultipleLinks(toNode->type, toPinIndex)) {
+        if (toNode == nullptr || !graphNodeInputPinAllowsMultipleLinks(*toNode, toPinIndex)) {
             removeLinksToInput(toNodeId, toPinIndex);
         }
         removeLinksFromOutput(fromNodeId, fromPinIndex);
@@ -132,6 +236,34 @@ namespace mat::demo {
                                         return link.fromNodeId == nodeId || link.toNodeId == nodeId;
                                     }),
                      _links.end());
+        return true;
+    }
+
+    bool GraphDocument::addRenderPassAttachmentSlot(int nodeId) {
+        GraphNode* node = findNode(nodeId);
+        if (node == nullptr || node->type != NodeType::VkRenderPass) {
+            return false;
+        }
+        ++node->renderPassAttachmentSlotCount;
+        return true;
+    }
+
+    bool GraphDocument::removeRenderPassAttachmentSlot(int nodeId, int slotIndex) {
+        GraphNode* node = findNode(nodeId);
+        if (node == nullptr || node->type != NodeType::VkRenderPass || node->renderPassAttachmentSlotCount <= 1) {
+            return false;
+        }
+        if (slotIndex < 0 || slotIndex >= node->renderPassAttachmentSlotCount) {
+            return false;
+        }
+
+        removeLinksToInput(nodeId, slotIndex);
+        for (GraphLink& link : _links) {
+            if (link.toNodeId == nodeId && link.toPinIndex > slotIndex) {
+                --link.toPinIndex;
+            }
+        }
+        --node->renderPassAttachmentSlotCount;
         return true;
     }
 

@@ -27,6 +27,7 @@ namespace mat::demo {
         VkAttachmentDescription,
         VkSubpassDescription,
         VkSubpassDependency,
+        VkAttachmentReference,
     };
 
     constexpr float kNodeWidth = 280.f;
@@ -34,7 +35,18 @@ namespace mat::demo {
     constexpr float kNodePinRowHeight = 22.f;
     constexpr float kNodeEmptyBodyHeight = 24.f;
     constexpr int kVkPipelineInputPinCount = 11;
-    constexpr int kVkRenderPassInputPinCount = 3;
+    constexpr int kVkRenderPassAttachmentHeaderRowCount = 1;
+    constexpr int kVkRenderPassAddAttachmentRowCount = 1;
+    constexpr int kVkRenderPassFixedInputPinCount = 2;
+    constexpr int kVkAttachmentDescriptionParamCount = 8;
+    constexpr int kVkSubpassDescriptionParamCount = 1;
+    constexpr int kVkSubpassDescriptionInputPinCount = 2;
+    constexpr int kVkSubpassDependencyParamCount = 6;
+    constexpr int kVkAttachmentReferenceParamCount = 2;
+    constexpr int kVkAttachmentLoadOpOptionCount = 3;
+    constexpr int kVkAttachmentStoreOpOptionCount = 2;
+    constexpr int kVkImageLayoutOptionCount = 10;
+    constexpr int kVkPipelineBindPointOptionCount = 2;
     constexpr int kVkPipelineIndexRowCount = 1;
     constexpr int kVkPipelineShaderStagePrefixParamCount = 2;
     constexpr int kVkPipelineShaderStageInputPinCount = 1;
@@ -90,6 +102,12 @@ namespace mat::demo {
     extern const char kVkDescriptorSetLayoutSType[];
     extern const char kVkDescriptorSetLayoutBindingNullSampler[];
 
+    struct NodeInputPinInfo {
+        const char* label = "";
+        NodeType slotType = NodeType::VkPipeline;
+        int slotSourcePinIndex = -1;
+    };
+
     struct NodeInputPinDef {
         const char* label;
         NodeType slotType;
@@ -120,5 +138,9 @@ namespace mat::demo {
     const char* vkLogicOpOptionName(int index);
     const char* vkDescriptorTypeOptionName(int index);
     const char* vkShaderStageFlagOptionName(int index);
+    const char* vkAttachmentLoadOpOptionName(int index);
+    const char* vkAttachmentStoreOpOptionName(int index);
+    const char* vkImageLayoutOptionName(int index);
+    const char* vkPipelineBindPointOptionName(int index);
 
 }  // namespace mat::demo
