@@ -55,6 +55,27 @@ namespace mat::demo {
             "VK_FRONT_FACE_CLOCKWISE",
         };
 
+        constexpr const char kVkSampleCountOptionNames[kVkSampleCountOptionCount][32] = {
+            "VK_SAMPLE_COUNT_1_BIT",
+            "VK_SAMPLE_COUNT_2_BIT",
+            "VK_SAMPLE_COUNT_4_BIT",
+            "VK_SAMPLE_COUNT_8_BIT",
+            "VK_SAMPLE_COUNT_16_BIT",
+            "VK_SAMPLE_COUNT_32_BIT",
+            "VK_SAMPLE_COUNT_64_BIT",
+        };
+
+        constexpr const char kVkCompareOpOptionNames[kVkCompareOpOptionCount][32] = {
+            "VK_COMPARE_OP_NEVER",
+            "VK_COMPARE_OP_LESS",
+            "VK_COMPARE_OP_EQUAL",
+            "VK_COMPARE_OP_LESS_OR_EQUAL",
+            "VK_COMPARE_OP_GREATER",
+            "VK_COMPARE_OP_NOT_EQUAL",
+            "VK_COMPARE_OP_GREATER_OR_EQUAL",
+            "VK_COMPARE_OP_ALWAYS",
+        };
+
     }  // namespace
 
     const char kVkPipelineInputAssemblyStateSType[] =
@@ -64,6 +85,11 @@ namespace mat::demo {
 
     const char kVkPipelineRasterizationStateSType[] =
         "VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO";
+
+    const char kVkPipelineMultisampleStateSType[] = "VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO";
+
+    const char kVkPipelineDepthStencilStateSType[] =
+        "VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO";
 
     const char* nodeTypeName(NodeType type) {
         switch (type) {
@@ -121,6 +147,14 @@ namespace mat::demo {
         if (type == NodeType::VkPipelineRasterizationState) {
             return ImVec2(kNodeWidth,
                           kNodeHeaderHeight + kVkPipelineRasterizationStateParamCount * kNodePinRowHeight);
+        }
+        if (type == NodeType::VkPipelineMultisampleState) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight + kVkPipelineMultisampleStateParamCount * kNodePinRowHeight);
+        }
+        if (type == NodeType::VkPipelineDepthStencilState) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight + kVkPipelineDepthStencilStateParamCount * kNodePinRowHeight);
         }
         return ImVec2(kNodeWidth, kNodeHeaderHeight + kNodeEmptyBodyHeight);
     }
@@ -210,6 +244,20 @@ namespace mat::demo {
 
     const char* vkBool32OptionName(bool value) {
         return value ? "VK_TRUE" : "VK_FALSE";
+    }
+
+    const char* vkSampleCountOptionName(int index) {
+        if (index < 0 || index >= kVkSampleCountOptionCount) {
+            return "";
+        }
+        return kVkSampleCountOptionNames[index];
+    }
+
+    const char* vkCompareOpOptionName(int index) {
+        if (index < 0 || index >= kVkCompareOpOptionCount) {
+            return "";
+        }
+        return kVkCompareOpOptionNames[index];
     }
 
 }  // namespace mat::demo

@@ -23,6 +23,13 @@ namespace mat::demo {
         int rasterizerCullMode = 2;
         int rasterizerFrontFace = 0;
         bool rasterizerDepthBiasEnable = false;
+        bool multisampleSampleShadingEnable = false;
+        int multisampleRasterizationSamples = 0;
+        bool depthStencilDepthTestEnable = true;
+        bool depthStencilDepthWriteEnable = true;
+        int depthStencilDepthCompareOp = 1;
+        bool depthStencilDepthBoundsTestEnable = false;
+        bool depthStencilStencilTestEnable = false;
     };
 
     struct GraphLink {
