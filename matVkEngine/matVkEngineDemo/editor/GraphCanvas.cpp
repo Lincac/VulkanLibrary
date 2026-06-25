@@ -242,10 +242,84 @@ namespace mat::demo {
             drawComfyBezierLink(drawList, start, end, startIsOutput, color, thickness, false);
         }
 
-        void drawGraphLinks(const GraphDocument& document, const GridViewState& view, const ImVec2& displaySize) {
+        bool isPinHighlighted(const PinHit& pin, int nodeId, int pinIndex, bool isInput,
+                              const GraphDocument* document = nullptr) {
+            if (pin.valid && pin.nodeId == nodeId && pin.pinIndex == pinIndex && pin.isInput == isInput) {
+                return true;
+            }
+            if (document == nullptr || !pin.valid) {
+                return false;
+            }
+
+            for (const GraphLink& link : document->links()) {
+                if (pin.isInput) {
+                    if (link.toNodeId == pin.nodeId && link.toPinIndex == pin.pinIndex && link.fromNodeId == nodeId &&
+                        link.fromPinIndex == pinIndex && !isInput) {
+                        return true;
+                    }
+                } else if (link.fromNodeId == pin.nodeId && link.fromPinIndex == pin.pinIndex &&
+                           link.toNodeId == nodeId && link.toPinIndex == pinIndex && isInput) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool isPinLinkSource(const GraphPanelState& panel, int nodeId, int pinIndex, bool isInput) {
+            if (panel.pinLinkDrag.active &&
+                isPinHighlighted({true, panel.pinLinkDrag.nodeId, panel.pinLinkDrag.pinIndex,
+                                  panel.pinLinkDrag.fromInput},
+                                 nodeId, pinIndex, isInput)) {
+                return true;
+            }
+            return panel.pinLinkPreview.active &&
+                   isPinHighlighted({true, panel.pinLinkPreview.nodeId, panel.pinLinkPreview.pinIndex,
+                                     panel.pinLinkPreview.fromInput},
+                                    nodeId, pinIndex, isInput);
+        }
+
+        bool isLinkHighlighted(const PinHit& hoveredPin, const GraphLink& link) {
+            if (!hoveredPin.valid) {
+                return false;
+            }
+            if (hoveredPin.isInput) {
+                return link.toNodeId == hoveredPin.nodeId && link.toPinIndex == hoveredPin.pinIndex;
+            }
+            return link.fromNodeId == hoveredPin.nodeId && link.fromPinIndex == hoveredPin.pinIndex;
+        }
+
+        const GraphDocument* g_pinHighlightDocument = nullptr;
+        const GraphPanelState* g_pinHighlightPanel = nullptr;
+        PinHit g_hoveredPin{};
+
+        void beginPinHighlightContext(const GraphDocument& document, const GraphPanelState& panel,
+                                      const PinHit& hoveredPin) {
+            g_pinHighlightDocument = &document;
+            g_pinHighlightPanel = &panel;
+            g_hoveredPin = hoveredPin;
+        }
+
+        void endPinHighlightContext() {
+            g_pinHighlightDocument = nullptr;
+            g_pinHighlightPanel = nullptr;
+            g_hoveredPin = {};
+        }
+
+        bool shouldHighlightPin(int nodeId, int pinIndex, bool isInput) {
+            if (g_pinHighlightDocument == nullptr || g_pinHighlightPanel == nullptr) {
+                return false;
+            }
+            return isPinHighlighted(g_hoveredPin, nodeId, pinIndex, isInput, g_pinHighlightDocument) ||
+                   isPinLinkSource(*g_pinHighlightPanel, nodeId, pinIndex, isInput);
+        }
+
+        void drawGraphLinks(const GraphDocument& document, const GridViewState& view, const ImVec2& displaySize,
+                            const PinHit& hoveredPin) {
             ImDrawList* drawList = ImGui::GetBackgroundDrawList();
             const ImU32 linkColor = IM_COL32(210, 210, 220, 235);
+            const ImU32 highlightLinkColor = IM_COL32(232, 196, 118, 255);
             const float thickness = std::max(2.5f, 3.f * view.zoom);
+            const float highlightThickness = thickness + 1.2f;
 
             for (const GraphLink& link : document.links()) {
                 const GraphNode* fromNode = document.findNode(link.fromNodeId);
@@ -261,7 +335,9 @@ namespace mat::demo {
                     continue;
                 }
 
-                drawBezierLink(drawList, startPos, endPos, true, linkColor, thickness);
+                const bool highlighted = isLinkHighlighted(hoveredPin, link);
+                drawBezierLink(drawList, startPos, endPos, true, highlighted ? highlightLinkColor : linkColor,
+                               highlighted ? highlightThickness : thickness);
             }
         }
 
@@ -518,23 +594,6 @@ namespace mat::demo {
             drawList->AddCircleFilled(center, slotRadius, fillColor);
         }
 
-        bool isPinHighlighted(const PinHit& pin, int nodeId, int pinIndex, bool isInput) {
-            return pin.valid && pin.nodeId == nodeId && pin.pinIndex == pinIndex && pin.isInput == isInput;
-        }
-
-        bool isPinLinkSource(const GraphPanelState& panel, int nodeId, int pinIndex, bool isInput) {
-            if (panel.pinLinkDrag.active &&
-                isPinHighlighted({true, panel.pinLinkDrag.nodeId, panel.pinLinkDrag.pinIndex,
-                                  panel.pinLinkDrag.fromInput},
-                                 nodeId, pinIndex, isInput)) {
-                return true;
-            }
-            return panel.pinLinkPreview.active &&
-                   isPinHighlighted({true, panel.pinLinkPreview.nodeId, panel.pinLinkPreview.pinIndex,
-                                     panel.pinLinkPreview.fromInput},
-                                    nodeId, pinIndex, isInput);
-        }
-
         void trackWidgetInteraction(bool interactive, bool& blockGraphDrag) {
             if (interactive && (ImGui::IsItemHovered() || ImGui::IsItemActive())) {
                 blockGraphDrag = true;
@@ -609,8 +668,7 @@ namespace mat::demo {
             }
 
             const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
-                                     isPinLinkSource(panel, node.id, 0, false);
+            const bool highlighted = shouldHighlightPin(node.id, 0, false);
             drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
@@ -715,8 +773,7 @@ namespace mat::demo {
             }
 
             const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
-                                     isPinLinkSource(panel, node.id, 0, false);
+            const bool highlighted = shouldHighlightPin(node.id, 0, false);
             drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
@@ -857,8 +914,7 @@ namespace mat::demo {
             }
 
             const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
-                                     isPinLinkSource(panel, node.id, 0, false);
+            const bool highlighted = shouldHighlightPin(node.id, 0, false);
             drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
@@ -995,8 +1051,7 @@ namespace mat::demo {
             }
 
             const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
-                                     isPinLinkSource(panel, node.id, 0, false);
+            const bool highlighted = shouldHighlightPin(node.id, 0, false);
             drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
@@ -1111,8 +1166,7 @@ namespace mat::demo {
             }
 
             const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
-                                     isPinLinkSource(panel, node.id, 0, false);
+            const bool highlighted = shouldHighlightPin(node.id, 0, false);
             drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
@@ -1178,8 +1232,7 @@ namespace mat::demo {
 
             const int bodyRow = graphNodeInputPinBodyRow(node, pinIndex);
             const float rowCenterY = layout.topLeft.y + layout.headerHeight + (bodyRow + 0.5f) * layout.pinRowHeight;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, pinIndex, true) ||
-                                     isPinLinkSource(panel, node.id, pinIndex, true);
+            const bool highlighted = shouldHighlightPin(node.id, pinIndex, true);
             drawPin(drawList, ImVec2(layout.topLeft.x, rowCenterY), layout.zoom, pinColor, highlighted);
             drawScaledText(drawList,
                            ImVec2(layout.topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
@@ -1196,8 +1249,7 @@ namespace mat::demo {
                                  const GraphPanelState& panel, const PinHit& hoveredPin, ImU32 pinColor) {
             const float bodyCenterY =
                 layout.topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
-                                     isPinLinkSource(panel, node.id, 0, false);
+            const bool highlighted = shouldHighlightPin(node.id, 0, false);
             drawPin(drawList, ImVec2(layout.bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
@@ -1340,8 +1392,7 @@ namespace mat::demo {
                                ImVec2(addItemRowLayout.nameFieldX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
                                nodeOutputPinLabel(node.type, pinIndex), layout.fontSize);
 
-                const bool highlighted = isPinHighlighted(hoveredPin, node.id, pinIndex, false) ||
-                                         isPinLinkSource(panel, node.id, pinIndex, false);
+                const bool highlighted = shouldHighlightPin(node.id, pinIndex, false);
                 drawPin(drawList, ImVec2(bottomRight.x, rowCenterY), layout.zoom, pinColor, highlighted);
             }
         }
@@ -1598,8 +1649,7 @@ namespace mat::demo {
                                ImVec2(topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
                                nodeOutputPinLabel(node.type, pinIndex), layout.fontSize);
 
-                const bool highlighted = isPinHighlighted(hoveredPin, node.id, pinIndex, false) ||
-                                         isPinLinkSource(panel, node.id, pinIndex, false);
+                const bool highlighted = shouldHighlightPin(node.id, pinIndex, false);
                 drawPin(drawList, ImVec2(bottomRight.x, rowCenterY), layout.zoom, pinColor, highlighted);
             }
         }
@@ -1617,8 +1667,7 @@ namespace mat::demo {
                                ImVec2(topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
                                nodeOutputPinLabel(node.type, pinIndex), layout.fontSize);
 
-                const bool highlighted = isPinHighlighted(hoveredPin, node.id, pinIndex, false) ||
-                                         isPinLinkSource(panel, node.id, pinIndex, false);
+                const bool highlighted = shouldHighlightPin(node.id, pinIndex, false);
                 drawPin(drawList, ImVec2(bottomRight.x, rowCenterY), layout.zoom, pinColor, highlighted);
             }
         }
@@ -1738,8 +1787,7 @@ namespace mat::demo {
                                         IM_COL32(120, 125, 140, 255), 0, 1.f);
                 }
 
-                const bool highlighted = isPinHighlighted(hoveredPin, node.id, slotIndex, true) ||
-                                         isPinLinkSource(panel, node.id, slotIndex, true);
+                const bool highlighted = shouldHighlightPin(node.id, slotIndex, true);
                 drawPin(drawList, ImVec2(layout.topLeft.x, rowCenterY), layout.zoom, pinColor, highlighted);
                 drawScaledText(drawList, ImVec2(rowLayout.nameFieldX, rowCenterY - layout.fontSize * 0.5f),
                                theme.pinLabel, "attachment", layout.fontSize);
@@ -1765,8 +1813,7 @@ namespace mat::demo {
 
             const float bodyCenterY =
                 layout.topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
-                                     isPinLinkSource(panel, node.id, 0, false);
+            const bool highlighted = shouldHighlightPin(node.id, 0, false);
             drawPin(drawList, ImVec2(layout.bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
@@ -2271,8 +2318,7 @@ namespace mat::demo {
             }
 
             const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
-                                     isPinLinkSource(panel, node.id, 0, false);
+            const bool highlighted = shouldHighlightPin(node.id, 0, false);
             drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
@@ -2382,8 +2428,7 @@ namespace mat::demo {
             }
 
             const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-            const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
-                                     isPinLinkSource(panel, node.id, 0, false);
+            const bool highlighted = shouldHighlightPin(node.id, 0, false);
             drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
         }
 
@@ -2513,8 +2558,7 @@ namespace mat::demo {
 
                     const int bodyRow = nodeInputPinBodyRow(node.type, pinIndex);
                     const float rowCenterY = topLeft.y + layout.headerHeight + (bodyRow + 0.5f) * layout.pinRowHeight;
-                    const bool highlighted = isPinHighlighted(hoveredPin, node.id, pinIndex, true) ||
-                                             isPinLinkSource(panel, node.id, pinIndex, true);
+                    const bool highlighted = shouldHighlightPin(node.id, pinIndex, true);
                     drawPin(drawList, ImVec2(topLeft.x, rowCenterY), layout.zoom, pinColor, highlighted);
                     drawScaledText(drawList,
                                    ImVec2(topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
@@ -2584,8 +2628,7 @@ namespace mat::demo {
                 drawVkAttachmentReferenceContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (nodeHasOutputPin(node.type)) {
                 const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
-                const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
-                                         isPinLinkSource(panel, node.id, 0, false);
+                const bool highlighted = shouldHighlightPin(node.id, 0, false);
                 drawPin(drawList, ImVec2(bottomRight.x, bodyCenterY), layout.zoom, pinColor, highlighted);
             }
         }
@@ -3008,9 +3051,11 @@ namespace mat::demo {
         }
 
         drawInfiniteGrid(ImVec2(0.f, 0.f), displaySize, view);
-        drawGraphLinks(document, view, displaySize);
+        beginPinHighlightContext(document, panel, hoveredPin);
+        drawGraphLinks(document, view, displaySize, hoveredPin);
         drawPinLinkPreview(panel, document, view, displaySize);
         drawGraphNodes(document, view, displaySize, panel.selectedNodeId, panel, hoveredPin);
+        endPinHighlightContext();
 
         const bool suppressingNodeWidgetFocus = panel.suppressNodeWidgetFocus;
         const bool nodeWidgetsInteractive = !panel.searchOpen && !suppressingNodeWidgetFocus;
