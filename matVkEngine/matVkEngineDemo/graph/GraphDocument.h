@@ -29,6 +29,7 @@ namespace mat::demo {
         GraphNode* findNode(int nodeId);
         const GraphNode* findNode(int nodeId) const;
         bool setNodePosition(int nodeId, float worldX, float worldY);
+        bool removeNode(int nodeId);
 
         const std::vector<GraphNode>& nodes() const { return _nodes; }
         const std::vector<GraphLink>& links() const { return _links; }

@@ -16,6 +16,8 @@ namespace mat::demo {
 
         constexpr float kDragThreshold = 4.f;
         constexpr float kNodeRounding = 8.f;
+        constexpr float kNodeToolbarHeightWorld = 24.f;
+        constexpr float kNodeToolbarGapWorld = 4.f;
 
         struct NodeTheme {
             ImU32 header;
@@ -726,6 +728,121 @@ namespace mat::demo {
             }
         }
 
+        void deleteNode(GraphPanelState& panel, GraphDocument& document, int nodeId) {
+            if (nodeId < 0 || !document.removeNode(nodeId)) {
+                return;
+            }
+
+            if (panel.selectedNodeId == nodeId) {
+                panel.selectedNodeId = -1;
+            }
+            if (panel.draggingNodeId == nodeId) {
+                panel.draggingNodeId = -1;
+            }
+            if (panel.pinLinkDrag.nodeId == nodeId) {
+                panel.pinLinkDrag.active = false;
+                panel.pinLinkDrag.dragged = false;
+            }
+            if (panel.pinLinkPreview.nodeId == nodeId) {
+                clearPinLinkPreview(panel);
+            }
+        }
+
+        bool getSelectedNodeToolbarRect(const GraphDocument& document, int selectedNodeId, const GridViewState& view,
+                                        const ImVec2& displaySize, ImVec2& outTopLeft, ImVec2& outSize) {
+            if (selectedNodeId < 0) {
+                return false;
+            }
+
+            const GraphNode* node = document.findNode(selectedNodeId);
+            if (node == nullptr) {
+                return false;
+            }
+
+            const NodeScreenLayout layout =
+                buildNodeScreenLayout(node->worldX, node->worldY, node->type, view, displaySize);
+            const float toolbarHeight = kNodeToolbarHeightWorld * layout.zoom;
+            const float gap = kNodeToolbarGapWorld * layout.zoom;
+            outTopLeft = ImVec2(layout.topLeft.x, layout.topLeft.y - toolbarHeight - gap);
+            outSize = ImVec2(layout.width, toolbarHeight);
+            return true;
+        }
+
+        bool hitTestSelectedNodeToolbar(const ImVec2& screenPos, const GraphDocument& document, int selectedNodeId,
+                                        const GridViewState& view, const ImVec2& displaySize) {
+            ImVec2 topLeft;
+            ImVec2 size;
+            if (!getSelectedNodeToolbarRect(document, selectedNodeId, view, displaySize, topLeft, size)) {
+                return false;
+            }
+
+            const ImVec2 bottomRight(topLeft.x + size.x, topLeft.y + size.y);
+            return screenPos.x >= topLeft.x && screenPos.x <= bottomRight.x && screenPos.y >= topLeft.y &&
+                   screenPos.y <= bottomRight.y;
+        }
+
+        void drawSelectedNodeToolbar(GraphPanelState& panel, GraphDocument& document, const GridViewState& view,
+                                     const ImVec2& displaySize, bool& blockGraphDrag, bool interactive) {
+            ImVec2 toolbarPos;
+            ImVec2 toolbarSize;
+            if (!getSelectedNodeToolbarRect(document, panel.selectedNodeId, view, displaySize, toolbarPos,
+                                            toolbarSize)) {
+                return;
+            }
+
+            const GraphNode* node = document.findNode(panel.selectedNodeId);
+            if (node == nullptr) {
+                return;
+            }
+
+            const float zoom = view.zoom;
+            const ImVec2 toolbarBottomRight(toolbarPos.x + toolbarSize.x, toolbarPos.y + toolbarSize.y);
+            const float rounding = kNodeRounding * zoom;
+
+            ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+            drawList->AddRectFilled(toolbarPos, toolbarBottomRight, IM_COL32(48, 48, 56, 255), rounding);
+            drawList->AddRect(toolbarPos, toolbarBottomRight, IM_COL32(232, 196, 118, 255), rounding, 0, 1.2f);
+
+            if (!interactive) {
+                return;
+            }
+
+            ImGui::PushID(panel.selectedNodeId);
+            ImGui::SetCursorScreenPos(toolbarPos);
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.f * zoom, 2.f * zoom));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, rounding);
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
+            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(180, 70, 70, 180));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(210, 50, 50, 220));
+
+            if (ImGui::Button("Delete", toolbarSize)) {
+                deleteNode(panel, document, panel.selectedNodeId);
+            }
+            if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+                blockGraphDrag = true;
+            }
+
+            ImGui::PopStyleColor(3);
+            ImGui::PopStyleVar(3);
+            ImGui::PopFont();
+            ImGui::PopID();
+        }
+
+        void handleNodeKeyboardDelete(GraphPanelState& panel, GraphDocument& document) {
+            if (panel.searchOpen || panel.pinLinkDrag.active || panel.selectedNodeId < 0) {
+                return;
+            }
+
+            ImGuiIO& io = ImGui::GetIO();
+            if (!ImGui::IsAnyItemActive() && !io.WantTextInput) {
+                if (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace)) {
+                    deleteNode(panel, document, panel.selectedNodeId);
+                }
+            }
+        }
+
         void handleNodeInteraction(GraphPanelState& panel, GraphDocument& document, const GridViewState& view,
                                    const ImVec2& displaySize, bool blockGraphDrag) {
             if (panel.pinLinkDrag.active) {
@@ -746,6 +863,9 @@ namespace mat::demo {
                         panel.nodeDragGrabOffset =
                             ImVec2(node->worldX - mouseWorld.x, node->worldY - mouseWorld.y);
                     }
+                } else if (hitTestSelectedNodeToolbar(io.MousePos, document, panel.selectedNodeId, view,
+                                                      displaySize)) {
+                    panel.leftDragActive = false;
                 } else {
                     panel.selectedNodeId = -1;
                     panel.draggingNodeId = -1;
@@ -829,10 +949,12 @@ namespace mat::demo {
 
         bool blockGraphDrag = false;
         drawNodeWidgets(document, view, displaySize, blockGraphDrag, nodeWidgetsInteractive);
+        drawSelectedNodeToolbar(panel, document, view, displaySize, blockGraphDrag, nodeWidgetsInteractive);
 
         if (!panel.searchOpen) {
             handlePinLinkInteraction(panel, document, view, displaySize, blockGraphDrag);
             handleNodeInteraction(panel, document, view, displaySize, blockGraphDrag);
+            handleNodeKeyboardDelete(panel, document);
             updateGridView(view, displaySize, panel);
 
             if (!panel.pinLinkDrag.active && ImGui::IsWindowHovered() &&

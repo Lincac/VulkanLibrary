@@ -60,4 +60,20 @@ namespace mat::demo {
         return false;
     }
 
+    bool GraphDocument::removeNode(int nodeId) {
+        const auto nodeIter = std::find_if(_nodes.begin(), _nodes.end(),
+                                           [nodeId](const GraphNode& node) { return node.id == nodeId; });
+        if (nodeIter == _nodes.end()) {
+            return false;
+        }
+
+        _nodes.erase(nodeIter);
+        _links.erase(std::remove_if(_links.begin(), _links.end(),
+                                    [nodeId](const GraphLink& link) {
+                                        return link.fromNodeId == nodeId || link.toNodeId == nodeId;
+                                    }),
+                     _links.end());
+        return true;
+    }
+
 }  // namespace mat::demo
