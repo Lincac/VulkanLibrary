@@ -16,6 +16,7 @@ namespace mat::demo {
         VkPipelineColorBlendState,
         VkPipelineColorBlendAttachmentState,
         VkColorWriteMask,
+        VkDynamicState,
         VkPipelineDynamicState,
         VkPipelineLayout,
         VkRenderPass,
@@ -41,6 +42,9 @@ namespace mat::demo {
     constexpr int kVkPipelineColorBlendAttachmentStateParamCount = 1;
     constexpr int kVkPipelineColorBlendAttachmentStateInputPinCount = 1;
     constexpr int kVkColorWriteMaskOutputPinCount = 4;
+    constexpr int kVkDynamicStateOutputPinCount = 5;
+    constexpr int kVkPipelineDynamicStateParamCount = 1;
+    constexpr int kVkPipelineDynamicStateInputPinCount = 1;
     constexpr int kVkPrimitiveTopologyOptionCount = 10;
     constexpr int kVkPolygonModeOptionCount = 3;
     constexpr int kVkCullModeOptionCount = 4;
@@ -55,6 +59,7 @@ namespace mat::demo {
     extern const char kVkPipelineMultisampleStateSType[];
     extern const char kVkPipelineDepthStencilStateSType[];
     extern const char kVkPipelineColorBlendStateSType[];
+    extern const char kVkPipelineDynamicStateSType[];
 
     struct NodeInputPinDef {
         const char* label;

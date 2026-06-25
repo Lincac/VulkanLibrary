@@ -30,6 +30,7 @@ namespace mat::demo {
             {NodeType::VkPipelineColorBlendState, "VkPipelineColorBlendState"},
             {NodeType::VkPipelineColorBlendAttachmentState, "VkPipelineColorBlendAttachmentState"},
             {NodeType::VkColorWriteMask, "VkColorWriteMask"},
+            {NodeType::VkDynamicState, "VkDynamicState"},
             {NodeType::VkPipelineDynamicState, "VkPipelineDynamicState"},
             {NodeType::VkPipelineLayout, "VkPipelineLayout"},
             {NodeType::VkRenderPass, "VkRenderPass"},

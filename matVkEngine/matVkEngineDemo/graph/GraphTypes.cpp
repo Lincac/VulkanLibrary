@@ -102,6 +102,14 @@ namespace mat::demo {
             "VK_COLOR_COMPONENT_A_BIT",
         };
 
+        constexpr const char kVkDynamicStateOutputPinLabels[kVkDynamicStateOutputPinCount][40] = {
+            "VK_DYNAMIC_STATE_VIEWPORT",
+            "VK_DYNAMIC_STATE_SCISSOR",
+            "VK_DYNAMIC_STATE_LINE_WIDTH",
+            "VK_DYNAMIC_STATE_BLEND_CONSTANTS",
+            "VK_DYNAMIC_STATE_DEPTH_BIAS",
+        };
+
         constexpr NodeInputPinDef kVkPipelineColorBlendStateInputs[kVkPipelineColorBlendStateInputPinCount] = {
             {"pAttachments", NodeType::VkPipelineColorBlendAttachmentState},
         };
@@ -111,11 +119,16 @@ namespace mat::demo {
                 {"colorWriteMask", NodeType::VkColorWriteMask},
             };
 
+        constexpr NodeInputPinDef kVkPipelineDynamicStateInputs[kVkPipelineDynamicStateInputPinCount] = {
+            {"pDynamicStates", NodeType::VkDynamicState},
+        };
+
         constexpr NodeType kPinLinkTargetNodeTypes[] = {
             NodeType::VkPipeline,
             NodeType::VkRenderPass,
             NodeType::VkPipelineColorBlendState,
             NodeType::VkPipelineColorBlendAttachmentState,
+            NodeType::VkPipelineDynamicState,
         };
 
     }  // namespace
@@ -134,6 +147,8 @@ namespace mat::demo {
         "VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO";
 
     const char kVkPipelineColorBlendStateSType[] = "VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO";
+
+    const char kVkPipelineDynamicStateSType[] = "VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO";
 
     const char* nodeTypeName(NodeType type) {
         switch (type) {
@@ -159,6 +174,8 @@ namespace mat::demo {
                 return "VkPipelineColorBlendAttachmentState";
             case NodeType::VkColorWriteMask:
                 return "VkColorWriteMask";
+            case NodeType::VkDynamicState:
+                return "VkDynamicState";
             case NodeType::VkPipelineDynamicState:
                 return "VkPipelineDynamicState";
             case NodeType::VkPipelineLayout:
@@ -220,6 +237,15 @@ namespace mat::demo {
         if (type == NodeType::VkColorWriteMask) {
             return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkColorWriteMaskOutputPinCount * kNodePinRowHeight);
         }
+        if (type == NodeType::VkDynamicState) {
+            return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkDynamicStateOutputPinCount * kNodePinRowHeight);
+        }
+        if (type == NodeType::VkPipelineDynamicState) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight +
+                              (kVkPipelineDynamicStateParamCount + kVkPipelineDynamicStateInputPinCount) *
+                                  kNodePinRowHeight);
+        }
         return ImVec2(kNodeWidth, kNodeHeaderHeight + kNodeEmptyBodyHeight);
     }
 
@@ -244,6 +270,9 @@ namespace mat::demo {
         if (type == NodeType::VkPipelineColorBlendAttachmentState && pinIndex == 0) {
             return true;
         }
+        if (type == NodeType::VkPipelineDynamicState && pinIndex == 0) {
+            return true;
+        }
         return false;
     }
 
@@ -260,6 +289,9 @@ namespace mat::demo {
         if (type == NodeType::VkPipelineColorBlendAttachmentState) {
             return kVkPipelineColorBlendAttachmentStateInputPinCount;
         }
+        if (type == NodeType::VkPipelineDynamicState) {
+            return kVkPipelineDynamicStateInputPinCount;
+        }
         return 0;
     }
 
@@ -275,6 +307,9 @@ namespace mat::demo {
         }
         if (type == NodeType::VkPipelineColorBlendAttachmentState) {
             return kVkPipelineColorBlendAttachmentStateParamCount + pinIndex;
+        }
+        if (type == NodeType::VkPipelineDynamicState) {
+            return kVkPipelineDynamicStateParamCount + pinIndex;
         }
         return pinIndex;
     }
@@ -304,6 +339,12 @@ namespace mat::demo {
             }
             return &kVkPipelineColorBlendAttachmentStateInputs[index];
         }
+        if (type == NodeType::VkPipelineDynamicState) {
+            if (index < 0 || index >= kVkPipelineDynamicStateInputPinCount) {
+                return nullptr;
+            }
+            return &kVkPipelineDynamicStateInputs[index];
+        }
         return nullptr;
     }
 
@@ -314,6 +355,9 @@ namespace mat::demo {
         if (type == NodeType::VkColorWriteMask) {
             return kVkColorWriteMaskOutputPinCount;
         }
+        if (type == NodeType::VkDynamicState) {
+            return kVkDynamicStateOutputPinCount;
+        }
         return 1;
     }
 
@@ -323,6 +367,12 @@ namespace mat::demo {
                 return "";
             }
             return kVkColorWriteMaskOutputPinLabels[pinIndex];
+        }
+        if (type == NodeType::VkDynamicState) {
+            if (pinIndex < 0 || pinIndex >= kVkDynamicStateOutputPinCount) {
+                return "";
+            }
+            return kVkDynamicStateOutputPinLabels[pinIndex];
         }
         return nodeTypeName(type);
     }

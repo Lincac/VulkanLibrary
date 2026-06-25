@@ -108,7 +108,7 @@ namespace mat::demo {
             }
 
             const NodeScreenLayout layout = buildNodeScreenLayout(node.worldX, node.worldY, node.type, view, displaySize);
-            if (node.type == NodeType::VkColorWriteMask) {
+            if (node.type == NodeType::VkColorWriteMask || node.type == NodeType::VkDynamicState) {
                 const float rowCenterY =
                     layout.topLeft.y + layout.headerHeight + (resolvedPinIndex + 0.5f) * layout.pinRowHeight;
                 outPos = ImVec2(layout.bottomRight.x, rowCenterY);
@@ -1362,6 +1362,74 @@ namespace mat::demo {
             }
         }
 
+        void drawVkDynamicStateContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
+                                       const NodeTheme& theme, const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+            const ImVec2& topLeft = layout.topLeft;
+            const ImVec2& bottomRight = layout.bottomRight;
+
+            for (int pinIndex = 0; pinIndex < kVkDynamicStateOutputPinCount; ++pinIndex) {
+                const float rowCenterY = topLeft.y + layout.headerHeight + (pinIndex + 0.5f) * layout.pinRowHeight;
+                drawScaledText(drawList,
+                               ImVec2(topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
+                               nodeOutputPinLabel(node.type, pinIndex), layout.fontSize);
+
+                const bool highlighted = isPinHighlighted(hoveredPin, node.id, pinIndex, false) ||
+                                         isPinLinkSource(panel, node.id, pinIndex, false);
+                drawPin(drawList, ImVec2(bottomRight.x, rowCenterY), layout.zoom, pinColor, highlighted);
+            }
+        }
+
+        void drawVkPipelineDynamicStateContent(ImDrawList* drawList, const GraphNode& node,
+                                               const NodeScreenLayout& layout, const NodeTheme& theme,
+                                               const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+            const ImVec2& topLeft = layout.topLeft;
+
+            const float sTypeRowY = nodeParamRowCenterY(layout, 0);
+            drawScaledText(drawList, ImVec2(topLeft.x + labelPadX, sTypeRowY - layout.fontSize * 0.5f), theme.pinLabel,
+                           "sType", layout.fontSize);
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            if (layout.zoom < kMinWidgetZoom) {
+                const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f,
+                                                                        kVkPipelineDynamicStateSType);
+                const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+                const float valueRightX = fieldLayout.sTypeFieldX + fieldLayout.sTypeFieldWidth - 4.f * layout.zoom;
+                drawScaledText(drawList, ImVec2(valueRightX - textSize.x, sTypeRowY - layout.fontSize * 0.5f),
+                               theme.pinLabel, kVkPipelineDynamicStateSType, layout.fontSize);
+            }
+
+            drawNodeInputPinRow(drawList, node, 0, layout, theme, panel, hoveredPin, labelPadX, pinColor);
+            drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
+        }
+
+        void drawVkPipelineDynamicStateWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                                               bool& blockGraphDrag) {
+            const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            const float sTypeRowY = nodeParamRowCenterY(layout, 0) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.sTypeFieldX, sTypeRowY));
+            ImGui::SetNextItemWidth(fieldLayout.sTypeFieldWidth);
+            char sTypeText[128];
+            std::snprintf(sTypeText, sizeof(sTypeText), "%s", kVkPipelineDynamicStateSType);
+            ImGui::BeginDisabled();
+            ImGui::InputText("##sType", sTypeText, sizeof(sTypeText), ImGuiInputTextFlags_ReadOnly);
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("%s", kVkPipelineDynamicStateSType);
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
         void drawNodeChrome(ImDrawList* drawList, const ImVec2& topLeft, const ImVec2& bottomRight, float headerHeight,
                             float rounding, const NodeTheme& theme, bool selected) {
             const ImVec2 headerBottomRight(bottomRight.x, topLeft.y + headerHeight);
@@ -1453,6 +1521,10 @@ namespace mat::demo {
                 drawVkPipelineColorBlendAttachmentStateContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::VkColorWriteMask) {
                 drawVkColorWriteMaskContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkDynamicState) {
+                drawVkDynamicStateContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkPipelineDynamicState) {
+                drawVkPipelineDynamicStateContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (nodeHasOutputPin(node.type)) {
                 const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
                 const bool highlighted = isPinHighlighted(hoveredPin, node.id, 0, false) ||
@@ -1514,6 +1586,8 @@ namespace mat::demo {
                     drawVkPipelineColorBlendStateWidgets(*editable, layout, interactive, blockGraphDrag);
                 } else if (node.type == NodeType::VkPipelineColorBlendAttachmentState) {
                     drawVkPipelineColorBlendAttachmentStateWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkPipelineDynamicState) {
+                    drawVkPipelineDynamicStateWidgets(*editable, layout, interactive, blockGraphDrag);
                 }
 
                 ImGui::PopID();
