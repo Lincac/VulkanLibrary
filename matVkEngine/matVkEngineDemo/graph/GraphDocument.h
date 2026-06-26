@@ -126,6 +126,7 @@ namespace mat::demo {
     public:
         int addNode(NodeType type, float worldX, float worldY);
         int addLink(int fromNodeId, int fromPinIndex, int toNodeId, int toPinIndex);
+        bool removeLink(int linkId);
 
         GraphNode* findNode(int nodeId);
         const GraphNode* findNode(int nodeId) const;

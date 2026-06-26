@@ -315,8 +315,13 @@ namespace mat::demo {
                    isPinLinkSource(*g_pinHighlightPanel, nodeId, pinIndex, isInput);
         }
 
+        bool shouldHideLinkDuringPinDrag(const GraphPanelState& panel, const GraphLink& link) {
+            return panel.pinLinkDrag.active && panel.pinLinkDrag.dragged && panel.pinLinkDrag.pickingExistingLink &&
+                   panel.pinLinkDrag.existingLinkId == link.id;
+        }
+
         void drawGraphLinks(const GraphDocument& document, const GridViewState& view, const ImVec2& displaySize,
-                            const PinHit& hoveredPin) {
+                            const PinHit& hoveredPin, const GraphPanelState& panel) {
             ImDrawList* drawList = ImGui::GetBackgroundDrawList();
             const ImU32 linkColor = IM_COL32(210, 210, 220, 235);
             const ImU32 highlightLinkColor = IM_COL32(232, 196, 118, 255);
@@ -324,6 +329,10 @@ namespace mat::demo {
             const float highlightThickness = thickness + 1.2f;
 
             for (const GraphLink& link : document.links()) {
+                if (shouldHideLinkDuringPinDrag(panel, link)) {
+                    continue;
+                }
+
                 const GraphNode* fromNode = document.findNode(link.fromNodeId);
                 const GraphNode* toNode = document.findNode(link.toNodeId);
                 if (fromNode == nullptr || toNode == nullptr) {
@@ -343,39 +352,103 @@ namespace mat::demo {
             }
         }
 
+        const GraphLink* findLinkById(const GraphDocument& document, int linkId) {
+            for (const GraphLink& link : document.links()) {
+                if (link.id == linkId) {
+                    return &link;
+                }
+            }
+            return nullptr;
+        }
+
+        bool getPinLinkPreviewWire(const GraphPanelState& panel, const GraphDocument& document,
+                                   const GridViewState& view, const ImVec2& displaySize, ImVec2& outStart,
+                                   ImVec2& outEnd, bool& outStartIsOutput) {
+            if (panel.pinLinkDrag.active && panel.pinLinkDrag.dragged) {
+                const PinLinkDrag& drag = panel.pinLinkDrag;
+                outEnd = ImGui::GetIO().MousePos;
+
+                if (drag.pickingExistingLink) {
+                    const GraphLink* link = findLinkById(document, drag.existingLinkId);
+                    if (link == nullptr) {
+                        return false;
+                    }
+
+                    if (drag.fromInput) {
+                        const GraphNode* fromNode = document.findNode(link->fromNodeId);
+                        if (fromNode == nullptr ||
+                            !getOutputPinScreenPos(*fromNode, link->fromPinIndex, view, displaySize, outStart)) {
+                            return false;
+                        }
+                        outStartIsOutput = true;
+                        return true;
+                    }
+
+                    const GraphNode* toNode = document.findNode(link->toNodeId);
+                    if (toNode == nullptr ||
+                        !getInputPinScreenPos(*toNode, link->toPinIndex, view, displaySize, outStart)) {
+                        return false;
+                    }
+                    outStartIsOutput = false;
+                    return true;
+                }
+
+                if (drag.fromInput) {
+                    const GraphNode* inputNode = document.findNode(drag.nodeId);
+                    if (inputNode == nullptr ||
+                        !getInputPinScreenPos(*inputNode, drag.pinIndex, view, displaySize, outStart)) {
+                        return false;
+                    }
+                    outStartIsOutput = false;
+                    return true;
+                }
+
+                const GraphNode* outputNode = document.findNode(drag.nodeId);
+                if (outputNode == nullptr ||
+                    !getOutputPinScreenPos(*outputNode, drag.pinIndex, view, displaySize, outStart)) {
+                    return false;
+                }
+                outStartIsOutput = true;
+                return true;
+            }
+
+            if (!panel.pinLinkPreview.active) {
+                return false;
+            }
+
+            outEnd = panel.pinLinkPreview.endScreen;
+            if (panel.pinLinkPreview.fromInput) {
+                const GraphNode* inputNode = document.findNode(panel.pinLinkPreview.nodeId);
+                if (inputNode == nullptr ||
+                    !getInputPinScreenPos(*inputNode, panel.pinLinkPreview.pinIndex, view, displaySize, outStart)) {
+                    return false;
+                }
+                outStartIsOutput = false;
+                return true;
+            }
+
+            const GraphNode* outputNode = document.findNode(panel.pinLinkPreview.nodeId);
+            if (outputNode == nullptr ||
+                !getOutputPinScreenPos(*outputNode, panel.pinLinkPreview.pinIndex, view, displaySize, outStart)) {
+                return false;
+            }
+            outStartIsOutput = true;
+            return true;
+        }
+
         void drawPinLinkPreview(const GraphPanelState& panel, const GraphDocument& document, const GridViewState& view,
                                 const ImVec2& displaySize) {
             ImVec2 startPos;
             ImVec2 endPos;
-            bool fromInput = false;
-            bool shouldDraw = false;
-
-            if (panel.pinLinkDrag.active && panel.pinLinkDrag.dragged) {
-                if (!getPinScreenPos(document, panel.pinLinkDrag.nodeId, panel.pinLinkDrag.pinIndex,
-                                     panel.pinLinkDrag.fromInput, view, displaySize, startPos)) {
-                    return;
-                }
-                endPos = ImGui::GetIO().MousePos;
-                fromInput = panel.pinLinkDrag.fromInput;
-                shouldDraw = true;
-            } else if (panel.pinLinkPreview.active) {
-                if (!getPinScreenPos(document, panel.pinLinkPreview.nodeId, panel.pinLinkPreview.pinIndex,
-                                     panel.pinLinkPreview.fromInput, view, displaySize, startPos)) {
-                    return;
-                }
-                endPos = panel.pinLinkPreview.endScreen;
-                fromInput = panel.pinLinkPreview.fromInput;
-                shouldDraw = true;
-            }
-
-            if (!shouldDraw) {
+            bool startIsOutput = false;
+            if (!getPinLinkPreviewWire(panel, document, view, displaySize, startPos, endPos, startIsOutput)) {
                 return;
             }
 
             ImDrawList* drawList = ImGui::GetBackgroundDrawList();
             const ImU32 previewColor = IM_COL32(245, 245, 250, 245);
             const float thickness = std::max(2.5f, 3.f * view.zoom);
-            drawComfyBezierLink(drawList, startPos, endPos, !fromInput, previewColor, thickness, true);
+            drawComfyBezierLink(drawList, startPos, endPos, startIsOutput, previewColor, thickness, true);
         }
 
         void clearPinLinkPreview(GraphPanelState& panel) {
@@ -384,6 +457,63 @@ namespace mat::demo {
             panel.pinLinkPreview.pinIndex = -1;
             panel.pinLinkPreview.fromInput = false;
             panel.pinLinkPreview.endScreen = ImVec2{};
+        }
+
+        void resetPinLinkDrag(PinLinkDrag& drag) {
+            drag.active = false;
+            drag.dragged = false;
+            drag.fromInput = false;
+            drag.pickingExistingLink = false;
+            drag.nodeId = -1;
+            drag.pinIndex = -1;
+            drag.existingLinkId = -1;
+            drag.startScreen = ImVec2{};
+        }
+
+        const GraphLink* findLinkOnPinAtPos(const GraphDocument& document, int nodeId, int pinIndex, bool isInput,
+                                            const GridViewState& view, const ImVec2& displaySize,
+                                            const ImVec2& screenPos) {
+            const GraphLink* bestLink = nullptr;
+            float bestDistSq = FLT_MAX;
+
+            for (const GraphLink& link : document.links()) {
+                const bool matches = isInput ? (link.toNodeId == nodeId && link.toPinIndex == pinIndex)
+                                             : (link.fromNodeId == nodeId && link.fromPinIndex == pinIndex);
+                if (!matches) {
+                    continue;
+                }
+
+                const GraphNode* otherNode = document.findNode(isInput ? link.fromNodeId : link.toNodeId);
+                if (otherNode == nullptr) {
+                    continue;
+                }
+
+                ImVec2 otherPinPos;
+                if (isInput) {
+                    if (!getOutputPinScreenPos(*otherNode, link.fromPinIndex, view, displaySize, otherPinPos)) {
+                        continue;
+                    }
+                } else if (!getInputPinScreenPos(*otherNode, link.toPinIndex, view, displaySize, otherPinPos)) {
+                    continue;
+                }
+
+                const float dx = screenPos.x - otherPinPos.x;
+                const float dy = screenPos.y - otherPinPos.y;
+                const float distSq = dx * dx + dy * dy;
+                if (distSq < bestDistSq) {
+                    bestDistSq = distSq;
+                    bestLink = &link;
+                }
+            }
+
+            return bestLink;
+        }
+
+        void unbindPickedPinLink(GraphDocument& document, const PinLinkDrag& drag) {
+            if (!drag.pickingExistingLink || drag.existingLinkId < 0) {
+                return;
+            }
+            document.removeLink(drag.existingLinkId);
         }
 
         bool canConnectPinLink(const GraphDocument& document, const PinLinkDrag& drag, const PinHit& target) {
@@ -520,19 +650,24 @@ namespace mat::demo {
                 if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
                     if (panel.pinLinkDrag.dragged) {
                         const PinHit targetPin = hitTestPin(io.MousePos, document, view, displaySize);
-                        if (!tryConnectPinLink(document, panel.pinLinkDrag, targetPin)) {
+                        if (tryConnectPinLink(document, panel.pinLinkDrag, targetPin)) {
+                            clearPinLinkPreview(panel);
+                        } else if (panel.pinLinkDrag.pickingExistingLink) {
+                            unbindPickedPinLink(document, panel.pinLinkDrag);
+                            clearPinLinkPreview(panel);
+                        } else {
                             panel.pinLinkPreview.active = true;
                             panel.pinLinkPreview.fromInput = panel.pinLinkDrag.fromInput;
                             panel.pinLinkPreview.nodeId = panel.pinLinkDrag.nodeId;
                             panel.pinLinkPreview.pinIndex = panel.pinLinkDrag.pinIndex;
                             panel.pinLinkPreview.endScreen = io.MousePos;
                             openPinLinkSearch(panel, io.MousePos, view, displaySize, document);
-                        } else {
-                            clearPinLinkPreview(panel);
                         }
+                    } else if (panel.pinLinkDrag.pickingExistingLink) {
+                        unbindPickedPinLink(document, panel.pinLinkDrag);
+                        clearPinLinkPreview(panel);
                     }
-                    panel.pinLinkDrag.active = false;
-                    panel.pinLinkDrag.dragged = false;
+                    resetPinLinkDrag(panel.pinLinkDrag);
                 }
                 return;
             }
@@ -546,8 +681,17 @@ namespace mat::demo {
                     panel.pinLinkDrag.fromInput = pinHit.isInput;
                     panel.pinLinkDrag.nodeId = pinHit.nodeId;
                     panel.pinLinkDrag.pinIndex = pinHit.pinIndex;
+                    panel.pinLinkDrag.pickingExistingLink = false;
+                    panel.pinLinkDrag.existingLinkId = -1;
                     panel.leftDragActive = false;
                     panel.draggingNodeId = -1;
+
+                    if (const GraphLink* existingLink =
+                            findLinkOnPinAtPos(document, pinHit.nodeId, pinHit.pinIndex, pinHit.isInput, view,
+                                               displaySize, io.MousePos)) {
+                        panel.pinLinkDrag.pickingExistingLink = true;
+                        panel.pinLinkDrag.existingLinkId = existingLink->id;
+                    }
 
                     const GraphNode* pinNode = document.findNode(pinHit.nodeId);
                     if (pinNode != nullptr) {
@@ -4109,8 +4253,7 @@ namespace mat::demo {
                 panel.draggingNodeId = -1;
             }
             if (panel.pinLinkDrag.nodeId == nodeId) {
-                panel.pinLinkDrag.active = false;
-                panel.pinLinkDrag.dragged = false;
+                resetPinLinkDrag(panel.pinLinkDrag);
             }
             if (panel.pinLinkPreview.nodeId == nodeId) {
                 clearPinLinkPreview(panel);
@@ -4313,7 +4456,7 @@ namespace mat::demo {
 
         drawInfiniteGrid(ImVec2(0.f, 0.f), displaySize, view);
         beginPinHighlightContext(document, panel, hoveredPin);
-        drawGraphLinks(document, view, displaySize, hoveredPin);
+        drawGraphLinks(document, view, displaySize, hoveredPin, panel);
         drawPinLinkPreview(panel, document, view, displaySize);
         drawGraphNodes(document, view, displaySize, panel.selectedNodeId, panel, hoveredPin);
         endPinHighlightContext();

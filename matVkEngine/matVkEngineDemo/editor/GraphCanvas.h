@@ -20,8 +20,10 @@ namespace mat::demo {
         bool active = false;
         bool dragged = false;
         bool fromInput = false;
+        bool pickingExistingLink = false;
         int nodeId = -1;
         int pinIndex = -1;
+        int existingLinkId = -1;
         ImVec2 startScreen{};
     };
 

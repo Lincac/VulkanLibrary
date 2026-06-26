@@ -382,6 +382,16 @@ namespace mat::demo {
                      _links.end());
     }
 
+    bool GraphDocument::removeLink(int linkId) {
+        const auto linkIter = std::find_if(_links.begin(), _links.end(),
+                                           [linkId](const GraphLink& link) { return link.id == linkId; });
+        if (linkIter == _links.end()) {
+            return false;
+        }
+        _links.erase(linkIter);
+        return true;
+    }
+
     int GraphDocument::addLink(int fromNodeId, int fromPinIndex, int toNodeId, int toPinIndex) {
         if (fromPinIndex < 0) {
             fromPinIndex = 0;
