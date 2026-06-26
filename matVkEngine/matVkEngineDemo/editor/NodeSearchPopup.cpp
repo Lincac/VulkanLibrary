@@ -42,6 +42,9 @@ namespace mat::demo {
             {NodeType::VkSubpassDescription, "VkSubpassDescription"},
             {NodeType::VkSubpassDependency, "VkSubpassDependency"},
             {NodeType::VkAttachmentReference, "VkAttachmentReference"},
+            {NodeType::VkImage, "VkImage"},
+            {NodeType::VkImageView, "VkImageView"},
+            {NodeType::VkFramebuffer, "VkFramebuffer"},
         };
 
     }  // namespace

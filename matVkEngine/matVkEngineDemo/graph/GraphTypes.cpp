@@ -18,6 +18,15 @@ namespace mat::demo {
             {"VkRenderPass", NodeType::VkRenderPass},
         };
 
+        constexpr NodeInputPinDef kVkFramebufferInputs[kVkFramebufferInputPinCount] = {
+            {"renderPass", NodeType::VkRenderPass},
+            {"pAttachments", NodeType::VkImageView},
+        };
+
+        constexpr NodeInputPinDef kVkImageViewInputs[kVkImageViewInputPinCount] = {
+            {"image", NodeType::VkImage},
+        };
+
         constexpr NodeInputPinDef kVkSubpassDescriptionInputs[kVkSubpassDescriptionInputPinCount] = {
             {"pColorAttachments", NodeType::VkAttachmentReference},
             {"pDepthStencilAttachment", NodeType::VkAttachmentReference},
@@ -52,6 +61,16 @@ namespace mat::demo {
             "VK_PIPELINE_BIND_POINT_COMPUTE",
         };
 
+        constexpr const char kVkImageViewTypeOptionNames[kVkImageViewTypeOptionCount][36] = {
+            "VK_IMAGE_VIEW_TYPE_1D",
+            "VK_IMAGE_VIEW_TYPE_2D",
+            "VK_IMAGE_VIEW_TYPE_3D",
+            "VK_IMAGE_VIEW_TYPE_CUBE",
+            "VK_IMAGE_VIEW_TYPE_1D_ARRAY",
+            "VK_IMAGE_VIEW_TYPE_2D_ARRAY",
+            "VK_IMAGE_VIEW_TYPE_CUBE_ARRAY",
+        };
+
         constexpr NodeType kPinLinkTargetNodeTypes[] = {
             NodeType::VkPipeline,
             NodeType::VkRenderPass,
@@ -63,6 +82,8 @@ namespace mat::demo {
             NodeType::VkPipelineLayout,
             NodeType::VkDescriptorSetLayout,
             NodeType::VkSubpassDescription,
+            NodeType::VkFramebuffer,
+            NodeType::VkImageView,
         };
 
         constexpr const char kVkPrimitiveTopologyOptionNames[kVkPrimitiveTopologyOptionCount][64] = {
@@ -240,6 +261,10 @@ namespace mat::demo {
 
     const char kVkDescriptorSetLayoutBindingNullSampler[] = "nullptr";
 
+    const char kVkFramebufferSType[] = "VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO";
+
+    const char kVkImageViewSType[] = "VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO";
+
     const char* nodeTypeName(NodeType type) {
         switch (type) {
             case NodeType::VkPipeline:
@@ -288,6 +313,12 @@ namespace mat::demo {
                 return "VkSubpassDependency";
             case NodeType::VkAttachmentReference:
                 return "VkAttachmentReference";
+            case NodeType::VkImage:
+                return "VkImage";
+            case NodeType::VkImageView:
+                return "VkImageView";
+            case NodeType::VkFramebuffer:
+                return "VkFramebuffer";
         }
         return "Unknown";
     }
@@ -403,6 +434,18 @@ namespace mat::demo {
             return ImVec2(kNodeWidth,
                           kNodeHeaderHeight + kVkAttachmentReferenceParamCount * kNodePinRowHeight);
         }
+        if (type == NodeType::VkImageView) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight +
+                              (kVkImageViewPrefixParamCount + kVkImageViewInputPinCount +
+                               kVkImageViewSuffixParamCount) *
+                                  kNodePinRowHeight);
+        }
+        if (type == NodeType::VkFramebuffer) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight +
+                              (kVkFramebufferParamCount + kVkFramebufferInputPinCount) * kNodePinRowHeight);
+        }
         return ImVec2(kNodeWidth, kNodeHeaderHeight + kNodeEmptyBodyHeight);
     }
 
@@ -439,6 +482,9 @@ namespace mat::demo {
         if (type == NodeType::VkSubpassDescription && pinIndex == 0) {
             return true;
         }
+        if (type == NodeType::VkFramebuffer && pinIndex == 1) {
+            return true;
+        }
         return false;
     }
 
@@ -448,6 +494,12 @@ namespace mat::demo {
         }
         if (type == NodeType::VkSubpassDescription) {
             return kVkSubpassDescriptionInputPinCount;
+        }
+        if (type == NodeType::VkFramebuffer) {
+            return kVkFramebufferInputPinCount;
+        }
+        if (type == NodeType::VkImageView) {
+            return kVkImageViewInputPinCount;
         }
         if (type == NodeType::VkPipelineVertexInputState) {
             return kVkPipelineVertexInputStateInputPinCount;
@@ -482,6 +534,12 @@ namespace mat::demo {
         }
         if (type == NodeType::VkSubpassDescription) {
             return kVkSubpassDescriptionParamCount + pinIndex;
+        }
+        if (type == NodeType::VkFramebuffer) {
+            return kVkFramebufferParamCount + pinIndex;
+        }
+        if (type == NodeType::VkImageView) {
+            return kVkImageViewPrefixParamCount + pinIndex;
         }
         if (type == NodeType::VkPipelineVertexInputState) {
             return kVkPipelineVertexInputStateParamCount + pinIndex;
@@ -519,6 +577,18 @@ namespace mat::demo {
                 return nullptr;
             }
             return &kVkSubpassDescriptionInputs[index];
+        }
+        if (type == NodeType::VkFramebuffer) {
+            if (index < 0 || index >= kVkFramebufferInputPinCount) {
+                return nullptr;
+            }
+            return &kVkFramebufferInputs[index];
+        }
+        if (type == NodeType::VkImageView) {
+            if (index < 0 || index >= kVkImageViewInputPinCount) {
+                return nullptr;
+            }
+            return &kVkImageViewInputs[index];
         }
         if (type == NodeType::VkRenderPass) {
             return nullptr;
@@ -622,6 +692,12 @@ namespace mat::demo {
     NodeType pinLinkTargetNodeTypeForSource(NodeType sourceType) {
         if (sourceType == NodeType::VkAttachmentDescription) {
             return NodeType::VkRenderPass;
+        }
+        if (sourceType == NodeType::VkImage) {
+            return NodeType::VkImageView;
+        }
+        if (sourceType == NodeType::VkImageView) {
+            return NodeType::VkFramebuffer;
         }
         for (NodeType nodeType : kPinLinkTargetNodeTypes) {
             if (nodeInputPinIndexForType(nodeType, sourceType) >= 0) {
@@ -734,6 +810,13 @@ namespace mat::demo {
             return "";
         }
         return kVkPipelineBindPointOptionNames[index];
+    }
+
+    const char* vkImageViewTypeOptionName(int index) {
+        if (index < 0 || index >= kVkImageViewTypeOptionCount) {
+            return "";
+        }
+        return kVkImageViewTypeOptionNames[index];
     }
 
 }  // namespace mat::demo

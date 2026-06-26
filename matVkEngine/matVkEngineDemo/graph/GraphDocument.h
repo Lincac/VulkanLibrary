@@ -69,6 +69,16 @@ namespace mat::demo {
         int subpassDependencyDstAccessMask = 0x00000050;
         int attachmentReferenceAttachment = 0;
         int attachmentReferenceLayout = 2;
+        int framebufferWidth = 800;
+        int framebufferHeight = 600;
+        int framebufferLayers = 1;
+        int imageViewViewType = 1;
+        int imageViewFormat = 0;
+        int imageViewAspectMask = 0x00000001;
+        int imageViewBaseMipLevel = 0;
+        int imageViewLevelCount = 1;
+        int imageViewBaseArrayLayer = 0;
+        int imageViewLayerCount = 1;
     };
 
     struct GraphLink {

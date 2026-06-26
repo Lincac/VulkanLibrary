@@ -28,6 +28,9 @@ namespace mat::demo {
         VkSubpassDescription,
         VkSubpassDependency,
         VkAttachmentReference,
+        VkImage,
+        VkImageView,
+        VkFramebuffer,
     };
 
     constexpr float kNodeWidth = 280.f;
@@ -43,6 +46,12 @@ namespace mat::demo {
     constexpr int kVkSubpassDescriptionInputPinCount = 2;
     constexpr int kVkSubpassDependencyParamCount = 6;
     constexpr int kVkAttachmentReferenceParamCount = 2;
+    constexpr int kVkImageViewPrefixParamCount = 1;
+    constexpr int kVkImageViewInputPinCount = 1;
+    constexpr int kVkImageViewSuffixParamCount = 7;
+    constexpr int kVkImageViewTypeOptionCount = 7;
+    constexpr int kVkFramebufferParamCount = 4;
+    constexpr int kVkFramebufferInputPinCount = 2;
     constexpr int kVkAttachmentLoadOpOptionCount = 3;
     constexpr int kVkAttachmentStoreOpOptionCount = 2;
     constexpr int kVkImageLayoutOptionCount = 10;
@@ -101,6 +110,8 @@ namespace mat::demo {
     extern const char kVkPipelineLayoutSType[];
     extern const char kVkDescriptorSetLayoutSType[];
     extern const char kVkDescriptorSetLayoutBindingNullSampler[];
+    extern const char kVkFramebufferSType[];
+    extern const char kVkImageViewSType[];
 
     struct NodeInputPinInfo {
         const char* label = "";
@@ -142,5 +153,6 @@ namespace mat::demo {
     const char* vkAttachmentStoreOpOptionName(int index);
     const char* vkImageLayoutOptionName(int index);
     const char* vkPipelineBindPointOptionName(int index);
+    const char* vkImageViewTypeOptionName(int index);
 
 }  // namespace mat::demo
