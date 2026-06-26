@@ -82,6 +82,38 @@ namespace mat::demo {
             "VK_IMAGE_TILING_LINEAR",
         };
 
+        constexpr const char kVkBufferSharingModeOptionNames[kVkBufferSharingModeOptionCount][36] = {
+            "VK_SHARING_MODE_EXCLUSIVE",
+            "VK_SHARING_MODE_CONCURRENT",
+        };
+
+        constexpr const char kVkFilterOptionNames[kVkFilterOptionCount][24] = {
+            "VK_FILTER_NEAREST",
+            "VK_FILTER_LINEAR",
+        };
+
+        constexpr const char kVkSamplerAddressModeOptionNames[kVkSamplerAddressModeOptionCount][48] = {
+            "VK_SAMPLER_ADDRESS_MODE_REPEAT",
+            "VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT",
+            "VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE",
+            "VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER",
+            "VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE",
+        };
+
+        constexpr const char kVkBorderColorOptionNames[kVkBorderColorOptionCount][44] = {
+            "VK_BORDER_COLOR_INT_OPAQUE_BLACK",
+            "VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK",
+            "VK_BORDER_COLOR_INT_OPAQUE_WHITE",
+            "VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE",
+            "VK_BORDER_COLOR_INT_TRANSPARENT_BLACK",
+            "VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK",
+        };
+
+        constexpr const char kVkSamplerMipmapModeOptionNames[kVkSamplerMipmapModeOptionCount][32] = {
+            "VK_SAMPLER_MIPMAP_MODE_NEAREST",
+            "VK_SAMPLER_MIPMAP_MODE_LINEAR",
+        };
+
         constexpr NodeType kPinLinkTargetNodeTypes[] = {
             NodeType::VkPipeline,
             NodeType::VkRenderPass,
@@ -96,6 +128,11 @@ namespace mat::demo {
             NodeType::VkFramebuffer,
             NodeType::VkImageView,
             NodeType::VkImage,
+            NodeType::VkWriteDescriptorSet,
+            NodeType::VkDescriptorBuffer,
+            NodeType::VkDescriptorImage,
+            NodeType::VkBuffer,
+            NodeType::Struct,
         };
 
         constexpr const char kVkPrimitiveTopologyOptionNames[kVkPrimitiveTopologyOptionCount][64] = {
@@ -238,6 +275,48 @@ namespace mat::demo {
             0x00000008,
         };
 
+        constexpr const char kVkBufferUsageOutputPinLabels[kVkBufferUsageOutputPinCount][44] = {
+            "VK_BUFFER_USAGE_TRANSFER_SRC_BIT",
+            "VK_BUFFER_USAGE_TRANSFER_DST_BIT",
+            "VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT",
+            "VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT",
+            "VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT",
+            "VK_BUFFER_USAGE_STORAGE_BUFFER_BIT",
+            "VK_BUFFER_USAGE_INDEX_BUFFER_BIT",
+            "VK_BUFFER_USAGE_VERTEX_BUFFER_BIT",
+            "VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT",
+        };
+
+        constexpr uint32_t kVkBufferUsageOutputPinValues[kVkBufferUsageOutputPinCount] = {
+            0x00000001,
+            0x00000002,
+            0x00000004,
+            0x00000008,
+            0x00000010,
+            0x00000020,
+            0x00000040,
+            0x00000080,
+            0x00000100,
+        };
+
+        constexpr const char kVkMemoryPropertyOutputPinLabels[kVkMemoryPropertyOutputPinCount][44] = {
+            "VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT",
+            "VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT",
+            "VK_MEMORY_PROPERTY_HOST_COHERENT_BIT",
+            "VK_MEMORY_PROPERTY_HOST_CACHED_BIT",
+            "VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT",
+            "VK_MEMORY_PROPERTY_PROTECTED_BIT",
+        };
+
+        constexpr uint32_t kVkMemoryPropertyOutputPinValues[kVkMemoryPropertyOutputPinCount] = {
+            0x00000001,
+            0x00000002,
+            0x00000004,
+            0x00000008,
+            0x00000010,
+            0x00000020,
+        };
+
         constexpr const char kVkDynamicStateOutputPinLabels[kVkDynamicStateOutputPinCount][40] = {
             "VK_DYNAMIC_STATE_VIEWPORT",
             "VK_DYNAMIC_STATE_SCISSOR",
@@ -274,6 +353,26 @@ namespace mat::demo {
 
         constexpr NodeInputPinDef kVkDescriptorSetLayoutInputs[kVkDescriptorSetLayoutInputPinCount] = {
             {"pBindings", NodeType::VkDescriptorSetLayoutBinding},
+        };
+
+        constexpr NodeInputPinDef kVkWriteDescriptorSetInputs[kVkWriteDescriptorSetInputPinCount] = {
+            {"pBufferInfo", NodeType::VkDescriptorBuffer},
+            {"pImageInfo", NodeType::VkDescriptorImage},
+        };
+
+        constexpr NodeInputPinDef kVkDescriptorBufferInputs[kVkDescriptorBufferInputPinCount] = {
+            {"buffer", NodeType::VkBuffer},
+        };
+
+        constexpr NodeInputPinDef kVkBufferInputs[kVkBufferInputPinCount] = {
+            {"size", NodeType::Struct},
+            {"usage", NodeType::VkBufferUsage},
+            {"memory flag", NodeType::VkMemoryProperty},
+        };
+
+        constexpr NodeInputPinDef kVkDescriptorImageInputs[kVkDescriptorImageInputPinCount] = {
+            {"imageView", NodeType::VkImageView},
+            {"sampler", NodeType::VkSampler},
         };
 
         constexpr const char kVkDescriptorTypeOptionNames[kVkDescriptorTypeOptionCount][48] = {
@@ -335,11 +434,17 @@ namespace mat::demo {
 
     const char kVkDescriptorSetLayoutBindingNullSampler[] = "nullptr";
 
+    const char kVkWriteDescriptorSetSType[] = "VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET";
+
     const char kVkFramebufferSType[] = "VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO";
 
     const char kVkImageSType[] = "VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO";
 
     const char kVkImageViewSType[] = "VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO";
+
+    const char kVkSamplerSType[] = "VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO";
+
+    const char kVkBufferSType[] = "VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO";
 
     const char* nodeTypeName(NodeType type) {
         switch (type) {
@@ -377,6 +482,14 @@ namespace mat::demo {
                 return "VkDescriptorSetLayoutBinding";
             case NodeType::VkDescriptorSetLayout:
                 return "VkDescriptorSetLayout";
+            case NodeType::VkBuffer:
+                return "VkBuffer";
+            case NodeType::VkWriteDescriptorSet:
+                return "VkWriteDescriptorSet";
+            case NodeType::VkDescriptorBuffer:
+                return "VkDescriptorBuffer";
+            case NodeType::VkDescriptorImage:
+                return "VkDescriptorImage";
             case NodeType::VkPipelineLayout:
                 return "VkPipelineLayout";
             case NodeType::VkRenderPass:
@@ -395,12 +508,34 @@ namespace mat::demo {
                 return "VkImageUsage";
             case NodeType::VkImageAspect:
                 return "VkImageAspect";
+            case NodeType::VkBufferUsage:
+                return "VkBufferUsage";
+            case NodeType::VkMemoryProperty:
+                return "VkMemoryProperty";
             case NodeType::VkImage:
                 return "VkImage";
             case NodeType::VkImageView:
                 return "VkImageView";
             case NodeType::VkFramebuffer:
                 return "VkFramebuffer";
+            case NodeType::VkSampler:
+                return "VkSampler";
+            case NodeType::Matrix4x4:
+                return "Matrix 4x4";
+            case NodeType::Matrix3x3:
+                return "Matrix 3x3";
+            case NodeType::Vector4:
+                return "Vector 4";
+            case NodeType::Vector3:
+                return "Vector 3";
+            case NodeType::Vector2:
+                return "Vector 2";
+            case NodeType::Float:
+                return "Float";
+            case NodeType::Int:
+                return "Int";
+            case NodeType::Struct:
+                return "Struct";
         }
         return "Unknown";
     }
@@ -480,6 +615,12 @@ namespace mat::demo {
         if (type == NodeType::VkImageUsage) {
             return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkImageUsageOutputPinCount * kNodePinRowHeight);
         }
+        if (type == NodeType::VkBufferUsage) {
+            return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkBufferUsageOutputPinCount * kNodePinRowHeight);
+        }
+        if (type == NodeType::VkMemoryProperty) {
+            return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkMemoryPropertyOutputPinCount * kNodePinRowHeight);
+        }
         if (type == NodeType::VkImageAspect) {
             return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkImageAspectOutputPinCount * kNodePinRowHeight);
         }
@@ -506,6 +647,28 @@ namespace mat::demo {
         if (type == NodeType::VkDescriptorSetLayoutBinding) {
             return ImVec2(kNodeWidth,
                           kNodeHeaderHeight + kVkDescriptorSetLayoutBindingParamCount * kNodePinRowHeight);
+        }
+        if (type == NodeType::VkBuffer) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight +
+                              (kVkBufferPrefixParamCount + kVkBufferInputPinCount + kVkBufferSuffixParamCount) *
+                                  kNodePinRowHeight);
+        }
+        if (type == NodeType::VkWriteDescriptorSet) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight +
+                              (kVkWriteDescriptorSetParamCount + kVkWriteDescriptorSetInputPinCount) *
+                                  kNodePinRowHeight);
+        }
+        if (type == NodeType::VkDescriptorBuffer) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight +
+                              (kVkDescriptorBufferParamCount + kVkDescriptorBufferInputPinCount) * kNodePinRowHeight);
+        }
+        if (type == NodeType::VkDescriptorImage) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight +
+                              (kVkDescriptorImageParamCount + kVkDescriptorImageInputPinCount) * kNodePinRowHeight);
         }
         if (type == NodeType::VkAttachmentDescription) {
             return ImVec2(kNodeWidth,
@@ -543,6 +706,15 @@ namespace mat::demo {
                           kNodeHeaderHeight +
                               (kVkFramebufferParamCount + kVkFramebufferInputPinCount) * kNodePinRowHeight);
         }
+        if (type == NodeType::VkSampler) {
+            return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkSamplerParamCount * kNodePinRowHeight);
+        }
+        if (type == NodeType::Matrix4x4 || type == NodeType::Matrix3x3) {
+            return ImVec2(kNodeWidth, kNodeHeaderHeight + valueNodeBodyRowCount(type) * kNodePinRowHeight);
+        }
+        if (isScalarValueNodeType(type)) {
+            return ImVec2(kNodeWidth, kNodeHeaderHeight + kScalarValueNodeBodyRowCount * kNodePinRowHeight);
+        }
         return ImVec2(kNodeWidth, kNodeHeaderHeight + kNodeEmptyBodyHeight);
     }
 
@@ -551,7 +723,7 @@ namespace mat::demo {
     }
 
     bool nodeHasInputPins(NodeType type) {
-        if (type == NodeType::VkRenderPass) {
+        if (type == NodeType::VkRenderPass || type == NodeType::Struct) {
             return true;
         }
         return nodeInputPinCount(type) > 0;
@@ -586,6 +758,9 @@ namespace mat::demo {
             return true;
         }
         if (type == NodeType::VkImageView && pinIndex == 1) {
+            return true;
+        }
+        if (type == NodeType::VkBuffer && (pinIndex == 1 || pinIndex == 2)) {
             return true;
         }
         return false;
@@ -624,6 +799,18 @@ namespace mat::demo {
         }
         if (type == NodeType::VkDescriptorSetLayout) {
             return kVkDescriptorSetLayoutInputPinCount;
+        }
+        if (type == NodeType::VkWriteDescriptorSet) {
+            return kVkWriteDescriptorSetInputPinCount;
+        }
+        if (type == NodeType::VkDescriptorBuffer) {
+            return kVkDescriptorBufferInputPinCount;
+        }
+        if (type == NodeType::VkBuffer) {
+            return kVkBufferInputPinCount;
+        }
+        if (type == NodeType::VkDescriptorImage) {
+            return kVkDescriptorImageInputPinCount;
         }
         if (type == NodeType::VkPipelineShaderStage) {
             return kVkPipelineShaderStageInputPinCount;
@@ -667,6 +854,18 @@ namespace mat::demo {
         }
         if (type == NodeType::VkDescriptorSetLayout) {
             return kVkDescriptorSetLayoutParamCount + pinIndex;
+        }
+        if (type == NodeType::VkWriteDescriptorSet) {
+            return kVkWriteDescriptorSetParamCount + pinIndex;
+        }
+        if (type == NodeType::VkDescriptorBuffer) {
+            return kVkDescriptorBufferParamCount + pinIndex;
+        }
+        if (type == NodeType::VkBuffer) {
+            return kVkBufferPrefixParamCount + pinIndex;
+        }
+        if (type == NodeType::VkDescriptorImage) {
+            return kVkDescriptorImageParamCount + pinIndex;
         }
         if (type == NodeType::VkPipelineShaderStage) {
             return kVkPipelineShaderStagePrefixParamCount + pinIndex;
@@ -744,6 +943,30 @@ namespace mat::demo {
             }
             return &kVkDescriptorSetLayoutInputs[index];
         }
+        if (type == NodeType::VkWriteDescriptorSet) {
+            if (index < 0 || index >= kVkWriteDescriptorSetInputPinCount) {
+                return nullptr;
+            }
+            return &kVkWriteDescriptorSetInputs[index];
+        }
+        if (type == NodeType::VkDescriptorBuffer) {
+            if (index < 0 || index >= kVkDescriptorBufferInputPinCount) {
+                return nullptr;
+            }
+            return &kVkDescriptorBufferInputs[index];
+        }
+        if (type == NodeType::VkBuffer) {
+            if (index < 0 || index >= kVkBufferInputPinCount) {
+                return nullptr;
+            }
+            return &kVkBufferInputs[index];
+        }
+        if (type == NodeType::VkDescriptorImage) {
+            if (index < 0 || index >= kVkDescriptorImageInputPinCount) {
+                return nullptr;
+            }
+            return &kVkDescriptorImageInputs[index];
+        }
         if (type == NodeType::VkPipelineShaderStage) {
             if (index < 0 || index >= kVkPipelineShaderStageInputPinCount) {
                 return nullptr;
@@ -765,6 +988,12 @@ namespace mat::demo {
         }
         if (type == NodeType::VkImageUsage) {
             return kVkImageUsageOutputPinCount;
+        }
+        if (type == NodeType::VkBufferUsage) {
+            return kVkBufferUsageOutputPinCount;
+        }
+        if (type == NodeType::VkMemoryProperty) {
+            return kVkMemoryPropertyOutputPinCount;
         }
         if (type == NodeType::VkImageAspect) {
             return kVkImageAspectOutputPinCount;
@@ -796,6 +1025,18 @@ namespace mat::demo {
                 return "";
             }
             return kVkImageUsageOutputPinLabels[pinIndex];
+        }
+        if (type == NodeType::VkBufferUsage) {
+            if (pinIndex < 0 || pinIndex >= kVkBufferUsageOutputPinCount) {
+                return "";
+            }
+            return kVkBufferUsageOutputPinLabels[pinIndex];
+        }
+        if (type == NodeType::VkMemoryProperty) {
+            if (pinIndex < 0 || pinIndex >= kVkMemoryPropertyOutputPinCount) {
+                return "";
+            }
+            return kVkMemoryPropertyOutputPinLabels[pinIndex];
         }
         if (type == NodeType::VkImageAspect) {
             if (pinIndex < 0 || pinIndex >= kVkImageAspectOutputPinCount) {
@@ -832,14 +1073,26 @@ namespace mat::demo {
     }
 
     NodeType pinLinkTargetNodeTypeForSource(NodeType sourceType) {
+        if (isStructValueNodeType(sourceType)) {
+            return NodeType::Struct;
+        }
         if (sourceType == NodeType::VkAttachmentDescription) {
             return NodeType::VkRenderPass;
         }
         if (sourceType == NodeType::VkFormat || sourceType == NodeType::VkImageUsage) {
             return NodeType::VkImage;
         }
+        if (sourceType == NodeType::VkBufferUsage || sourceType == NodeType::VkMemoryProperty) {
+            return NodeType::VkBuffer;
+        }
         if (sourceType == NodeType::VkImageAspect) {
             return NodeType::VkImageView;
+        }
+        if (sourceType == NodeType::VkBuffer) {
+            return NodeType::VkDescriptorBuffer;
+        }
+        if (sourceType == NodeType::VkDescriptorBuffer || sourceType == NodeType::VkDescriptorImage) {
+            return NodeType::VkWriteDescriptorSet;
         }
         if (sourceType == NodeType::VkImage) {
             return NodeType::VkImageView;
@@ -863,6 +1116,47 @@ namespace mat::demo {
             }
         }
         return -1;
+    }
+
+    bool isStructValueNodeType(NodeType type) {
+        switch (type) {
+            case NodeType::Matrix4x4:
+            case NodeType::Matrix3x3:
+            case NodeType::Vector4:
+            case NodeType::Vector3:
+            case NodeType::Vector2:
+            case NodeType::Float:
+            case NodeType::Int:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    bool isScalarValueNodeType(NodeType type) {
+        switch (type) {
+            case NodeType::Vector4:
+            case NodeType::Vector3:
+            case NodeType::Vector2:
+            case NodeType::Float:
+            case NodeType::Int:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    int valueNodeBodyRowCount(NodeType type) {
+        if (type == NodeType::Matrix4x4) {
+            return kMatrix4x4RowCount;
+        }
+        if (type == NodeType::Matrix3x3) {
+            return kMatrix3x3RowCount;
+        }
+        if (isScalarValueNodeType(type)) {
+            return kScalarValueNodeBodyRowCount;
+        }
+        return kScalarValueNodeBodyRowCount;
     }
 
     const char* vkPrimitiveTopologyOptionName(int index) {
@@ -974,6 +1268,41 @@ namespace mat::demo {
         return kVkImageTilingOptionNames[index];
     }
 
+    const char* vkBufferSharingModeOptionName(int index) {
+        if (index < 0 || index >= kVkBufferSharingModeOptionCount) {
+            return "";
+        }
+        return kVkBufferSharingModeOptionNames[index];
+    }
+
+    const char* vkFilterOptionName(int index) {
+        if (index < 0 || index >= kVkFilterOptionCount) {
+            return "";
+        }
+        return kVkFilterOptionNames[index];
+    }
+
+    const char* vkSamplerAddressModeOptionName(int index) {
+        if (index < 0 || index >= kVkSamplerAddressModeOptionCount) {
+            return "";
+        }
+        return kVkSamplerAddressModeOptionNames[index];
+    }
+
+    const char* vkBorderColorOptionName(int index) {
+        if (index < 0 || index >= kVkBorderColorOptionCount) {
+            return "";
+        }
+        return kVkBorderColorOptionNames[index];
+    }
+
+    const char* vkSamplerMipmapModeOptionName(int index) {
+        if (index < 0 || index >= kVkSamplerMipmapModeOptionCount) {
+            return "";
+        }
+        return kVkSamplerMipmapModeOptionNames[index];
+    }
+
     int vkFormatOutputPinValue(int pinIndex) {
         if (pinIndex < 0 || pinIndex >= kVkFormatOutputPinCount) {
             return 0;
@@ -993,6 +1322,20 @@ namespace mat::demo {
             return 0;
         }
         return kVkImageAspectOutputPinValues[pinIndex];
+    }
+
+    uint32_t vkBufferUsageOutputPinValue(int pinIndex) {
+        if (pinIndex < 0 || pinIndex >= kVkBufferUsageOutputPinCount) {
+            return 0;
+        }
+        return kVkBufferUsageOutputPinValues[pinIndex];
+    }
+
+    uint32_t vkMemoryPropertyOutputPinValue(int pinIndex) {
+        if (pinIndex < 0 || pinIndex >= kVkMemoryPropertyOutputPinCount) {
+            return 0;
+        }
+        return kVkMemoryPropertyOutputPinValues[pinIndex];
     }
 
 }  // namespace mat::demo

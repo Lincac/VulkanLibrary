@@ -111,7 +111,8 @@ namespace mat::demo {
             const NodeScreenLayout layout = buildNodeScreenLayout(node, view, displaySize);
             if (node.type == NodeType::VkColorWriteMask || node.type == NodeType::VkDynamicState ||
                 node.type == NodeType::VkFormat || node.type == NodeType::VkImageUsage ||
-                node.type == NodeType::VkImageAspect || node.type == NodeType::Vertex) {
+                node.type == NodeType::VkImageAspect || node.type == NodeType::VkBufferUsage ||
+                node.type == NodeType::VkMemoryProperty || node.type == NodeType::Vertex) {
                 int bodyRow = resolvedPinIndex;
                 if (node.type == NodeType::Vertex) {
                     bodyRow = static_cast<int>(node.vertexAttributes.size()) + kVertexAddItemRowCount +
@@ -1337,6 +1338,254 @@ namespace mat::demo {
             return clicked;
         }
 
+        struct ValueChannelRowLayout {
+            float rowCenterY = 0.f;
+            float firstChannelX = 0.f;
+            float channelFieldWidth = 0.f;
+            float channelFieldGap = 0.f;
+            float fieldHeight = 0.f;
+        };
+
+        ValueChannelRowLayout buildValueChannelRowLayout(const NodeScreenLayout& layout, int rowIndex,
+                                                         int channelCount) {
+            ValueChannelRowLayout result{};
+            result.rowCenterY = nodeParamRowCenterY(layout, rowIndex);
+            result.fieldHeight = layout.fontSize + 4.f * layout.zoom;
+
+            const float sidePad = 14.f * layout.zoom;
+            result.channelFieldGap = 6.f * layout.zoom;
+            const float channelsAreaRight = layout.bottomRight.x - sidePad;
+            const float channelsAreaWidth = channelsAreaRight - (layout.topLeft.x + sidePad);
+            result.channelFieldWidth =
+                std::max(24.f * layout.zoom,
+                         (channelsAreaWidth - result.channelFieldGap * static_cast<float>(channelCount - 1)) /
+                             static_cast<float>(channelCount));
+            result.firstChannelX = layout.topLeft.x + sidePad;
+            return result;
+        }
+
+        void drawFloatChannelPreview(ImDrawList* drawList, const NodeScreenLayout& layout, const NodeTheme& theme,
+                                     const ValueChannelRowLayout& rowLayout, int channelIndex, float value) {
+            char valueText[32];
+            std::snprintf(valueText, sizeof(valueText), "%.1f", value);
+            const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, valueText);
+            const float channelX =
+                rowLayout.firstChannelX + static_cast<float>(channelIndex) *
+                                              (rowLayout.channelFieldWidth + rowLayout.channelFieldGap);
+            drawScaledText(drawList,
+                           ImVec2(channelX + rowLayout.channelFieldWidth - textSize.x,
+                                  rowLayout.rowCenterY - layout.fontSize * 0.5f),
+                           theme.pinLabel, valueText, layout.fontSize);
+        }
+
+        void drawFloatChannelWidgets(float& value, const ValueChannelRowLayout& rowLayout, int channelIndex,
+                                     bool interactive, bool& blockGraphDrag) {
+            const float channelX =
+                rowLayout.firstChannelX + static_cast<float>(channelIndex) *
+                                              (rowLayout.channelFieldWidth + rowLayout.channelFieldGap);
+            const float rowY = rowLayout.rowCenterY - rowLayout.fieldHeight * 0.5f;
+            ImGui::PushID(channelIndex);
+            ImGui::SetCursorScreenPos(ImVec2(channelX, rowY));
+            ImGui::SetNextItemWidth(rowLayout.channelFieldWidth);
+            ImGui::InputFloat("##channel", &value, 0.f, 0.f, "%.3f");
+            trackWidgetInteraction(interactive, blockGraphDrag);
+            ImGui::PopID();
+        }
+
+        void drawMatrixValueNodeContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
+                                        const NodeTheme& theme, const GraphPanelState& panel,
+                                        const PinHit& hoveredPin) {
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+            const int rowCount = valueNodeBodyRowCount(node.type);
+            const int colCount = node.type == NodeType::Matrix4x4 ? 4 : 3;
+            const float* values = node.type == NodeType::Matrix4x4 ? node.matrix4x4 : node.matrix3x3;
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            if (layout.zoom < kMinWidgetZoom) {
+                for (int rowIndex = 0; rowIndex < rowCount; ++rowIndex) {
+                    const ValueChannelRowLayout rowLayout = buildValueChannelRowLayout(layout, rowIndex, colCount);
+                    for (int colIndex = 0; colIndex < colCount; ++colIndex) {
+                        drawFloatChannelPreview(drawList, layout, theme, rowLayout, colIndex,
+                                                values[rowIndex * colCount + colIndex]);
+                    }
+                }
+            }
+
+            drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
+        }
+
+        void drawMatrixValueNodeWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                                        bool& blockGraphDrag) {
+            const int rowCount = valueNodeBodyRowCount(node.type);
+            const int colCount = node.type == NodeType::Matrix4x4 ? 4 : 3;
+            float* values = node.type == NodeType::Matrix4x4 ? node.matrix4x4 : node.matrix3x3;
+
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            for (int rowIndex = 0; rowIndex < rowCount; ++rowIndex) {
+                const ValueChannelRowLayout rowLayout = buildValueChannelRowLayout(layout, rowIndex, colCount);
+                ImGui::PushID(rowIndex);
+                for (int colIndex = 0; colIndex < colCount; ++colIndex) {
+                    drawFloatChannelWidgets(values[rowIndex * colCount + colIndex], rowLayout, colIndex, interactive,
+                                            blockGraphDrag);
+                }
+                ImGui::PopID();
+            }
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
+        void drawScalarValueNodeContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
+                                        const NodeTheme& theme, const GraphPanelState& panel,
+                                        const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            const float rowCenterY = nodeParamRowCenterY(layout, 0);
+            const bool isVector =
+                node.type == NodeType::Vector4 || node.type == NodeType::Vector3 || node.type == NodeType::Vector2;
+
+            if (!isVector) {
+                drawScaledText(drawList,
+                               ImVec2(layout.topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f),
+                               theme.pinLabel, "value", layout.fontSize);
+            }
+
+            if (layout.zoom < kMinWidgetZoom) {
+                if (isVector) {
+                    const int channelCount = node.type == NodeType::Vector4   ? kVector4ElementCount
+                                             : node.type == NodeType::Vector3 ? kVector3ElementCount
+                                                                              : kVector2ElementCount;
+                    const float* values = node.type == NodeType::Vector4   ? node.vector4
+                                          : node.type == NodeType::Vector3 ? node.vector3
+                                                                           : node.vector2;
+                    const ValueChannelRowLayout rowLayout = buildValueChannelRowLayout(layout, 0, channelCount);
+                    for (int channelIndex = 0; channelIndex < channelCount; ++channelIndex) {
+                        drawFloatChannelPreview(drawList, layout, theme, rowLayout, channelIndex, values[channelIndex]);
+                    }
+                } else {
+                    char valueText[128];
+                    if (node.type == NodeType::Float) {
+                        std::snprintf(valueText, sizeof(valueText), "%.3f", node.scalarFloat);
+                    } else {
+                        std::snprintf(valueText, sizeof(valueText), "%d", node.scalarInt);
+                    }
+                    const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, valueText);
+                    const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+                    const float valueRightX =
+                        fieldLayout.comboFieldX + fieldLayout.comboFieldWidth - 4.f * layout.zoom;
+                    drawScaledText(drawList, ImVec2(valueRightX - textSize.x, rowCenterY - layout.fontSize * 0.5f),
+                                   theme.pinLabel, valueText, layout.fontSize);
+                }
+            }
+
+            drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
+        }
+
+        void drawScalarValueNodeWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                                        bool& blockGraphDrag) {
+            const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            if (node.type == NodeType::Vector4 || node.type == NodeType::Vector3 || node.type == NodeType::Vector2) {
+                const int channelCount = node.type == NodeType::Vector4   ? kVector4ElementCount
+                                         : node.type == NodeType::Vector3 ? kVector3ElementCount
+                                                                          : kVector2ElementCount;
+                float* values = node.type == NodeType::Vector4   ? node.vector4
+                                : node.type == NodeType::Vector3 ? node.vector3
+                                                                 : node.vector2;
+                const ValueChannelRowLayout rowLayout = buildValueChannelRowLayout(layout, 0, channelCount);
+                for (int channelIndex = 0; channelIndex < channelCount; ++channelIndex) {
+                    drawFloatChannelWidgets(values[channelIndex], rowLayout, channelIndex, interactive,
+                                            blockGraphDrag);
+                }
+            } else {
+                const float rowY = nodeParamRowCenterY(layout, 0) - fieldLayout.fieldHeight * 0.5f;
+                ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, rowY));
+                ImGui::SetNextItemWidth(fieldLayout.comboFieldWidth);
+                if (node.type == NodeType::Float) {
+                    ImGui::InputFloat("##value", &node.scalarFloat, 0.f, 0.f, "%.3f");
+                } else {
+                    ImGui::InputInt("##value", &node.scalarInt, 0, 0);
+                }
+                trackWidgetInteraction(interactive, blockGraphDrag);
+            }
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
+        void drawStructContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
+                               const NodeTheme& theme, const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            const bool drawStaticPreview = layout.zoom < kMinWidgetZoom;
+
+            for (int slotIndex = 0; slotIndex < node.structInputSlotCount; ++slotIndex) {
+                const VertexRowLayout rowLayout = buildVertexRowLayout(layout, slotIndex);
+                const float rowCenterY = rowLayout.rowCenterY;
+
+                if (drawStaticPreview) {
+                    drawList->AddCircleFilled(ImVec2(rowLayout.deleteButtonCenterX, rowCenterY),
+                                              rowLayout.deleteButtonRadius, IM_COL32(72, 76, 90, 255));
+                    drawList->AddCircle(ImVec2(rowLayout.deleteButtonCenterX, rowCenterY), rowLayout.deleteButtonRadius,
+                                        IM_COL32(120, 125, 140, 255), 0, 1.f);
+                }
+
+                const bool highlighted = shouldHighlightPin(node.id, slotIndex, true);
+                drawPin(drawList, ImVec2(layout.topLeft.x, rowCenterY), layout.zoom, pinColor, highlighted);
+                drawScaledText(drawList, ImVec2(rowLayout.nameFieldX, rowCenterY - layout.fontSize * 0.5f),
+                               theme.pinLabel, "member", layout.fontSize);
+            }
+
+            const int addRowIndex = node.structInputSlotCount;
+            const VertexRowLayout addRowLayout = buildVertexRowLayout(layout, addRowIndex);
+            if (drawStaticPreview) {
+                drawList->AddCircleFilled(ImVec2(addRowLayout.deleteButtonCenterX, addRowLayout.rowCenterY),
+                                          addRowLayout.actionButtonRadius, IM_COL32(62, 102, 152, 255));
+                drawList->AddCircle(ImVec2(addRowLayout.deleteButtonCenterX, addRowLayout.rowCenterY),
+                                    addRowLayout.actionButtonRadius, IM_COL32(120, 125, 140, 255), 0, 1.f);
+                const ImVec2 addGlyphSize = ImGui::CalcTextSize("+");
+                drawList->AddText(ImVec2(addRowLayout.deleteButtonCenterX - addGlyphSize.x * 0.5f,
+                                         addRowLayout.rowCenterY - addGlyphSize.y * 0.5f),
+                                  IM_COL32(235, 235, 245, 255), "+");
+            }
+
+            drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
+        }
+
+        void drawStructWidgets(GraphDocument& document, GraphNode& node, const NodeScreenLayout& layout,
+                               bool interactive, bool& blockGraphDrag) {
+            for (int slotIndex = 0; slotIndex < node.structInputSlotCount; ++slotIndex) {
+                const VertexRowLayout rowLayout = buildVertexRowLayout(layout, slotIndex);
+
+                ImGui::PushID(slotIndex);
+                if (vertexCircleButton("##deleteStructMember",
+                                       ImVec2(rowLayout.deleteButtonCenterX, rowLayout.rowCenterY),
+                                       rowLayout.deleteButtonRadius, '-', true, IM_COL32(72, 76, 90, 255), interactive,
+                                       blockGraphDrag)) {
+                    document.removeStructInputSlot(node.id, slotIndex);
+                    ImGui::PopID();
+                    return;
+                }
+                ImGui::PopID();
+            }
+
+            const int addRowIndex = node.structInputSlotCount;
+            const VertexRowLayout addRowLayout = buildVertexRowLayout(layout, addRowIndex);
+            if (vertexCircleButton("##addStructMember", ImVec2(addRowLayout.deleteButtonCenterX, addRowLayout.rowCenterY),
+                                   addRowLayout.actionButtonRadius, '+', true, IM_COL32(62, 102, 152, 255), interactive,
+                                   blockGraphDrag)) {
+                document.addStructInputSlot(node.id);
+            }
+        }
+
         void drawVertexContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
                                const NodeTheme& theme, const GraphPanelState& panel, const PinHit& hoveredPin) {
             const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
@@ -2441,6 +2690,207 @@ namespace mat::demo {
             ImGui::PopFont();
         }
 
+        void drawVkSamplerContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
+                                  const NodeTheme& theme, const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+
+            static const char* kParamLabels[kVkSamplerParamCount] = {
+                "sType",           "magFilter",   "minFilter",   "addressModeU", "addressModeV", "addressModeW",
+                "anisotropyEnable", "borderColor", "unnormalizedCoordinates",
+                "compareEnable",   "compareOp",   "mipmapMode",
+            };
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            for (int rowIndex = 0; rowIndex < kVkSamplerParamCount; ++rowIndex) {
+                const float rowCenterY = nodeParamRowCenterY(layout, rowIndex);
+                drawScaledText(drawList,
+                               ImVec2(layout.topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
+                               kParamLabels[rowIndex], layout.fontSize);
+
+                if (layout.zoom >= kMinWidgetZoom) {
+                    continue;
+                }
+
+                char valueText[128];
+                switch (rowIndex) {
+                    case 0:
+                        std::snprintf(valueText, sizeof(valueText), "%s", kVkSamplerSType);
+                        break;
+                    case 1:
+                        std::snprintf(valueText, sizeof(valueText), "%s", vkFilterOptionName(node.samplerMagFilter));
+                        break;
+                    case 2:
+                        std::snprintf(valueText, sizeof(valueText), "%s", vkFilterOptionName(node.samplerMinFilter));
+                        break;
+                    case 3:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkSamplerAddressModeOptionName(node.samplerAddressModeU));
+                        break;
+                    case 4:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkSamplerAddressModeOptionName(node.samplerAddressModeV));
+                        break;
+                    case 5:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkSamplerAddressModeOptionName(node.samplerAddressModeW));
+                        break;
+                    case 6:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkBool32OptionName(node.samplerAnisotropyEnable));
+                        break;
+                    case 7:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkBorderColorOptionName(node.samplerBorderColor));
+                        break;
+                    case 8:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkBool32OptionName(node.samplerUnnormalizedCoordinates));
+                        break;
+                    case 9:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkBool32OptionName(node.samplerCompareEnable));
+                        break;
+                    case 10:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkCompareOpOptionName(node.samplerCompareOp));
+                        break;
+                    default:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkSamplerMipmapModeOptionName(node.samplerMipmapMode));
+                        break;
+                }
+
+                const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, valueText);
+                const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+                const float fieldWidth =
+                    rowIndex == 0 ? fieldLayout.sTypeFieldWidth : fieldLayout.comboFieldWidth;
+                const float fieldX = rowIndex == 0 ? fieldLayout.sTypeFieldX : fieldLayout.comboFieldX;
+                const float valueRightX = fieldX + fieldWidth - 4.f * layout.zoom;
+                drawScaledText(drawList, ImVec2(valueRightX - textSize.x, rowCenterY - layout.fontSize * 0.5f),
+                               theme.pinLabel, valueText, layout.fontSize);
+            }
+
+            drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
+        }
+
+        void drawVkSamplerWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                                  bool& blockGraphDrag) {
+            const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            drawSTypeParamWidget(kVkSamplerSType, layout, interactive, blockGraphDrag);
+
+            int* filterFields[] = {&node.samplerMagFilter, &node.samplerMinFilter};
+            for (int fieldIndex = 0; fieldIndex < 2; ++fieldIndex) {
+                const float rowY = nodeParamRowCenterY(layout, 1 + fieldIndex) - fieldLayout.fieldHeight * 0.5f;
+                ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, rowY));
+                ImGui::PushID(fieldIndex);
+                if (beginNodeCombo("##filter", vkFilterOptionName(*filterFields[fieldIndex]),
+                                   fieldLayout.comboFieldWidth)) {
+                    for (int optionIndex = 0; optionIndex < kVkFilterOptionCount; ++optionIndex) {
+                        const bool selected = *filterFields[fieldIndex] == optionIndex;
+                        if (ImGui::Selectable(vkFilterOptionName(optionIndex), selected)) {
+                            *filterFields[fieldIndex] = optionIndex;
+                        }
+                        if (selected) {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::PopID();
+                trackWidgetInteraction(interactive, blockGraphDrag);
+            }
+
+            int* addressModeFields[] = {&node.samplerAddressModeU, &node.samplerAddressModeV,
+                                        &node.samplerAddressModeW};
+            for (int fieldIndex = 0; fieldIndex < 3; ++fieldIndex) {
+                const float rowY = nodeParamRowCenterY(layout, 3 + fieldIndex) - fieldLayout.fieldHeight * 0.5f;
+                ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, rowY));
+                ImGui::PushID(fieldIndex);
+                if (beginNodeCombo("##addressMode", vkSamplerAddressModeOptionName(*addressModeFields[fieldIndex]),
+                                   fieldLayout.comboFieldWidth)) {
+                    for (int optionIndex = 0; optionIndex < kVkSamplerAddressModeOptionCount; ++optionIndex) {
+                        const bool selected = *addressModeFields[fieldIndex] == optionIndex;
+                        if (ImGui::Selectable(vkSamplerAddressModeOptionName(optionIndex), selected)) {
+                            *addressModeFields[fieldIndex] = optionIndex;
+                        }
+                        if (selected) {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::PopID();
+                trackWidgetInteraction(interactive, blockGraphDrag);
+            }
+
+            drawVkBool32Combo("##anisotropyEnable", node.samplerAnisotropyEnable, nodeParamRowCenterY(layout, 6),
+                              fieldLayout, interactive, blockGraphDrag);
+
+            const float borderColorRowY = nodeParamRowCenterY(layout, 7) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, borderColorRowY));
+            if (beginNodeCombo("##borderColor", vkBorderColorOptionName(node.samplerBorderColor),
+                               fieldLayout.comboFieldWidth)) {
+                for (int optionIndex = 0; optionIndex < kVkBorderColorOptionCount; ++optionIndex) {
+                    const bool selected = node.samplerBorderColor == optionIndex;
+                    if (ImGui::Selectable(vkBorderColorOptionName(optionIndex), selected)) {
+                        node.samplerBorderColor = optionIndex;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            drawVkBool32Combo("##unnormalizedCoordinates", node.samplerUnnormalizedCoordinates,
+                              nodeParamRowCenterY(layout, 8), fieldLayout, interactive, blockGraphDrag);
+            drawVkBool32Combo("##compareEnable", node.samplerCompareEnable, nodeParamRowCenterY(layout, 9),
+                              fieldLayout, interactive, blockGraphDrag);
+
+            const float compareOpRowY = nodeParamRowCenterY(layout, 10) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, compareOpRowY));
+            if (beginNodeCombo("##compareOp", vkCompareOpOptionName(node.samplerCompareOp),
+                               fieldLayout.comboFieldWidth)) {
+                for (int optionIndex = 0; optionIndex < kVkCompareOpOptionCount; ++optionIndex) {
+                    const bool selected = node.samplerCompareOp == optionIndex;
+                    if (ImGui::Selectable(vkCompareOpOptionName(optionIndex), selected)) {
+                        node.samplerCompareOp = optionIndex;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            const float mipmapModeRowY = nodeParamRowCenterY(layout, 11) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, mipmapModeRowY));
+            if (beginNodeCombo("##mipmapMode", vkSamplerMipmapModeOptionName(node.samplerMipmapMode),
+                               fieldLayout.comboFieldWidth)) {
+                for (int optionIndex = 0; optionIndex < kVkSamplerMipmapModeOptionCount; ++optionIndex) {
+                    const bool selected = node.samplerMipmapMode == optionIndex;
+                    if (ImGui::Selectable(vkSamplerMipmapModeOptionName(optionIndex), selected)) {
+                        node.samplerMipmapMode = optionIndex;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
         void drawVkFramebufferContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
                                       const NodeTheme& theme, const GraphPanelState& panel, const PinHit& hoveredPin) {
             const float labelPadX = 14.f * layout.zoom;
@@ -2678,6 +3128,272 @@ namespace mat::demo {
                                          bool& blockGraphDrag) {
             (void)node;
             drawSTypeParamWidget(kVkPipelineLayoutSType, layout, interactive, blockGraphDrag);
+        }
+
+        void drawVkBufferContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
+                                 const NodeTheme& theme, const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+
+            drawSTypeParamRow(drawList, layout, theme, labelPadX, kVkBufferSType);
+
+            for (int pinIndex = 0; pinIndex < kVkBufferInputPinCount; ++pinIndex) {
+                drawNodeInputPinRow(drawList, node, pinIndex, layout, theme, panel, hoveredPin, labelPadX, pinColor);
+            }
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            const int sharingModeRowIndex = kVkBufferPrefixParamCount + kVkBufferInputPinCount;
+            const float sharingModeRowY = nodeParamRowCenterY(layout, sharingModeRowIndex);
+            drawScaledText(drawList,
+                           ImVec2(layout.topLeft.x + labelPadX, sharingModeRowY - layout.fontSize * 0.5f), theme.pinLabel,
+                           "sharingMode", layout.fontSize);
+
+            if (layout.zoom < kMinWidgetZoom) {
+                char valueText[128];
+                std::snprintf(valueText, sizeof(valueText), "%s",
+                              vkBufferSharingModeOptionName(node.bufferSharingMode));
+                const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, valueText);
+                const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+                const float valueRightX = fieldLayout.comboFieldX + fieldLayout.comboFieldWidth - 4.f * layout.zoom;
+                drawScaledText(drawList, ImVec2(valueRightX - textSize.x, sharingModeRowY - layout.fontSize * 0.5f),
+                               theme.pinLabel, valueText, layout.fontSize);
+            }
+
+            drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
+        }
+
+        void drawVkBufferWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                                 bool& blockGraphDrag) {
+            const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            drawSTypeParamWidget(kVkBufferSType, layout, interactive, blockGraphDrag);
+
+            const int sharingModeRowIndex = kVkBufferPrefixParamCount + kVkBufferInputPinCount;
+            const float sharingModeRowY =
+                nodeParamRowCenterY(layout, sharingModeRowIndex) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, sharingModeRowY));
+            if (beginNodeCombo("##sharingMode", vkBufferSharingModeOptionName(node.bufferSharingMode),
+                               fieldLayout.comboFieldWidth)) {
+                for (int optionIndex = 0; optionIndex < kVkBufferSharingModeOptionCount; ++optionIndex) {
+                    const bool selected = node.bufferSharingMode == optionIndex;
+                    if (ImGui::Selectable(vkBufferSharingModeOptionName(optionIndex), selected)) {
+                        node.bufferSharingMode = optionIndex;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
+        void drawVkWriteDescriptorSetContent(ImDrawList* drawList, const GraphNode& node,
+                                             const NodeScreenLayout& layout, const NodeTheme& theme,
+                                             const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+
+            static const char* kParamLabels[kVkWriteDescriptorSetParamCount] = {
+                "sType", "dstSet", "dstBinding", "dstArrayElement", "descriptorType", "descriptorCount",
+            };
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            for (int rowIndex = 0; rowIndex < kVkWriteDescriptorSetParamCount; ++rowIndex) {
+                const float rowCenterY = nodeParamRowCenterY(layout, rowIndex);
+                drawScaledText(drawList,
+                               ImVec2(layout.topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
+                               kParamLabels[rowIndex], layout.fontSize);
+
+                if (layout.zoom >= kMinWidgetZoom) {
+                    continue;
+                }
+
+                char valueText[128];
+                switch (rowIndex) {
+                    case 0:
+                        std::snprintf(valueText, sizeof(valueText), "%s", kVkWriteDescriptorSetSType);
+                        break;
+                    case 1:
+                        std::snprintf(valueText, sizeof(valueText), "%d", node.writeDescriptorSetDstSet);
+                        break;
+                    case 2:
+                        std::snprintf(valueText, sizeof(valueText), "%d", node.writeDescriptorSetDstBinding);
+                        break;
+                    case 3:
+                        std::snprintf(valueText, sizeof(valueText), "%d", node.writeDescriptorSetDstArrayElement);
+                        break;
+                    case 4:
+                        std::snprintf(valueText, sizeof(valueText), "%s",
+                                      vkDescriptorTypeOptionName(node.writeDescriptorSetDescriptorType));
+                        break;
+                    default:
+                        std::snprintf(valueText, sizeof(valueText), "%d", node.writeDescriptorSetDescriptorCount);
+                        break;
+                }
+
+                const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, valueText);
+                const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+                const float fieldWidth =
+                    rowIndex == 0 ? fieldLayout.sTypeFieldWidth : fieldLayout.comboFieldWidth;
+                const float fieldX = rowIndex == 0 ? fieldLayout.sTypeFieldX : fieldLayout.comboFieldX;
+                const float valueRightX = fieldX + fieldWidth - 4.f * layout.zoom;
+                drawScaledText(drawList, ImVec2(valueRightX - textSize.x, rowCenterY - layout.fontSize * 0.5f),
+                               theme.pinLabel, valueText, layout.fontSize);
+            }
+
+            for (int pinIndex = 0; pinIndex < kVkWriteDescriptorSetInputPinCount; ++pinIndex) {
+                drawNodeInputPinRow(drawList, node, pinIndex, layout, theme, panel, hoveredPin, labelPadX, pinColor);
+            }
+            drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
+        }
+
+        void drawVkWriteDescriptorSetWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                                             bool& blockGraphDrag) {
+            const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            drawSTypeParamWidget(kVkWriteDescriptorSetSType, layout, interactive, blockGraphDrag);
+
+            int* intFields[] = {&node.writeDescriptorSetDstSet, &node.writeDescriptorSetDstBinding,
+                                &node.writeDescriptorSetDstArrayElement, &node.writeDescriptorSetDescriptorCount};
+            static const char* fieldIds[] = {"##dstSet", "##dstBinding", "##dstArrayElement", "##descriptorCount"};
+            for (int fieldIndex = 0; fieldIndex < 4; ++fieldIndex) {
+                const float rowY = nodeParamRowCenterY(layout, 1 + fieldIndex) - fieldLayout.fieldHeight * 0.5f;
+                ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, rowY));
+                ImGui::SetNextItemWidth(fieldLayout.comboFieldWidth);
+                ImGui::InputInt(fieldIds[fieldIndex], intFields[fieldIndex], 0, 0);
+                trackWidgetInteraction(interactive, blockGraphDrag);
+            }
+
+            const float descriptorTypeRowY = nodeParamRowCenterY(layout, 4) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, descriptorTypeRowY));
+            if (beginNodeCombo("##descriptorType",
+                               vkDescriptorTypeOptionName(node.writeDescriptorSetDescriptorType),
+                               fieldLayout.comboFieldWidth)) {
+                for (int optionIndex = 0; optionIndex < kVkDescriptorTypeOptionCount; ++optionIndex) {
+                    const bool selected = node.writeDescriptorSetDescriptorType == optionIndex;
+                    if (ImGui::Selectable(vkDescriptorTypeOptionName(optionIndex), selected)) {
+                        node.writeDescriptorSetDescriptorType = optionIndex;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
+        void drawVkDescriptorBufferContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
+                                           const NodeTheme& theme, const GraphPanelState& panel,
+                                           const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            const float rowCenterY = nodeParamRowCenterY(layout, 0);
+            drawScaledText(drawList,
+                           ImVec2(layout.topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
+                           "offset", layout.fontSize);
+
+            if (layout.zoom < kMinWidgetZoom) {
+                char valueText[128];
+                std::snprintf(valueText, sizeof(valueText), "%d", node.descriptorBufferOffset);
+                const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, valueText);
+                const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+                const float valueRightX = fieldLayout.comboFieldX + fieldLayout.comboFieldWidth - 4.f * layout.zoom;
+                drawScaledText(drawList, ImVec2(valueRightX - textSize.x, rowCenterY - layout.fontSize * 0.5f),
+                               theme.pinLabel, valueText, layout.fontSize);
+            }
+
+            drawNodeInputPinRow(drawList, node, 0, layout, theme, panel, hoveredPin, labelPadX, pinColor);
+            drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
+        }
+
+        void drawVkDescriptorBufferWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                                           bool& blockGraphDrag) {
+            const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            const float rowY = nodeParamRowCenterY(layout, 0) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, rowY));
+            ImGui::SetNextItemWidth(fieldLayout.comboFieldWidth);
+            ImGui::InputInt("##offset", &node.descriptorBufferOffset, 0, 0);
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
+        void drawVkDescriptorImageContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
+                                          const NodeTheme& theme, const GraphPanelState& panel,
+                                          const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            const float rowCenterY = nodeParamRowCenterY(layout, 0);
+            drawScaledText(drawList,
+                           ImVec2(layout.topLeft.x + labelPadX, rowCenterY - layout.fontSize * 0.5f), theme.pinLabel,
+                           "imageLayout", layout.fontSize);
+
+            if (layout.zoom < kMinWidgetZoom) {
+                char valueText[128];
+                std::snprintf(valueText, sizeof(valueText), "%s",
+                              vkImageLayoutOptionName(node.descriptorImageLayout));
+                const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(layout.fontSize, FLT_MAX, 0.f, valueText);
+                const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+                const float valueRightX = fieldLayout.comboFieldX + fieldLayout.comboFieldWidth - 4.f * layout.zoom;
+                drawScaledText(drawList, ImVec2(valueRightX - textSize.x, rowCenterY - layout.fontSize * 0.5f),
+                               theme.pinLabel, valueText, layout.fontSize);
+            }
+
+            for (int pinIndex = 0; pinIndex < kVkDescriptorImageInputPinCount; ++pinIndex) {
+                drawNodeInputPinRow(drawList, node, pinIndex, layout, theme, panel, hoveredPin, labelPadX, pinColor);
+            }
+            drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
+        }
+
+        void drawVkDescriptorImageWidgets(GraphNode& node, const NodeScreenLayout& layout, bool interactive,
+                                          bool& blockGraphDrag) {
+            const InputAssemblyFieldLayout fieldLayout = inputAssemblyStateFieldLayout(layout);
+
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            const float rowY = nodeParamRowCenterY(layout, 0) - fieldLayout.fieldHeight * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(fieldLayout.comboFieldX, rowY));
+            if (beginNodeCombo("##imageLayout", vkImageLayoutOptionName(node.descriptorImageLayout),
+                               fieldLayout.comboFieldWidth)) {
+                for (int optionIndex = 0; optionIndex < kVkImageLayoutOptionCount; ++optionIndex) {
+                    const bool selected = node.descriptorImageLayout == optionIndex;
+                    if (ImGui::Selectable(vkImageLayoutOptionName(optionIndex), selected)) {
+                        node.descriptorImageLayout = optionIndex;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            trackWidgetInteraction(interactive, blockGraphDrag);
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
         }
 
         void drawVkDescriptorSetLayoutContent(ImDrawList* drawList, const GraphNode& node,
@@ -2932,7 +3648,8 @@ namespace mat::demo {
             } else if (node.type == NodeType::VkColorWriteMask) {
                 drawVkColorWriteMaskContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::VkFormat || node.type == NodeType::VkImageUsage ||
-                       node.type == NodeType::VkImageAspect) {
+                       node.type == NodeType::VkImageAspect || node.type == NodeType::VkBufferUsage ||
+                       node.type == NodeType::VkMemoryProperty) {
                 drawVulkanOutputPinListContent(drawList, node, layout, theme, hoveredPin);
             } else if (node.type == NodeType::VkDynamicState) {
                 drawVkDynamicStateContent(drawList, node, layout, theme, panel, hoveredPin);
@@ -2944,6 +3661,14 @@ namespace mat::demo {
                 drawVkDescriptorSetLayoutContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::VkDescriptorSetLayoutBinding) {
                 drawVkDescriptorSetLayoutBindingContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkBuffer) {
+                drawVkBufferContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkWriteDescriptorSet) {
+                drawVkWriteDescriptorSetContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkDescriptorBuffer) {
+                drawVkDescriptorBufferContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkDescriptorImage) {
+                drawVkDescriptorImageContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::VkRenderPass) {
                 drawVkRenderPassContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::VkAttachmentDescription) {
@@ -2960,6 +3685,14 @@ namespace mat::demo {
                 drawVkImageViewContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::VkFramebuffer) {
                 drawVkFramebufferContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkSampler) {
+                drawVkSamplerContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::Matrix4x4 || node.type == NodeType::Matrix3x3) {
+                drawMatrixValueNodeContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (isScalarValueNodeType(node.type)) {
+                drawScalarValueNodeContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::Struct) {
+                drawStructContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (nodeHasOutputPin(node.type)) {
                 const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
                 const bool highlighted = shouldHighlightPin(node.id, 0, false);
@@ -3036,6 +3769,14 @@ namespace mat::demo {
                     drawVkDescriptorSetLayoutWidgets(*editable, layout, interactive, blockGraphDrag);
                 } else if (node.type == NodeType::VkDescriptorSetLayoutBinding) {
                     drawVkDescriptorSetLayoutBindingWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkBuffer) {
+                    drawVkBufferWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkWriteDescriptorSet) {
+                    drawVkWriteDescriptorSetWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkDescriptorBuffer) {
+                    drawVkDescriptorBufferWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkDescriptorImage) {
+                    drawVkDescriptorImageWidgets(*editable, layout, interactive, blockGraphDrag);
                 } else if (node.type == NodeType::VkRenderPass) {
                     drawVkRenderPassWidgets(document, *editable, layout, interactive, blockGraphDrag);
                 } else if (node.type == NodeType::VkAttachmentDescription) {
@@ -3052,6 +3793,14 @@ namespace mat::demo {
                     drawVkImageViewWidgets(*editable, layout, interactive, blockGraphDrag);
                 } else if (node.type == NodeType::VkFramebuffer) {
                     drawVkFramebufferWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkSampler) {
+                    drawVkSamplerWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::Matrix4x4 || node.type == NodeType::Matrix3x3) {
+                    drawMatrixValueNodeWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (isScalarValueNodeType(node.type)) {
+                    drawScalarValueNodeWidgets(*editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::Struct) {
+                    drawStructWidgets(document, *editable, layout, interactive, blockGraphDrag);
                 }
 
                 ImGui::PopID();

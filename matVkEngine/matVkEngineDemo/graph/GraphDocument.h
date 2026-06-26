@@ -83,6 +83,33 @@ namespace mat::demo {
         int imageViewLevelCount = 1;
         int imageViewBaseArrayLayer = 0;
         int imageViewLayerCount = 1;
+        int samplerMagFilter = 1;
+        int samplerMinFilter = 1;
+        int samplerAddressModeU = 0;
+        int samplerAddressModeV = 0;
+        int samplerAddressModeW = 0;
+        bool samplerAnisotropyEnable = true;
+        int samplerBorderColor = 0;
+        bool samplerUnnormalizedCoordinates = false;
+        bool samplerCompareEnable = false;
+        int samplerCompareOp = 7;
+        int samplerMipmapMode = 1;
+        int writeDescriptorSetDstSet = 0;
+        int writeDescriptorSetDstBinding = 0;
+        int writeDescriptorSetDstArrayElement = 0;
+        int writeDescriptorSetDescriptorType = 6;
+        int writeDescriptorSetDescriptorCount = 1;
+        int bufferSharingMode = 0;
+        int descriptorBufferOffset = 0;
+        int descriptorImageLayout = 5;
+        int structInputSlotCount = 0;
+        float matrix4x4[kMatrix4x4ElementCount]{};
+        float matrix3x3[kMatrix3x3ElementCount]{};
+        float vector4[kVector4ElementCount]{};
+        float vector3[kVector3ElementCount]{};
+        float vector2[kVector2ElementCount]{};
+        float scalarFloat = 0.f;
+        int scalarInt = 0;
     };
 
     struct GraphLink {
@@ -104,6 +131,8 @@ namespace mat::demo {
         bool removeNode(int nodeId);
         bool addRenderPassAttachmentSlot(int nodeId);
         bool removeRenderPassAttachmentSlot(int nodeId, int slotIndex);
+        bool addStructInputSlot(int nodeId);
+        bool removeStructInputSlot(int nodeId, int slotIndex);
 
         const std::vector<GraphNode>& nodes() const { return _nodes; }
         const std::vector<GraphLink>& links() const { return _links; }
@@ -122,7 +151,10 @@ namespace mat::demo {
     ImVec2 vertexNodeWorldSize(const GraphNode& node);
     ImVec2 nodeWorldSize(const GraphNode& node);
     void initDefaultVertexAttributes(GraphNode& node);
+    void initIdentityMatrix4x4(GraphNode& node);
+    void initIdentityMatrix3x3(GraphNode& node);
 
+    int structNodeBodyRowCount(const GraphNode& node);
     int graphNodeInputPinCount(const GraphNode& node);
     int graphNodeInputPinBodyRow(const GraphNode& node, int pinIndex);
     bool graphNodeInputPinAllowsMultipleLinks(const GraphNode& node, int pinIndex);

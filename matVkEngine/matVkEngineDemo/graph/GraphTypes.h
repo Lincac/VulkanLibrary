@@ -22,6 +22,10 @@ namespace mat::demo {
         VkPipelineDynamicState,
         VkDescriptorSetLayoutBinding,
         VkDescriptorSetLayout,
+        VkBuffer,
+        VkWriteDescriptorSet,
+        VkDescriptorBuffer,
+        VkDescriptorImage,
         VkPipelineLayout,
         VkRenderPass,
         VkAttachmentDescription,
@@ -31,9 +35,20 @@ namespace mat::demo {
         VkFormat,
         VkImageUsage,
         VkImageAspect,
+        VkBufferUsage,
+        VkMemoryProperty,
         VkImage,
         VkImageView,
         VkFramebuffer,
+        VkSampler,
+        Matrix4x4,
+        Matrix3x3,
+        Vector4,
+        Vector3,
+        Vector2,
+        Float,
+        Int,
+        Struct,
     };
 
     constexpr float kNodeWidth = 280.f;
@@ -52,6 +67,8 @@ namespace mat::demo {
     constexpr int kVkFormatOutputPinCount = 10;
     constexpr int kVkImageUsageOutputPinCount = 8;
     constexpr int kVkImageAspectOutputPinCount = 4;
+    constexpr int kVkBufferUsageOutputPinCount = 9;
+    constexpr int kVkMemoryPropertyOutputPinCount = 6;
     constexpr int kVkImagePrefixParamCount = 3;
     constexpr int kVkImageInputPinCount = 2;
     constexpr int kVkImageSuffixParamCount = 2;
@@ -62,6 +79,11 @@ namespace mat::demo {
     constexpr int kVkImageViewTypeOptionCount = 7;
     constexpr int kVkFramebufferParamCount = 4;
     constexpr int kVkFramebufferInputPinCount = 2;
+    constexpr int kVkSamplerParamCount = 12;
+    constexpr int kVkFilterOptionCount = 2;
+    constexpr int kVkSamplerAddressModeOptionCount = 5;
+    constexpr int kVkBorderColorOptionCount = 6;
+    constexpr int kVkSamplerMipmapModeOptionCount = 2;
     constexpr int kVkAttachmentLoadOpOptionCount = 3;
     constexpr int kVkAttachmentStoreOpOptionCount = 2;
     constexpr int kVkImageLayoutOptionCount = 10;
@@ -99,7 +121,26 @@ namespace mat::demo {
     constexpr int kVkDescriptorSetLayoutParamCount = 1;
     constexpr int kVkDescriptorSetLayoutInputPinCount = 1;
     constexpr int kVkDescriptorSetLayoutBindingParamCount = 5;
+    constexpr int kVkBufferPrefixParamCount = 1;
+    constexpr int kVkBufferInputPinCount = 3;
+    constexpr int kVkBufferSuffixParamCount = 1;
+    constexpr int kVkBufferSharingModeOptionCount = 2;
+    constexpr int kVkWriteDescriptorSetParamCount = 6;
+    constexpr int kVkWriteDescriptorSetInputPinCount = 2;
+    constexpr int kVkDescriptorBufferParamCount = 1;
+    constexpr int kVkDescriptorBufferInputPinCount = 1;
+    constexpr int kVkDescriptorImageParamCount = 1;
+    constexpr int kVkDescriptorImageInputPinCount = 2;
     constexpr int kVkDescriptorTypeOptionCount = 11;
+    constexpr int kStructAddInputRowCount = 1;
+    constexpr int kMatrix4x4RowCount = 4;
+    constexpr int kMatrix3x3RowCount = 3;
+    constexpr int kScalarValueNodeBodyRowCount = 1;
+    constexpr int kMatrix4x4ElementCount = 16;
+    constexpr int kMatrix3x3ElementCount = 9;
+    constexpr int kVector4ElementCount = 4;
+    constexpr int kVector3ElementCount = 3;
+    constexpr int kVector2ElementCount = 2;
     constexpr int kVkShaderStageFlagOptionCount = 7;
     constexpr int kVkPrimitiveTopologyOptionCount = 10;
     constexpr int kVkPolygonModeOptionCount = 3;
@@ -121,9 +162,12 @@ namespace mat::demo {
     extern const char kVkPipelineLayoutSType[];
     extern const char kVkDescriptorSetLayoutSType[];
     extern const char kVkDescriptorSetLayoutBindingNullSampler[];
+    extern const char kVkWriteDescriptorSetSType[];
     extern const char kVkFramebufferSType[];
     extern const char kVkImageSType[];
     extern const char kVkImageViewSType[];
+    extern const char kVkSamplerSType[];
+    extern const char kVkBufferSType[];
 
     struct NodeInputPinInfo {
         const char* label = "";
@@ -151,6 +195,9 @@ namespace mat::demo {
     int nodeOutputPinCount(NodeType type);
     const char* nodeOutputPinLabel(NodeType type, int pinIndex);
     NodeType pinLinkTargetNodeTypeForSource(NodeType sourceType);
+    bool isStructValueNodeType(NodeType type);
+    bool isScalarValueNodeType(NodeType type);
+    int valueNodeBodyRowCount(NodeType type);
     const char* vkPrimitiveTopologyOptionName(int index);
     const char* vkPolygonModeOptionName(int index);
     const char* vkCullModeOptionName(int index);
@@ -167,8 +214,15 @@ namespace mat::demo {
     const char* vkPipelineBindPointOptionName(int index);
     const char* vkImageViewTypeOptionName(int index);
     const char* vkImageTilingOptionName(int index);
+    const char* vkBufferSharingModeOptionName(int index);
+    const char* vkFilterOptionName(int index);
+    const char* vkSamplerAddressModeOptionName(int index);
+    const char* vkBorderColorOptionName(int index);
+    const char* vkSamplerMipmapModeOptionName(int index);
     int vkFormatOutputPinValue(int pinIndex);
     uint32_t vkImageUsageOutputPinValue(int pinIndex);
     uint32_t vkImageAspectOutputPinValue(int pinIndex);
+    uint32_t vkBufferUsageOutputPinValue(int pinIndex);
+    uint32_t vkMemoryPropertyOutputPinValue(int pinIndex);
 
 }  // namespace mat::demo

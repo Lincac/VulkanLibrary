@@ -11,6 +11,25 @@ namespace mat::demo {
             std::snprintf(attribute.name, sizeof(attribute.name), "%s", name);
         }
 
+        void setIdentityMatrix4x4(float* matrix) {
+            for (int index = 0; index < kMatrix4x4ElementCount; ++index) {
+                matrix[index] = 0.f;
+            }
+            matrix[0] = 1.f;
+            matrix[5] = 1.f;
+            matrix[10] = 1.f;
+            matrix[15] = 1.f;
+        }
+
+        void setIdentityMatrix3x3(float* matrix) {
+            for (int index = 0; index < kMatrix3x3ElementCount; ++index) {
+                matrix[index] = 0.f;
+            }
+            matrix[0] = 1.f;
+            matrix[4] = 1.f;
+            matrix[8] = 1.f;
+        }
+
     }  // namespace
 
     int vertexNodeBodyRowCount(const GraphNode& node) {
@@ -28,6 +47,9 @@ namespace mat::demo {
         if (node.type == NodeType::VkRenderPass) {
             return ImVec2(kNodeWidth, kNodeHeaderHeight + renderPassNodeBodyRowCount(node) * kNodePinRowHeight);
         }
+        if (node.type == NodeType::Struct) {
+            return ImVec2(kNodeWidth, kNodeHeaderHeight + structNodeBodyRowCount(node) * kNodePinRowHeight);
+        }
         return nodeWorldSize(node.type);
     }
 
@@ -36,9 +58,16 @@ namespace mat::demo {
                kVkRenderPassAddAttachmentRowCount + kVkRenderPassFixedInputPinCount;
     }
 
+    int structNodeBodyRowCount(const GraphNode& node) {
+        return node.structInputSlotCount + kStructAddInputRowCount;
+    }
+
     int graphNodeInputPinCount(const GraphNode& node) {
         if (node.type == NodeType::VkRenderPass) {
             return node.renderPassAttachmentSlotCount + kVkRenderPassFixedInputPinCount;
+        }
+        if (node.type == NodeType::Struct) {
+            return node.structInputSlotCount;
         }
         return nodeInputPinCount(node.type);
     }
@@ -60,6 +89,12 @@ namespace mat::demo {
                        kVkRenderPassAddAttachmentRowCount + 1;
             }
             return -1;
+        }
+        if (node.type == NodeType::Struct) {
+            if (pinIndex < 0 || pinIndex >= node.structInputSlotCount) {
+                return -1;
+            }
+            return pinIndex;
         }
         return nodeInputPinBodyRow(node.type, pinIndex);
     }
@@ -96,6 +131,12 @@ namespace mat::demo {
             out.slotSourcePinIndex = -1;
             return true;
         }
+        if (node.type == NodeType::Struct) {
+            out.label = "member";
+            out.slotType = NodeType::Float;
+            out.slotSourcePinIndex = -1;
+            return true;
+        }
         const NodeInputPinDef* pinDef = nodeInputPin(node.type, pinIndex);
         if (pinDef == nullptr) {
             return false;
@@ -108,6 +149,17 @@ namespace mat::demo {
 
     bool graphNodeInputPinAcceptsSource(const GraphNode& inputNode, int inputPinIndex, NodeType sourceType,
                                         int sourcePinIndex) {
+        if (inputNode.type == NodeType::Struct) {
+            if (inputPinIndex < 0 || inputPinIndex >= inputNode.structInputSlotCount) {
+                return false;
+            }
+            if (!isStructValueNodeType(sourceType)) {
+                return false;
+            }
+            (void)sourcePinIndex;
+            return true;
+        }
+
         NodeInputPinInfo pinInfo{};
         if (!graphNodeGetInputPin(inputNode, inputPinIndex, pinInfo)) {
             return false;
@@ -154,6 +206,14 @@ namespace mat::demo {
         node.vertexAttributes.push_back(texcoord);
     }
 
+    void initIdentityMatrix4x4(GraphNode& node) {
+        setIdentityMatrix4x4(node.matrix4x4);
+    }
+
+    void initIdentityMatrix3x3(GraphNode& node) {
+        setIdentityMatrix3x3(node.matrix3x3);
+    }
+
     int GraphDocument::addNode(NodeType type, float worldX, float worldY) {
         GraphNode node{};
         node.id = _nextNodeId++;
@@ -162,6 +222,12 @@ namespace mat::demo {
         node.worldY = worldY;
         if (type == NodeType::Vertex) {
             initDefaultVertexAttributes(node);
+        }
+        if (type == NodeType::Matrix4x4) {
+            initIdentityMatrix4x4(node);
+        }
+        if (type == NodeType::Matrix3x3) {
+            initIdentityMatrix3x3(node);
         }
         _nodes.push_back(node);
         return node.id;
@@ -264,6 +330,34 @@ namespace mat::demo {
             }
         }
         --node->renderPassAttachmentSlotCount;
+        return true;
+    }
+
+    bool GraphDocument::addStructInputSlot(int nodeId) {
+        GraphNode* node = findNode(nodeId);
+        if (node == nullptr || node->type != NodeType::Struct) {
+            return false;
+        }
+        ++node->structInputSlotCount;
+        return true;
+    }
+
+    bool GraphDocument::removeStructInputSlot(int nodeId, int slotIndex) {
+        GraphNode* node = findNode(nodeId);
+        if (node == nullptr || node->type != NodeType::Struct || node->structInputSlotCount <= 0) {
+            return false;
+        }
+        if (slotIndex < 0 || slotIndex >= node->structInputSlotCount) {
+            return false;
+        }
+
+        removeLinksToInput(nodeId, slotIndex);
+        for (GraphLink& link : _links) {
+            if (link.toNodeId == nodeId && link.toPinIndex > slotIndex) {
+                --link.toPinIndex;
+            }
+        }
+        --node->structInputSlotCount;
         return true;
     }
 
