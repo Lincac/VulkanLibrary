@@ -23,8 +23,14 @@ namespace mat::demo {
             {"pAttachments", NodeType::VkImageView},
         };
 
+        constexpr NodeInputPinDef kVkImageInputs[kVkImageInputPinCount] = {
+            {"format", NodeType::VkFormat},
+            {"usage", NodeType::VkImageUsage},
+        };
+
         constexpr NodeInputPinDef kVkImageViewInputs[kVkImageViewInputPinCount] = {
             {"image", NodeType::VkImage},
+            {"aspectMask", NodeType::VkImageAspect},
         };
 
         constexpr NodeInputPinDef kVkSubpassDescriptionInputs[kVkSubpassDescriptionInputPinCount] = {
@@ -71,6 +77,11 @@ namespace mat::demo {
             "VK_IMAGE_VIEW_TYPE_CUBE_ARRAY",
         };
 
+        constexpr const char kVkImageTilingOptionNames[kVkImageTilingOptionCount][28] = {
+            "VK_IMAGE_TILING_OPTIMAL",
+            "VK_IMAGE_TILING_LINEAR",
+        };
+
         constexpr NodeType kPinLinkTargetNodeTypes[] = {
             NodeType::VkPipeline,
             NodeType::VkRenderPass,
@@ -84,6 +95,7 @@ namespace mat::demo {
             NodeType::VkSubpassDescription,
             NodeType::VkFramebuffer,
             NodeType::VkImageView,
+            NodeType::VkImage,
         };
 
         constexpr const char kVkPrimitiveTopologyOptionNames[kVkPrimitiveTopologyOptionCount][64] = {
@@ -162,6 +174,68 @@ namespace mat::demo {
             "VK_COLOR_COMPONENT_G_BIT",
             "VK_COLOR_COMPONENT_B_BIT",
             "VK_COLOR_COMPONENT_A_BIT",
+        };
+
+        constexpr const char kVkFormatOutputPinLabels[kVkFormatOutputPinCount][36] = {
+            "VK_FORMAT_R8_UNORM",
+            "VK_FORMAT_R8G8B8A8_UNORM",
+            "VK_FORMAT_R8G8B8A8_SRGB",
+            "VK_FORMAT_B8G8R8A8_UNORM",
+            "VK_FORMAT_B8G8R8A8_SRGB",
+            "VK_FORMAT_R16G16B16A16_SFLOAT",
+            "VK_FORMAT_R32G32B32A32_SFLOAT",
+            "VK_FORMAT_D16_UNORM",
+            "VK_FORMAT_D32_SFLOAT",
+            "VK_FORMAT_D24_UNORM_S8_UINT",
+        };
+
+        constexpr int kVkFormatOutputPinValues[kVkFormatOutputPinCount] = {
+            9,    // VK_FORMAT_R8_UNORM
+            37,   // VK_FORMAT_R8G8B8A8_UNORM
+            43,   // VK_FORMAT_R8G8B8A8_SRGB
+            44,   // VK_FORMAT_B8G8R8A8_UNORM
+            50,   // VK_FORMAT_B8G8R8A8_SRGB
+            97,   // VK_FORMAT_R16G16B16A16_SFLOAT
+            109,  // VK_FORMAT_R32G32B32A32_SFLOAT
+            124,  // VK_FORMAT_D16_UNORM
+            126,  // VK_FORMAT_D32_SFLOAT
+            129,  // VK_FORMAT_D24_UNORM_S8_UINT
+        };
+
+        constexpr const char kVkImageUsageOutputPinLabels[kVkImageUsageOutputPinCount][44] = {
+            "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+            "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+            "VK_IMAGE_USAGE_SAMPLED_BIT",
+            "VK_IMAGE_USAGE_STORAGE_BIT",
+            "VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT",
+            "VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT",
+            "VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT",
+            "VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT",
+        };
+
+        constexpr uint32_t kVkImageUsageOutputPinValues[kVkImageUsageOutputPinCount] = {
+            0x00000001,
+            0x00000002,
+            0x00000004,
+            0x00000008,
+            0x00000010,
+            0x00000020,
+            0x00000040,
+            0x00000080,
+        };
+
+        constexpr const char kVkImageAspectOutputPinLabels[kVkImageAspectOutputPinCount][36] = {
+            "VK_IMAGE_ASPECT_COLOR_BIT",
+            "VK_IMAGE_ASPECT_DEPTH_BIT",
+            "VK_IMAGE_ASPECT_STENCIL_BIT",
+            "VK_IMAGE_ASPECT_METADATA_BIT",
+        };
+
+        constexpr uint32_t kVkImageAspectOutputPinValues[kVkImageAspectOutputPinCount] = {
+            0x00000001,
+            0x00000002,
+            0x00000004,
+            0x00000008,
         };
 
         constexpr const char kVkDynamicStateOutputPinLabels[kVkDynamicStateOutputPinCount][40] = {
@@ -263,6 +337,8 @@ namespace mat::demo {
 
     const char kVkFramebufferSType[] = "VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO";
 
+    const char kVkImageSType[] = "VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO";
+
     const char kVkImageViewSType[] = "VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO";
 
     const char* nodeTypeName(NodeType type) {
@@ -313,6 +389,12 @@ namespace mat::demo {
                 return "VkSubpassDependency";
             case NodeType::VkAttachmentReference:
                 return "VkAttachmentReference";
+            case NodeType::VkFormat:
+                return "VkFormat";
+            case NodeType::VkImageUsage:
+                return "VkImageUsage";
+            case NodeType::VkImageAspect:
+                return "VkImageAspect";
             case NodeType::VkImage:
                 return "VkImage";
             case NodeType::VkImageView:
@@ -392,6 +474,15 @@ namespace mat::demo {
         if (type == NodeType::VkColorWriteMask) {
             return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkColorWriteMaskOutputPinCount * kNodePinRowHeight);
         }
+        if (type == NodeType::VkFormat) {
+            return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkFormatOutputPinCount * kNodePinRowHeight);
+        }
+        if (type == NodeType::VkImageUsage) {
+            return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkImageUsageOutputPinCount * kNodePinRowHeight);
+        }
+        if (type == NodeType::VkImageAspect) {
+            return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkImageAspectOutputPinCount * kNodePinRowHeight);
+        }
         if (type == NodeType::VkDynamicState) {
             return ImVec2(kNodeWidth, kNodeHeaderHeight + kVkDynamicStateOutputPinCount * kNodePinRowHeight);
         }
@@ -433,6 +524,12 @@ namespace mat::demo {
         if (type == NodeType::VkAttachmentReference) {
             return ImVec2(kNodeWidth,
                           kNodeHeaderHeight + kVkAttachmentReferenceParamCount * kNodePinRowHeight);
+        }
+        if (type == NodeType::VkImage) {
+            return ImVec2(kNodeWidth,
+                          kNodeHeaderHeight +
+                              (kVkImagePrefixParamCount + kVkImageInputPinCount + kVkImageSuffixParamCount) *
+                                  kNodePinRowHeight);
         }
         if (type == NodeType::VkImageView) {
             return ImVec2(kNodeWidth,
@@ -485,6 +582,12 @@ namespace mat::demo {
         if (type == NodeType::VkFramebuffer && pinIndex == 1) {
             return true;
         }
+        if (type == NodeType::VkImage && (pinIndex == 0 || pinIndex == 1)) {
+            return true;
+        }
+        if (type == NodeType::VkImageView && pinIndex == 1) {
+            return true;
+        }
         return false;
     }
 
@@ -497,6 +600,9 @@ namespace mat::demo {
         }
         if (type == NodeType::VkFramebuffer) {
             return kVkFramebufferInputPinCount;
+        }
+        if (type == NodeType::VkImage) {
+            return kVkImageInputPinCount;
         }
         if (type == NodeType::VkImageView) {
             return kVkImageViewInputPinCount;
@@ -537,6 +643,9 @@ namespace mat::demo {
         }
         if (type == NodeType::VkFramebuffer) {
             return kVkFramebufferParamCount + pinIndex;
+        }
+        if (type == NodeType::VkImage) {
+            return kVkImagePrefixParamCount + pinIndex;
         }
         if (type == NodeType::VkImageView) {
             return kVkImageViewPrefixParamCount + pinIndex;
@@ -583,6 +692,12 @@ namespace mat::demo {
                 return nullptr;
             }
             return &kVkFramebufferInputs[index];
+        }
+        if (type == NodeType::VkImage) {
+            if (index < 0 || index >= kVkImageInputPinCount) {
+                return nullptr;
+            }
+            return &kVkImageInputs[index];
         }
         if (type == NodeType::VkImageView) {
             if (index < 0 || index >= kVkImageViewInputPinCount) {
@@ -645,6 +760,15 @@ namespace mat::demo {
         if (type == NodeType::VkColorWriteMask) {
             return kVkColorWriteMaskOutputPinCount;
         }
+        if (type == NodeType::VkFormat) {
+            return kVkFormatOutputPinCount;
+        }
+        if (type == NodeType::VkImageUsage) {
+            return kVkImageUsageOutputPinCount;
+        }
+        if (type == NodeType::VkImageAspect) {
+            return kVkImageAspectOutputPinCount;
+        }
         if (type == NodeType::Vertex) {
             return kVertexOutputPinCount;
         }
@@ -660,6 +784,24 @@ namespace mat::demo {
                 return "";
             }
             return kVkColorWriteMaskOutputPinLabels[pinIndex];
+        }
+        if (type == NodeType::VkFormat) {
+            if (pinIndex < 0 || pinIndex >= kVkFormatOutputPinCount) {
+                return "";
+            }
+            return kVkFormatOutputPinLabels[pinIndex];
+        }
+        if (type == NodeType::VkImageUsage) {
+            if (pinIndex < 0 || pinIndex >= kVkImageUsageOutputPinCount) {
+                return "";
+            }
+            return kVkImageUsageOutputPinLabels[pinIndex];
+        }
+        if (type == NodeType::VkImageAspect) {
+            if (pinIndex < 0 || pinIndex >= kVkImageAspectOutputPinCount) {
+                return "";
+            }
+            return kVkImageAspectOutputPinLabels[pinIndex];
         }
         if (type == NodeType::VkDynamicState) {
             if (pinIndex < 0 || pinIndex >= kVkDynamicStateOutputPinCount) {
@@ -692,6 +834,12 @@ namespace mat::demo {
     NodeType pinLinkTargetNodeTypeForSource(NodeType sourceType) {
         if (sourceType == NodeType::VkAttachmentDescription) {
             return NodeType::VkRenderPass;
+        }
+        if (sourceType == NodeType::VkFormat || sourceType == NodeType::VkImageUsage) {
+            return NodeType::VkImage;
+        }
+        if (sourceType == NodeType::VkImageAspect) {
+            return NodeType::VkImageView;
         }
         if (sourceType == NodeType::VkImage) {
             return NodeType::VkImageView;
@@ -817,6 +965,34 @@ namespace mat::demo {
             return "";
         }
         return kVkImageViewTypeOptionNames[index];
+    }
+
+    const char* vkImageTilingOptionName(int index) {
+        if (index < 0 || index >= kVkImageTilingOptionCount) {
+            return "";
+        }
+        return kVkImageTilingOptionNames[index];
+    }
+
+    int vkFormatOutputPinValue(int pinIndex) {
+        if (pinIndex < 0 || pinIndex >= kVkFormatOutputPinCount) {
+            return 0;
+        }
+        return kVkFormatOutputPinValues[pinIndex];
+    }
+
+    uint32_t vkImageUsageOutputPinValue(int pinIndex) {
+        if (pinIndex < 0 || pinIndex >= kVkImageUsageOutputPinCount) {
+            return 0;
+        }
+        return kVkImageUsageOutputPinValues[pinIndex];
+    }
+
+    uint32_t vkImageAspectOutputPinValue(int pinIndex) {
+        if (pinIndex < 0 || pinIndex >= kVkImageAspectOutputPinCount) {
+            return 0;
+        }
+        return kVkImageAspectOutputPinValues[pinIndex];
     }
 
 }  // namespace mat::demo

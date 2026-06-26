@@ -1,7 +1,7 @@
 #pragma once
 
+#include <cstdint>
 #include <imgui.h>
-
 namespace mat::demo {
 
     enum class NodeType {
@@ -28,6 +28,9 @@ namespace mat::demo {
         VkSubpassDescription,
         VkSubpassDependency,
         VkAttachmentReference,
+        VkFormat,
+        VkImageUsage,
+        VkImageAspect,
         VkImage,
         VkImageView,
         VkFramebuffer,
@@ -46,9 +49,16 @@ namespace mat::demo {
     constexpr int kVkSubpassDescriptionInputPinCount = 2;
     constexpr int kVkSubpassDependencyParamCount = 6;
     constexpr int kVkAttachmentReferenceParamCount = 2;
+    constexpr int kVkFormatOutputPinCount = 10;
+    constexpr int kVkImageUsageOutputPinCount = 8;
+    constexpr int kVkImageAspectOutputPinCount = 4;
+    constexpr int kVkImagePrefixParamCount = 3;
+    constexpr int kVkImageInputPinCount = 2;
+    constexpr int kVkImageSuffixParamCount = 2;
+    constexpr int kVkImageTilingOptionCount = 2;
     constexpr int kVkImageViewPrefixParamCount = 1;
-    constexpr int kVkImageViewInputPinCount = 1;
-    constexpr int kVkImageViewSuffixParamCount = 7;
+    constexpr int kVkImageViewInputPinCount = 2;
+    constexpr int kVkImageViewSuffixParamCount = 6;
     constexpr int kVkImageViewTypeOptionCount = 7;
     constexpr int kVkFramebufferParamCount = 4;
     constexpr int kVkFramebufferInputPinCount = 2;
@@ -69,6 +79,7 @@ namespace mat::demo {
     constexpr int kMaxVertexAttributeChannels = 4;
     constexpr int kMinVertexAttributeChannels = 1;
     constexpr int kMaxShaderModulePathLen = 260;
+    constexpr int kMaxImagePathLen = 260;
     constexpr int kMaxShaderStageEntryNameLen = 64;
     constexpr int kVkPipelineInputAssemblyStateParamCount = 3;
     constexpr int kVkPipelineViewportStateParamCount = 3;
@@ -111,6 +122,7 @@ namespace mat::demo {
     extern const char kVkDescriptorSetLayoutSType[];
     extern const char kVkDescriptorSetLayoutBindingNullSampler[];
     extern const char kVkFramebufferSType[];
+    extern const char kVkImageSType[];
     extern const char kVkImageViewSType[];
 
     struct NodeInputPinInfo {
@@ -154,5 +166,9 @@ namespace mat::demo {
     const char* vkImageLayoutOptionName(int index);
     const char* vkPipelineBindPointOptionName(int index);
     const char* vkImageViewTypeOptionName(int index);
+    const char* vkImageTilingOptionName(int index);
+    int vkFormatOutputPinValue(int pinIndex);
+    uint32_t vkImageUsageOutputPinValue(int pinIndex);
+    uint32_t vkImageAspectOutputPinValue(int pinIndex);
 
 }  // namespace mat::demo

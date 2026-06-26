@@ -2,6 +2,7 @@
 
 #include "graph/GraphTypes.h"
 
+#include <cstdint>
 #include <vector>
 
 namespace mat::demo {
@@ -72,9 +73,12 @@ namespace mat::demo {
         int framebufferWidth = 800;
         int framebufferHeight = 600;
         int framebufferLayers = 1;
+        int imageWidth = 800;
+        int imageHeight = 600;
+        int imageTiling = 0;
+        char imagePath[kMaxImagePathLen]{};
         int imageViewViewType = 1;
         int imageViewFormat = 0;
-        int imageViewAspectMask = 0x00000001;
         int imageViewBaseMipLevel = 0;
         int imageViewLevelCount = 1;
         int imageViewBaseArrayLayer = 0;
