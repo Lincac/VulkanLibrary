@@ -38,5 +38,6 @@
     <ClCompile Include="pipeline\matVkEngineRenderPass.cpp" />
     <ClCompile Include="pipeline\matVkEngineRenderPipeline.cpp" />
     <ClCompile Include="pipeline\matVkEngineFramebuffer.cpp" />
+    <ClCompile Include="test.cpp" />
   </ItemGroup>
 </Project>

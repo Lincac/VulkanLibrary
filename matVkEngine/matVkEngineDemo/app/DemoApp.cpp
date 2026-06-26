@@ -1,6 +1,7 @@
 #include "app/DemoApp.h"
 
 #include "editor/GraphCanvas.h"
+#include "graph/DefaultDeferredScene.h"
 #include "graph/GraphDocument.h"
 
 #include <imgui.h>
@@ -145,6 +146,8 @@ namespace mat::demo {
 
         ImGui_ImplWin32_InitForOpenGL(_impl->hwnd);
         ImGui_ImplOpenGL3_Init();
+
+        loadDefaultDeferredScene(_impl->document, _impl->gridView);
 
         _impl->running = true;
         return true;

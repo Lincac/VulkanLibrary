@@ -56,6 +56,10 @@
     <ClCompile Include="resource\matVkEngineBuffer.cpp" />
     <ClCompile Include="resource\matVkEngineImage.cpp" />
     <ClCompile Include="resource\matVkEngineTexture.cpp" />
+    <ClCompile Include="test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

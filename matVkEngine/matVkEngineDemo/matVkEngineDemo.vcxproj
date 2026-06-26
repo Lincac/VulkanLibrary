@@ -141,6 +141,7 @@
     <ClCompile Include="app\DemoApp.cpp" />
     <ClCompile Include="editor\GraphCanvas.cpp" />
     <ClCompile Include="editor\NodeSearchPopup.cpp" />
+    <ClCompile Include="graph\DefaultDeferredScene.cpp" />
     <ClCompile Include="graph\GraphDocument.cpp" />
     <ClCompile Include="graph\GraphTypes.cpp" />
     <ClCompile Include="..\dependency\imgui\imgui.cpp" />
@@ -155,6 +156,7 @@
     <ClInclude Include="editor\FuzzySearch.h" />
     <ClInclude Include="editor\GraphCanvas.h" />
     <ClInclude Include="editor\NodeSearchPopup.h" />
+    <ClInclude Include="graph\DefaultDeferredScene.h" />
     <ClInclude Include="graph\GraphDocument.h" />
     <ClInclude Include="graph\GraphTypes.h" />
   </ItemGroup>

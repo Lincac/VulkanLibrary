@@ -25,6 +25,9 @@
     <ClCompile Include="editor\NodeSearchPopup.cpp">
       <Filter>editor</Filter>
     </ClCompile>
+    <ClCompile Include="graph\DefaultDeferredScene.cpp">
+      <Filter>graph</Filter>
+    </ClCompile>
     <ClCompile Include="graph\GraphDocument.cpp">
       <Filter>graph</Filter>
     </ClCompile>
@@ -62,6 +65,9 @@
     </ClInclude>
     <ClInclude Include="editor\NodeSearchPopup.h">
       <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="graph\DefaultDeferredScene.h">
+      <Filter>graph</Filter>
     </ClInclude>
     <ClInclude Include="graph\GraphDocument.h">
       <Filter>graph</Filter>
