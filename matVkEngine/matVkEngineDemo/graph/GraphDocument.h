@@ -103,6 +103,8 @@ namespace mat::demo {
         int descriptorBufferOffset = 0;
         int descriptorImageLayout = 5;
         int structInputSlotCount = 0;
+        int renderDrawPipelineSlotCount = 0;
+        int clearValueInputSlotCount = 0;
         float matrix4x4[kMatrix4x4ElementCount]{};
         float matrix3x3[kMatrix3x3ElementCount]{};
         float vector4[kVector4ElementCount]{};
@@ -133,6 +135,10 @@ namespace mat::demo {
         bool removeRenderPassAttachmentSlot(int nodeId, int slotIndex);
         bool addStructInputSlot(int nodeId);
         bool removeStructInputSlot(int nodeId, int slotIndex);
+        bool addRenderDrawPipelineSlot(int nodeId);
+        bool removeRenderDrawPipelineSlot(int nodeId, int slotIndex);
+        bool addClearValueInputSlot(int nodeId);
+        bool removeClearValueInputSlot(int nodeId, int slotIndex);
 
         const std::vector<GraphNode>& nodes() const { return _nodes; }
         const std::vector<GraphLink>& links() const { return _links; }
@@ -155,13 +161,19 @@ namespace mat::demo {
     void initIdentityMatrix3x3(GraphNode& node);
 
     int structNodeBodyRowCount(const GraphNode& node);
+    int renderDrawNodeBodyRowCount(const GraphNode& node);
+    int clearValueNodeBodyRowCount(const GraphNode& node);
     int graphNodeInputPinCount(const GraphNode& node);
     int graphNodeInputPinBodyRow(const GraphNode& node, int pinIndex);
     bool graphNodeInputPinAllowsMultipleLinks(const GraphNode& node, int pinIndex);
     bool graphNodeGetInputPin(const GraphNode& node, int pinIndex, NodeInputPinInfo& out);
     bool graphNodeInputPinAcceptsSource(const GraphNode& inputNode, int inputPinIndex, NodeType sourceType,
                                         int sourcePinIndex);
+    bool graphNodeInputPinAcceptsSource(const GraphDocument& document, const GraphNode& inputNode, int inputPinIndex,
+                                        NodeType sourceType, int sourcePinIndex);
     int graphNodeInputPinIndexForType(const GraphNode& node, NodeType slotType, int slotSourcePinIndex = -1);
+    int graphNodeInputPinIndexForType(const GraphDocument& document, const GraphNode& node, NodeType slotType,
+                                      int slotSourcePinIndex = -1);
     int renderPassNodeBodyRowCount(const GraphNode& node);
 
 }  // namespace mat::demo

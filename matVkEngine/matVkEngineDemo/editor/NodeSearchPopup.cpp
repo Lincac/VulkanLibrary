@@ -55,6 +55,8 @@ namespace mat::demo {
             {NodeType::VkImageView, "VkImageView"},
             {NodeType::VkFramebuffer, "VkFramebuffer"},
             {NodeType::VkSampler, "VkSampler"},
+            {NodeType::VkRenderDraw, "VkRenderDraw"},
+            {NodeType::VkClearValue, "VkClearValue"},
             {NodeType::Matrix4x4, "Matrix 4x4"},
             {NodeType::Matrix3x3, "Matrix 3x3"},
             {NodeType::Vector4, "Vector 4"},

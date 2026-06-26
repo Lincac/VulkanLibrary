@@ -50,6 +50,12 @@ namespace mat::demo {
         if (node.type == NodeType::Struct) {
             return ImVec2(kNodeWidth, kNodeHeaderHeight + structNodeBodyRowCount(node) * kNodePinRowHeight);
         }
+        if (node.type == NodeType::VkRenderDraw) {
+            return ImVec2(kNodeWidth, kNodeHeaderHeight + renderDrawNodeBodyRowCount(node) * kNodePinRowHeight);
+        }
+        if (node.type == NodeType::VkClearValue) {
+            return ImVec2(kNodeWidth, kNodeHeaderHeight + clearValueNodeBodyRowCount(node) * kNodePinRowHeight);
+        }
         return nodeWorldSize(node.type);
     }
 
@@ -62,12 +68,27 @@ namespace mat::demo {
         return node.structInputSlotCount + kStructAddInputRowCount;
     }
 
+    int renderDrawNodeBodyRowCount(const GraphNode& node) {
+        return kVkRenderDrawPrefixParamCount + kVkRenderDrawFixedInputPinCount + node.renderDrawPipelineSlotCount +
+               kVkRenderDrawAddPipelineRowCount;
+    }
+
+    int clearValueNodeBodyRowCount(const GraphNode& node) {
+        return node.clearValueInputSlotCount + kVkClearValueAddValueRowCount;
+    }
+
     int graphNodeInputPinCount(const GraphNode& node) {
         if (node.type == NodeType::VkRenderPass) {
             return node.renderPassAttachmentSlotCount + kVkRenderPassFixedInputPinCount;
         }
         if (node.type == NodeType::Struct) {
             return node.structInputSlotCount;
+        }
+        if (node.type == NodeType::VkRenderDraw) {
+            return kVkRenderDrawFixedInputPinCount + node.renderDrawPipelineSlotCount;
+        }
+        if (node.type == NodeType::VkClearValue) {
+            return node.clearValueInputSlotCount;
         }
         return nodeInputPinCount(node.type);
     }
@@ -92,6 +113,25 @@ namespace mat::demo {
         }
         if (node.type == NodeType::Struct) {
             if (pinIndex < 0 || pinIndex >= node.structInputSlotCount) {
+                return -1;
+            }
+            return pinIndex;
+        }
+        if (node.type == NodeType::VkRenderDraw) {
+            if (pinIndex < 0) {
+                return -1;
+            }
+            if (pinIndex < kVkRenderDrawFixedInputPinCount) {
+                return kVkRenderDrawPrefixParamCount + pinIndex;
+            }
+            const int dynamicIndex = pinIndex - kVkRenderDrawFixedInputPinCount;
+            if (dynamicIndex >= node.renderDrawPipelineSlotCount) {
+                return -1;
+            }
+            return kVkRenderDrawPrefixParamCount + kVkRenderDrawFixedInputPinCount + dynamicIndex;
+        }
+        if (node.type == NodeType::VkClearValue) {
+            if (pinIndex < 0 || pinIndex >= node.clearValueInputSlotCount) {
                 return -1;
             }
             return pinIndex;
@@ -137,6 +177,40 @@ namespace mat::demo {
             out.slotSourcePinIndex = -1;
             return true;
         }
+        if (node.type == NodeType::VkRenderDraw) {
+            static thread_local char s_renderDrawPinLabel[64];
+            if (pinIndex == 0) {
+                out.label = "renderPass";
+                out.slotType = NodeType::VkRenderPass;
+            } else if (pinIndex == 1) {
+                out.label = "framebuffer";
+                out.slotType = NodeType::VkFramebuffer;
+            } else if (pinIndex == 2) {
+                out.label = "offset";
+                out.slotType = NodeType::Vector2;
+            } else if (pinIndex == 3) {
+                out.label = "extent";
+                out.slotType = NodeType::Vector2;
+            } else if (pinIndex == 4) {
+                out.label = "pClearValues";
+                out.slotType = NodeType::VkClearValue;
+            } else {
+                const int pipelineIndex = pinIndex - kVkRenderDrawFixedInputPinCount;
+                std::snprintf(s_renderDrawPinLabel, sizeof(s_renderDrawPinLabel), "pipeline %d", pipelineIndex);
+                out.label = s_renderDrawPinLabel;
+                out.slotType = NodeType::VkPipeline;
+            }
+            out.slotSourcePinIndex = -1;
+            return true;
+        }
+        if (node.type == NodeType::VkClearValue) {
+            static thread_local char s_clearValuePinLabel[64];
+            std::snprintf(s_clearValuePinLabel, sizeof(s_clearValuePinLabel), "value %d", pinIndex);
+            out.label = s_clearValuePinLabel;
+            out.slotType = NodeType::Vector4;
+            out.slotSourcePinIndex = -1;
+            return true;
+        }
         const NodeInputPinDef* pinDef = nodeInputPin(node.type, pinIndex);
         if (pinDef == nullptr) {
             return false;
@@ -147,37 +221,96 @@ namespace mat::demo {
         return true;
     }
 
-    bool graphNodeInputPinAcceptsSource(const GraphNode& inputNode, int inputPinIndex, NodeType sourceType,
-                                        int sourcePinIndex) {
-        if (inputNode.type == NodeType::Struct) {
-            if (inputPinIndex < 0 || inputPinIndex >= inputNode.structInputSlotCount) {
+    namespace {
+
+        bool clearValueNodeHasVector2Link(const GraphDocument& document, int clearValueNodeId, int ignoreToPinIndex) {
+            for (const GraphLink& link : document.links()) {
+                if (link.toNodeId != clearValueNodeId) {
+                    continue;
+                }
+                if (link.toPinIndex == ignoreToPinIndex) {
+                    continue;
+                }
+                const GraphNode* sourceNode = document.findNode(link.fromNodeId);
+                if (sourceNode != nullptr && sourceNode->type == NodeType::Vector2) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool graphNodeInputPinAcceptsSourceImpl(const GraphDocument* document, const GraphNode& inputNode,
+                                                int inputPinIndex, NodeType sourceType, int sourcePinIndex) {
+            if (inputNode.type == NodeType::Struct) {
+                if (inputPinIndex < 0 || inputPinIndex >= inputNode.structInputSlotCount) {
+                    return false;
+                }
+                if (!isStructValueNodeType(sourceType)) {
+                    return false;
+                }
+                (void)sourcePinIndex;
+                return true;
+            }
+
+            if (inputNode.type == NodeType::VkClearValue) {
+                if (inputPinIndex < 0 || inputPinIndex >= inputNode.clearValueInputSlotCount) {
+                    return false;
+                }
+                if (sourceType == NodeType::Vector4) {
+                    (void)sourcePinIndex;
+                    return true;
+                }
+                if (sourceType == NodeType::Vector2) {
+                    if (document == nullptr) {
+                        return true;
+                    }
+                    (void)sourcePinIndex;
+                    return !clearValueNodeHasVector2Link(*document, inputNode.id, inputPinIndex);
+                }
                 return false;
             }
-            if (!isStructValueNodeType(sourceType)) {
+
+            NodeInputPinInfo pinInfo{};
+            if (!graphNodeGetInputPin(inputNode, inputPinIndex, pinInfo)) {
                 return false;
             }
-            (void)sourcePinIndex;
+            if (pinInfo.slotType != sourceType) {
+                return false;
+            }
+            if (pinInfo.slotSourcePinIndex >= 0 && sourcePinIndex >= 0 &&
+                pinInfo.slotSourcePinIndex != sourcePinIndex) {
+                return false;
+            }
             return true;
         }
 
-        NodeInputPinInfo pinInfo{};
-        if (!graphNodeGetInputPin(inputNode, inputPinIndex, pinInfo)) {
-            return false;
-        }
-        if (pinInfo.slotType != sourceType) {
-            return false;
-        }
-        if (pinInfo.slotSourcePinIndex >= 0 && sourcePinIndex >= 0 &&
-            pinInfo.slotSourcePinIndex != sourcePinIndex) {
-            return false;
-        }
-        return true;
+    }  // namespace
+
+    bool graphNodeInputPinAcceptsSource(const GraphNode& inputNode, int inputPinIndex, NodeType sourceType,
+                                        int sourcePinIndex) {
+        return graphNodeInputPinAcceptsSourceImpl(nullptr, inputNode, inputPinIndex, sourceType, sourcePinIndex);
+    }
+
+    bool graphNodeInputPinAcceptsSource(const GraphDocument& document, const GraphNode& inputNode, int inputPinIndex,
+                                        NodeType sourceType, int sourcePinIndex) {
+        return graphNodeInputPinAcceptsSourceImpl(&document, inputNode, inputPinIndex, sourceType, sourcePinIndex);
     }
 
     int graphNodeInputPinIndexForType(const GraphNode& node, NodeType slotType, int slotSourcePinIndex) {
         const int pinCount = graphNodeInputPinCount(node);
         for (int index = 0; index < pinCount; ++index) {
             if (graphNodeInputPinAcceptsSource(node, index, slotType, slotSourcePinIndex)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    int graphNodeInputPinIndexForType(const GraphDocument& document, const GraphNode& node, NodeType slotType,
+                                      int slotSourcePinIndex) {
+        const int pinCount = graphNodeInputPinCount(node);
+        for (int index = 0; index < pinCount; ++index) {
+            if (graphNodeInputPinAcceptsSource(document, node, index, slotType, slotSourcePinIndex)) {
                 return index;
             }
         }
@@ -254,8 +387,16 @@ namespace mat::demo {
             fromPinIndex = 0;
         }
 
+        const GraphNode* fromNode = findNode(fromNodeId);
         const GraphNode* toNode = findNode(toNodeId);
-        if (toNode == nullptr || !graphNodeInputPinAllowsMultipleLinks(*toNode, toPinIndex)) {
+        if (fromNode == nullptr || toNode == nullptr) {
+            return 0;
+        }
+        if (!graphNodeInputPinAcceptsSource(*this, *toNode, toPinIndex, fromNode->type, fromPinIndex)) {
+            return 0;
+        }
+
+        if (!graphNodeInputPinAllowsMultipleLinks(*toNode, toPinIndex)) {
             removeLinksToInput(toNodeId, toPinIndex);
         }
         removeLinksFromOutput(fromNodeId, fromPinIndex);
@@ -358,6 +499,63 @@ namespace mat::demo {
             }
         }
         --node->structInputSlotCount;
+        return true;
+    }
+
+    bool GraphDocument::addRenderDrawPipelineSlot(int nodeId) {
+        GraphNode* node = findNode(nodeId);
+        if (node == nullptr || node->type != NodeType::VkRenderDraw) {
+            return false;
+        }
+        ++node->renderDrawPipelineSlotCount;
+        return true;
+    }
+
+    bool GraphDocument::removeRenderDrawPipelineSlot(int nodeId, int slotIndex) {
+        GraphNode* node = findNode(nodeId);
+        if (node == nullptr || node->type != NodeType::VkRenderDraw || node->renderDrawPipelineSlotCount <= 0) {
+            return false;
+        }
+        if (slotIndex < 0 || slotIndex >= node->renderDrawPipelineSlotCount) {
+            return false;
+        }
+
+        const int pinIndex = kVkRenderDrawFixedInputPinCount + slotIndex;
+        removeLinksToInput(nodeId, pinIndex);
+        for (GraphLink& link : _links) {
+            if (link.toNodeId == nodeId && link.toPinIndex > pinIndex) {
+                --link.toPinIndex;
+            }
+        }
+        --node->renderDrawPipelineSlotCount;
+        return true;
+    }
+
+    bool GraphDocument::addClearValueInputSlot(int nodeId) {
+        GraphNode* node = findNode(nodeId);
+        if (node == nullptr || node->type != NodeType::VkClearValue) {
+            return false;
+        }
+        ++node->clearValueInputSlotCount;
+        return true;
+    }
+
+    bool GraphDocument::removeClearValueInputSlot(int nodeId, int slotIndex) {
+        GraphNode* node = findNode(nodeId);
+        if (node == nullptr || node->type != NodeType::VkClearValue || node->clearValueInputSlotCount <= 0) {
+            return false;
+        }
+        if (slotIndex < 0 || slotIndex >= node->clearValueInputSlotCount) {
+            return false;
+        }
+
+        removeLinksToInput(nodeId, slotIndex);
+        for (GraphLink& link : _links) {
+            if (link.toNodeId == nodeId && link.toPinIndex > slotIndex) {
+                --link.toPinIndex;
+            }
+        }
+        --node->clearValueInputSlotCount;
         return true;
     }
 

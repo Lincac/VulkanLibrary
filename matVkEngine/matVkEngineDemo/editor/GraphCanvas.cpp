@@ -400,7 +400,8 @@ namespace mat::demo {
                 }
 
                 const int sourcePinIndex = target.pinIndex < 0 ? 0 : target.pinIndex;
-                return graphNodeInputPinAcceptsSource(*inputNode, drag.pinIndex, sourceNode->type, sourcePinIndex);
+                return graphNodeInputPinAcceptsSource(document, *inputNode, drag.pinIndex, sourceNode->type,
+                                                      sourcePinIndex);
             }
 
             if (!drag.fromInput && target.isInput) {
@@ -412,7 +413,8 @@ namespace mat::demo {
                 }
 
                 const int sourcePinIndex = drag.pinIndex < 0 ? 0 : drag.pinIndex;
-                return graphNodeInputPinAcceptsSource(*inputNode, target.pinIndex, sourceNode->type, sourcePinIndex);
+                return graphNodeInputPinAcceptsSource(document, *inputNode, target.pinIndex, sourceNode->type,
+                                                      sourcePinIndex);
             }
 
             return false;
@@ -455,7 +457,11 @@ namespace mat::demo {
                 if (inputNode != nullptr) {
                     graphNodeGetInputPin(*inputNode, panel.pinLinkDrag.pinIndex, pinInfo);
                 }
-                panel.searchTypeFilter = pinInfo.label[0] != '\0' ? pinInfo.slotType : NodeType::VkPipeline;
+                if (inputNode != nullptr && inputNode->type == NodeType::VkClearValue) {
+                    panel.searchTypeFilterEnabled = false;
+                } else {
+                    panel.searchTypeFilter = pinInfo.label[0] != '\0' ? pinInfo.slotType : NodeType::VkPipeline;
+                }
             } else if (const GraphNode* sourceNode = document.findNode(panel.pinLinkDrag.nodeId)) {
                 panel.searchTypeFilter = pinLinkTargetNodeTypeForSource(sourceNode->type);
             } else {
@@ -481,8 +487,8 @@ namespace mat::demo {
                 if (sourceNode != nullptr && newNode != nullptr && nodeHasInputPins(newNode->type)) {
                     const int fromPinIndex =
                         panel.pinLinkFromPinIndex < 0 ? 0 : panel.pinLinkFromPinIndex;
-                    const int pinIndex =
-                        graphNodeInputPinIndexForType(*newNode, sourceNode->type, fromPinIndex);
+                    const int pinIndex = graphNodeInputPinIndexForType(document, *newNode, sourceNode->type,
+                                                                       fromPinIndex);
                     if (pinIndex >= 0) {
                         document.addLink(panel.pinLinkFromNodeId, fromPinIndex, newNodeId, pinIndex);
                     }
@@ -3194,6 +3200,163 @@ namespace mat::demo {
             ImGui::PopFont();
         }
 
+        void drawVkRenderDrawContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
+                                     const NodeTheme& theme, const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const float labelPadX = 14.f * layout.zoom;
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+
+            drawSTypeParamRow(drawList, layout, theme, labelPadX, kVkRenderDrawSType);
+
+            for (int pinIndex = 0; pinIndex < kVkRenderDrawFixedInputPinCount; ++pinIndex) {
+                drawNodeInputPinRow(drawList, node, pinIndex, layout, theme, panel, hoveredPin, labelPadX, pinColor);
+            }
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            const bool drawStaticPreview = layout.zoom < kMinWidgetZoom;
+            for (int slotIndex = 0; slotIndex < node.renderDrawPipelineSlotCount; ++slotIndex) {
+                const int rowIndex = kVkRenderDrawPrefixParamCount + kVkRenderDrawFixedInputPinCount + slotIndex;
+                const VertexRowLayout rowLayout = buildVertexRowLayout(layout, rowIndex);
+                const float rowCenterY = rowLayout.rowCenterY;
+
+                if (drawStaticPreview) {
+                    drawList->AddCircleFilled(ImVec2(rowLayout.deleteButtonCenterX, rowCenterY),
+                                              rowLayout.deleteButtonRadius, IM_COL32(72, 76, 90, 255));
+                    drawList->AddCircle(ImVec2(rowLayout.deleteButtonCenterX, rowCenterY), rowLayout.deleteButtonRadius,
+                                        IM_COL32(120, 125, 140, 255), 0, 1.f);
+                }
+
+                const int pinIndex = kVkRenderDrawFixedInputPinCount + slotIndex;
+                const bool highlighted = shouldHighlightPin(node.id, pinIndex, true);
+                drawPin(drawList, ImVec2(layout.topLeft.x, rowCenterY), layout.zoom, pinColor, highlighted);
+
+                char labelText[32];
+                std::snprintf(labelText, sizeof(labelText), "pipeline %d", slotIndex);
+                drawScaledText(drawList, ImVec2(rowLayout.nameFieldX, rowCenterY - layout.fontSize * 0.5f),
+                               theme.pinLabel, labelText, layout.fontSize);
+            }
+
+            const int addRowIndex =
+                kVkRenderDrawPrefixParamCount + kVkRenderDrawFixedInputPinCount + node.renderDrawPipelineSlotCount;
+            const VertexRowLayout addRowLayout = buildVertexRowLayout(layout, addRowIndex);
+            if (drawStaticPreview) {
+                drawList->AddCircleFilled(ImVec2(addRowLayout.deleteButtonCenterX, addRowLayout.rowCenterY),
+                                          addRowLayout.actionButtonRadius, IM_COL32(62, 102, 152, 255));
+                drawList->AddCircle(ImVec2(addRowLayout.deleteButtonCenterX, addRowLayout.rowCenterY),
+                                    addRowLayout.actionButtonRadius, IM_COL32(120, 125, 140, 255), 0, 1.f);
+                const ImVec2 addGlyphSize = ImGui::CalcTextSize("+");
+                drawList->AddText(ImVec2(addRowLayout.deleteButtonCenterX - addGlyphSize.x * 0.5f,
+                                         addRowLayout.rowCenterY - addGlyphSize.y * 0.5f),
+                                  IM_COL32(235, 235, 245, 255), "+");
+            }
+        }
+
+        void drawVkRenderDrawWidgets(GraphDocument& document, GraphNode& node, const NodeScreenLayout& layout,
+                                     bool interactive, bool& blockGraphDrag) {
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * layout.zoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * layout.zoom, 1.f * layout.zoom));
+
+            drawSTypeParamWidget(kVkRenderDrawSType, layout, interactive, blockGraphDrag);
+
+            for (int slotIndex = 0; slotIndex < node.renderDrawPipelineSlotCount; ++slotIndex) {
+                const int rowIndex = kVkRenderDrawPrefixParamCount + kVkRenderDrawFixedInputPinCount + slotIndex;
+                const VertexRowLayout rowLayout = buildVertexRowLayout(layout, rowIndex);
+
+                ImGui::PushID(slotIndex);
+                if (vertexCircleButton("##deletePipeline",
+                                       ImVec2(rowLayout.deleteButtonCenterX, rowLayout.rowCenterY),
+                                       rowLayout.deleteButtonRadius, '-', true, IM_COL32(72, 76, 90, 255), interactive,
+                                       blockGraphDrag)) {
+                    document.removeRenderDrawPipelineSlot(node.id, slotIndex);
+                    ImGui::PopID();
+                    ImGui::PopStyleVar();
+                    ImGui::PopFont();
+                    return;
+                }
+                ImGui::PopID();
+            }
+
+            const int addRowIndex =
+                kVkRenderDrawPrefixParamCount + kVkRenderDrawFixedInputPinCount + node.renderDrawPipelineSlotCount;
+            const VertexRowLayout addRowLayout = buildVertexRowLayout(layout, addRowIndex);
+            if (vertexCircleButton("##addPipeline", ImVec2(addRowLayout.deleteButtonCenterX, addRowLayout.rowCenterY),
+                                   addRowLayout.actionButtonRadius, '+', true, IM_COL32(62, 102, 152, 255), interactive,
+                                   blockGraphDrag)) {
+                document.addRenderDrawPipelineSlot(node.id);
+            }
+
+            ImGui::PopStyleVar();
+            ImGui::PopFont();
+        }
+
+        void drawVkClearValueContent(ImDrawList* drawList, const GraphNode& node, const NodeScreenLayout& layout,
+                                     const NodeTheme& theme, const GraphPanelState& panel, const PinHit& hoveredPin) {
+            const ImU32 pinColor = IM_COL32(170, 170, 185, 255);
+
+            constexpr float kMinWidgetZoom = 0.35f;
+            const bool drawStaticPreview = layout.zoom < kMinWidgetZoom;
+
+            for (int slotIndex = 0; slotIndex < node.clearValueInputSlotCount; ++slotIndex) {
+                const VertexRowLayout rowLayout = buildVertexRowLayout(layout, slotIndex);
+                const float rowCenterY = rowLayout.rowCenterY;
+
+                if (drawStaticPreview) {
+                    drawList->AddCircleFilled(ImVec2(rowLayout.deleteButtonCenterX, rowCenterY),
+                                              rowLayout.deleteButtonRadius, IM_COL32(72, 76, 90, 255));
+                    drawList->AddCircle(ImVec2(rowLayout.deleteButtonCenterX, rowCenterY), rowLayout.deleteButtonRadius,
+                                        IM_COL32(120, 125, 140, 255), 0, 1.f);
+                }
+
+                const bool highlighted = shouldHighlightPin(node.id, slotIndex, true);
+                drawPin(drawList, ImVec2(layout.topLeft.x, rowCenterY), layout.zoom, pinColor, highlighted);
+
+                char labelText[32];
+                std::snprintf(labelText, sizeof(labelText), "value %d", slotIndex);
+                drawScaledText(drawList, ImVec2(rowLayout.nameFieldX, rowCenterY - layout.fontSize * 0.5f),
+                               theme.pinLabel, labelText, layout.fontSize);
+            }
+
+            const int addRowIndex = node.clearValueInputSlotCount;
+            const VertexRowLayout addRowLayout = buildVertexRowLayout(layout, addRowIndex);
+            if (drawStaticPreview) {
+                drawList->AddCircleFilled(ImVec2(addRowLayout.deleteButtonCenterX, addRowLayout.rowCenterY),
+                                          addRowLayout.actionButtonRadius, IM_COL32(62, 102, 152, 255));
+                drawList->AddCircle(ImVec2(addRowLayout.deleteButtonCenterX, addRowLayout.rowCenterY),
+                                    addRowLayout.actionButtonRadius, IM_COL32(120, 125, 140, 255), 0, 1.f);
+                const ImVec2 addGlyphSize = ImGui::CalcTextSize("+");
+                drawList->AddText(ImVec2(addRowLayout.deleteButtonCenterX - addGlyphSize.x * 0.5f,
+                                         addRowLayout.rowCenterY - addGlyphSize.y * 0.5f),
+                                  IM_COL32(235, 235, 245, 255), "+");
+            }
+
+            drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
+        }
+
+        void drawVkClearValueWidgets(GraphDocument& document, GraphNode& node, const NodeScreenLayout& layout,
+                                     bool interactive, bool& blockGraphDrag) {
+            for (int slotIndex = 0; slotIndex < node.clearValueInputSlotCount; ++slotIndex) {
+                const VertexRowLayout rowLayout = buildVertexRowLayout(layout, slotIndex);
+
+                ImGui::PushID(slotIndex);
+                if (vertexCircleButton("##deleteClearValue",
+                                       ImVec2(rowLayout.deleteButtonCenterX, rowLayout.rowCenterY),
+                                       rowLayout.deleteButtonRadius, '-', true, IM_COL32(72, 76, 90, 255), interactive,
+                                       blockGraphDrag)) {
+                    document.removeClearValueInputSlot(node.id, slotIndex);
+                    ImGui::PopID();
+                    return;
+                }
+                ImGui::PopID();
+            }
+
+            const int addRowIndex = node.clearValueInputSlotCount;
+            const VertexRowLayout addRowLayout = buildVertexRowLayout(layout, addRowIndex);
+            if (vertexCircleButton("##addClearValue", ImVec2(addRowLayout.deleteButtonCenterX, addRowLayout.rowCenterY),
+                                   addRowLayout.actionButtonRadius, '+', true, IM_COL32(62, 102, 152, 255), interactive,
+                                   blockGraphDrag)) {
+                document.addClearValueInputSlot(node.id);
+            }
+        }
+
         void drawVkWriteDescriptorSetContent(ImDrawList* drawList, const GraphNode& node,
                                              const NodeScreenLayout& layout, const NodeTheme& theme,
                                              const GraphPanelState& panel, const PinHit& hoveredPin) {
@@ -3623,6 +3786,7 @@ namespace mat::demo {
                                           indexRowCenterY - layout.fontSize * 0.5f),
                                    theme.pinLabel, indexText, layout.fontSize);
                 }
+                drawSingleOutputPin(drawList, node, layout, panel, hoveredPin, pinColor);
             } else if (node.type == NodeType::VkPipelineInputAssemblyState) {
                 drawVkPipelineInputAssemblyStateContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::VkPipelineShaderStage) {
@@ -3693,6 +3857,10 @@ namespace mat::demo {
                 drawScalarValueNodeContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (node.type == NodeType::Struct) {
                 drawStructContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkRenderDraw) {
+                drawVkRenderDrawContent(drawList, node, layout, theme, panel, hoveredPin);
+            } else if (node.type == NodeType::VkClearValue) {
+                drawVkClearValueContent(drawList, node, layout, theme, panel, hoveredPin);
             } else if (nodeHasOutputPin(node.type)) {
                 const float bodyCenterY = topLeft.y + layout.headerHeight + (layout.height - layout.headerHeight) * 0.5f;
                 const bool highlighted = shouldHighlightPin(node.id, 0, false);
@@ -3801,6 +3969,10 @@ namespace mat::demo {
                     drawScalarValueNodeWidgets(*editable, layout, interactive, blockGraphDrag);
                 } else if (node.type == NodeType::Struct) {
                     drawStructWidgets(document, *editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkRenderDraw) {
+                    drawVkRenderDrawWidgets(document, *editable, layout, interactive, blockGraphDrag);
+                } else if (node.type == NodeType::VkClearValue) {
+                    drawVkClearValueWidgets(document, *editable, layout, interactive, blockGraphDrag);
                 }
 
                 ImGui::PopID();

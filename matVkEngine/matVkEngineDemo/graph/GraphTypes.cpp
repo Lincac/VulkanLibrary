@@ -132,6 +132,8 @@ namespace mat::demo {
             NodeType::VkDescriptorBuffer,
             NodeType::VkDescriptorImage,
             NodeType::VkBuffer,
+            NodeType::VkRenderDraw,
+            NodeType::VkClearValue,
             NodeType::Struct,
         };
 
@@ -444,6 +446,8 @@ namespace mat::demo {
 
     const char kVkSamplerSType[] = "VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO";
 
+    const char kVkRenderDrawSType[] = "VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO";
+
     const char kVkBufferSType[] = "VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO";
 
     const char* nodeTypeName(NodeType type) {
@@ -520,6 +524,10 @@ namespace mat::demo {
                 return "VkFramebuffer";
             case NodeType::VkSampler:
                 return "VkSampler";
+            case NodeType::VkRenderDraw:
+                return "VkRenderDraw";
+            case NodeType::VkClearValue:
+                return "VkClearValue";
             case NodeType::Matrix4x4:
                 return "Matrix 4x4";
             case NodeType::Matrix3x3:
@@ -723,7 +731,8 @@ namespace mat::demo {
     }
 
     bool nodeHasInputPins(NodeType type) {
-        if (type == NodeType::VkRenderPass || type == NodeType::Struct) {
+        if (type == NodeType::VkRenderPass || type == NodeType::Struct || type == NodeType::VkRenderDraw ||
+            type == NodeType::VkClearValue) {
             return true;
         }
         return nodeInputPinCount(type) > 0;
@@ -977,9 +986,6 @@ namespace mat::demo {
     }
 
     int nodeOutputPinCount(NodeType type) {
-        if (type == NodeType::VkPipeline) {
-            return 0;
-        }
         if (type == NodeType::VkColorWriteMask) {
             return kVkColorWriteMaskOutputPinCount;
         }
@@ -1084,6 +1090,9 @@ namespace mat::demo {
         }
         if (sourceType == NodeType::VkBufferUsage || sourceType == NodeType::VkMemoryProperty) {
             return NodeType::VkBuffer;
+        }
+        if (sourceType == NodeType::VkClearValue) {
+            return NodeType::VkRenderDraw;
         }
         if (sourceType == NodeType::VkImageAspect) {
             return NodeType::VkImageView;

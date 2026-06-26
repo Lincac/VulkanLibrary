@@ -41,6 +41,8 @@ namespace mat::demo {
         VkImageView,
         VkFramebuffer,
         VkSampler,
+        VkRenderDraw,
+        VkClearValue,
         Matrix4x4,
         Matrix3x3,
         Vector4,
@@ -79,6 +81,10 @@ namespace mat::demo {
     constexpr int kVkImageViewTypeOptionCount = 7;
     constexpr int kVkFramebufferParamCount = 4;
     constexpr int kVkFramebufferInputPinCount = 2;
+    constexpr int kVkRenderDrawPrefixParamCount = 1;
+    constexpr int kVkRenderDrawFixedInputPinCount = 5;
+    constexpr int kVkRenderDrawAddPipelineRowCount = 1;
+    constexpr int kVkClearValueAddValueRowCount = 1;
     constexpr int kVkSamplerParamCount = 12;
     constexpr int kVkFilterOptionCount = 2;
     constexpr int kVkSamplerAddressModeOptionCount = 5;
@@ -167,6 +173,7 @@ namespace mat::demo {
     extern const char kVkImageSType[];
     extern const char kVkImageViewSType[];
     extern const char kVkSamplerSType[];
+    extern const char kVkRenderDrawSType[];
     extern const char kVkBufferSType[];
 
     struct NodeInputPinInfo {
