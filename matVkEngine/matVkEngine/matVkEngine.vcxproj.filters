@@ -17,6 +17,5 @@
     <ClCompile Include="src\matVkEngineCommon.cpp" />
     <ClCompile Include="src\matVkEngineMesh.cpp" />
     <ClCompile Include="src\matVkEngineBuffer.cpp" />
-    <ClCompile Include="test.cpp" />
   </ItemGroup>
 </Project>
