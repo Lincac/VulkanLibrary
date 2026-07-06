@@ -2,6 +2,9 @@
 
 #include <Volk/volk.h>
 
+#include <string>
+#include <vector>
+
 static const char* vkResultToString(VkResult result) {
     switch (result) {
         case VK_SUCCESS:
@@ -45,28 +48,31 @@ static const char* vkResultToString(VkResult result) {
     }
 }
 
-#define VK_CHECK(x)                                                                                              \
-    do {                                                                                                         \
-        VkResult err = x;                                                                                        \
-        if (err != VK_SUCCESS) {                                                                                 \
-            fprintf(stderr, "Vulkan error: %s (%d) at %s:%d\n", vkResultToString(err), err, __FILE__, __LINE__); \
-            abort();                                                                                             \
-        }                                                                                                        \
+#define VK_CHECK(arg)                                                                                                \
+    do {                                                                                                           \
+        VkResult err = arg;                                                                                          \
+        if (err != VK_SUCCESS) {                                                                                   \
+            fprintf(stderr, "[Vulkan error]: %s (%d) at %s:%d\n", vkResultToString(err), err, __FILE__, __LINE__); \
+            abort();                                                                                               \
+        }                                                                                                          \
     } while (0)
 
+#define VK_PRINT(arg)                                   \
+    do {                                                \
+        fprintf(stderr, "[Vulkan Message]: %s\n", arg); \
+        abort();                                        \
+    } while (0)
+
+#define VK_ERROR(arg)                                   \
+    do {                                                \
+        fprintf(stderr, "[Vulkan ERROR]: %s\n", arg);   \
+        abort();                                        \
+    } while (0)
 
 namespace mat {
 
-    enum class ImageShaderDomain {
-        Compute,
-        Fragment,
-        ColorAttachment,
-        RayTracing,
-    };
-
     uint32_t findMemoryType(VkPhysicalDevice physDev, uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
-    void transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout,
-                               ImageShaderDomain shaderDomain = ImageShaderDomain::Compute);
+    std::vector<char> load(const std::string& path);
 
 }  // namespace mat

@@ -1,12 +1,6 @@
 ﻿#pragma once
 
-#include <string>
-#include <vector>
-
-#include "common/matVkEngineCommon.h"
-#include "device/matVkEngineCmdPool.h"
-#include "device/matVkEngineLogicalDevice.h"
-#include "device/matVkEnginePhysicalDevice.h"
+#include "matVkEngineCommon.h"
 
 namespace mat {
 
@@ -31,8 +25,7 @@ namespace mat {
 
         void load(const std::string& path, uint32_t width, uint32_t height, uint32_t depth);
 
-        void create(std::shared_ptr<VkEnginePhysicalDevice> physicalDevice,
-                    std::shared_ptr<VkEngineLogicalDevice> logicalDevice);
+        void create(VkPhysicalDevice device, VkDevice logDevice);
 
         void getResolution(uint32_t& w, uint32_t& h, uint32_t& d) const;
 
@@ -46,7 +39,7 @@ namespace mat {
 
         VkDeviceMemory getVkDeviceMemory() const;
 
-        void release(std::shared_ptr<VkEngineLogicalDevice> logicalDevice);
+        void release(VkDevice logDevice);
 
     private:
         VkEngineImage(const VkEngineImage&) = delete;

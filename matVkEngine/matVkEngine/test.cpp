@@ -1,20 +1,21 @@
 #include "pipeline/matVkEngineRenderPipeline.h"
+#include "common/matVkEngineCommon.h"
 
-void func()
-{
+VkPipeline pipelines[2];
+VkCommandBuffer cmd;
+
+void func() {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
 
-    // -----------------------------
-    // 1. 开始 RenderPass
-    // -----------------------------
     VkRenderPassBeginInfo rpInfo{};
     rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    rpInfo.renderPass = offscreenRenderPass;    // 多 subpass 的 render pass
-    rpInfo.framebuffer = offscreenFramebuffer;  // 多 attachment 的 framebuffer
+    rpInfo.renderPass = offscreenRenderPass;    
+    rpInfo.framebuffer = offscreenFramebuffer;  
     rpInfo.renderArea.offset = {0, 0};
-    rpInfo.renderArea.extent = offscreenExtent;
+    rpInfo.renderArea.extent.width = 800;
+    rpInfo.renderArea.extent.height = 600;
 
     VkClearValue clearValues[3];
     clearValues[0].color = {{0.f, 0.f, 0.f, 1.f}};  // GBuffer color
@@ -25,55 +26,37 @@ void func()
     rpInfo.pClearValues = clearValues;
 
     vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+    for (size_t i = 0; i < 2; i++) {
+        if (i != 0) {
+            vkCmdNextSubpass(cmd, VK_SUBPASS_CONTENTS_INLINE);
+        }
 
-    // ============================================================
-    // SUBPASS 0: GBuffer Pass
-    // ============================================================
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, gbufferPipeline);
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[i]);
 
-    VkViewport viewport{};
-    viewport.x = 0.f;
-    viewport.y = 0.f;
-    viewport.width = (float)offscreenExtent.width;
-    viewport.height = (float)offscreenExtent.height;
-    viewport.minDepth = 0.f;
-    viewport.maxDepth = 1.f;
-    vkCmdSetViewport(cmd, 0, 1, &viewport);
+        VkViewport viewport{};
+        viewport.x = 0.f;
+        viewport.y = 0.f;
+        viewport.width = 800;
+        viewport.height = 600;
+        viewport.minDepth = 0.f;
+        viewport.maxDepth = 1.f;
+        vkCmdSetViewport(cmd, 0, 1, &viewport);
 
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = offscreenExtent;
-    vkCmdSetScissor(cmd, 0, 1, &scissor);
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent.width = 800;
+        scissor.extent.height = 600;
+        vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    VkBuffer vbs[] = {vertexBuffer};
-    VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(cmd, 0, 1, vbs, offsets);
-    vkCmdBindIndexBuffer(cmd, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        VkBuffer vbs[] = {vertexBuffer};
+        vkCmdBindVertexBuffers(cmd, 0, 1, vbs, {0});
+        vkCmdBindIndexBuffer(cmd, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, gbufferPipelineLayout, 0, 1, &gbufferDescriptorSet, 0,
-                            nullptr);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _layout, 0, 1,
+                                &gbufferDescriptorSet, 0, nullptr);
 
-    vkCmdDrawIndexed(cmd, indexCount, 1, 0, 0, 0);
-
-    // -----------------------------
-    // 进入 Subpass 1
-    // -----------------------------
-    vkCmdNextSubpass(cmd, VK_SUBPASS_CONTENTS_INLINE);
-
-    // ============================================================
-    // SUBPASS 1: Lighting Pass
-    // ============================================================
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, lightingPipeline);
-
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, lightingPipelineLayout, 0, 1, &lightingDescriptorSet,
-                            0, nullptr);
-
-    // Fullscreen quad
-    vkCmdDraw(cmd, 3, 1, 0, 0);
-
-    // -----------------------------
-    // 结束 RenderPass
-    // -----------------------------
+        vkCmdDrawIndexed(cmd, indexCount, 1, 0, 0, 0);
+    }
     vkCmdEndRenderPass(cmd);
 
     VK_CHECK(vkEndCommandBuffer(cmd));

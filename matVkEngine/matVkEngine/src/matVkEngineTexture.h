@@ -1,7 +1,8 @@
 ﻿#pragma once
 
-#include "device/matVkEngineLogicalDevice.h"
-#include "resource/matVkEngineImage.h"
+#include "matVkEngineImage.h"
+
+#include <memory>
 
 namespace mat {
 
@@ -10,9 +11,9 @@ namespace mat {
         VkEngineTexture();
         ~VkEngineTexture();
 
-        void create(std::shared_ptr<VkEngineLogicalDevice> logicalDevice, std::shared_ptr<VkEngineImage> image);
+        void create(VkDevice logDevice, std::shared_ptr<VkEngineImage> image);
 
-        void release(std::shared_ptr<VkEngineLogicalDevice> logicalDevice);
+        void release(VkDevice logDevice);
 
         std::shared_ptr<VkEngineImage> getImage() const;
 
@@ -25,8 +26,6 @@ namespace mat {
         VkEngineTexture(VkEngineTexture&&) = delete;
         VkEngineTexture& operator=(const VkEngineTexture&) = delete;
         VkEngineTexture& operator=(VkEngineTexture&&) = delete;
-
-        void createSampler(std::shared_ptr<VkEngineLogicalDevice> logicalDevice, ImageType type);
 
         std::shared_ptr<VkEngineImage> _image;
         VkSampler _sampler = VK_NULL_HANDLE;

@@ -1,7 +1,6 @@
 ﻿#pragma once
 
-#include "device/matVkEngineCmdPool.h"
-#include "device/matVkEngineLogicalDevice.h"
+#include "matVkEngineCommon.h"
 
 namespace mat {
 
@@ -16,16 +15,15 @@ namespace mat {
 
         void setVkMemoryPropertyFlags(VkMemoryPropertyFlags properties);
 
-        void create(std::shared_ptr<VkEnginePhysicalDevice> physicalDevice,
-                    std::shared_ptr<VkEngineLogicalDevice> logicalDevice);
+        void create(VkPhysicalDevice device, VkDevice logDevice);
 
         VkBuffer& getVkBuffer();
 
         VkDeviceMemory& getVkDeviceMemory();
 
-        VkDeviceAddress getVkDeviceAddress(std::shared_ptr<VkEngineLogicalDevice> logicalDevice);
+        VkDeviceAddress getVkDeviceAddress(VkDevice logDevice);
 
-        void release(std::shared_ptr<VkEngineLogicalDevice> logicalDevice);
+        void release(VkDevice logDevice);
 
     private:
         VkEngineBuffer(const VkEngineBuffer&) = delete;

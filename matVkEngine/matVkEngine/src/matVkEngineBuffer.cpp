@@ -1,9 +1,5 @@
 ﻿#include "matVkEngineBuffer.h"
 
-#include <stdexcept>
-
-#include "common/matVkEngineCommon.h"
-
 namespace mat {
 
     VkEngineBuffer::VkEngineBuffer() {
@@ -26,10 +22,9 @@ namespace mat {
         _memoryProperties = properties;
     }
 
-    void VkEngineBuffer::create(std::shared_ptr<VkEnginePhysicalDevice> physicalDevice,
-                                std::shared_ptr<VkEngineLogicalDevice> logicalDevice) {
+    void VkEngineBuffer::create(VkPhysicalDevice device, VkDevice logDevice) {
         if (_size == 0 || _usage == 0) {
-            throw std::runtime_error("buffer size/usage not set!");
+            VK_ERROR("Buffer size & usage is not meet the criteria!");
         }
 
         VkBufferCreateInfo bufferInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
@@ -37,17 +32,14 @@ namespace mat {
         bufferInfo.usage = _usage;
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        if (vkCreateBuffer(logicalDevice->getVkDevice(), &bufferInfo, nullptr, &_buffer) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create buffer!");
-        }
+        VK_CHECK(vkCreateBuffer(logDevice, &bufferInfo, nullptr, &_buffer));
 
         VkMemoryRequirements memReq{};
-        vkGetBufferMemoryRequirements(logicalDevice->getVkDevice(), _buffer, &memReq);
+        vkGetBufferMemoryRequirements(logDevice, _buffer, &memReq);
 
         VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
         allocInfo.allocationSize = memReq.size;
-        allocInfo.memoryTypeIndex =
-            findMemoryType(physicalDevice->getVkPhysicalDevice(), memReq.memoryTypeBits, _memoryProperties);
+        allocInfo.memoryTypeIndex = findMemoryType(device, memReq.memoryTypeBits, _memoryProperties);
 
         VkMemoryAllocateFlagsInfo allocFlags{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
 
@@ -56,11 +48,9 @@ namespace mat {
             allocInfo.pNext = &allocFlags;
         }
 
-        if (vkAllocateMemory(logicalDevice->getVkDevice(), &allocInfo, nullptr, &_memory) != VK_SUCCESS) {
-            throw std::runtime_error("failed to allocate buffer memory!");
-        }
+        VK_CHECK(vkAllocateMemory(logDevice, &allocInfo, nullptr, &_memory));
 
-        vkBindBufferMemory(logicalDevice->getVkDevice(), _buffer, _memory, 0);
+        vkBindBufferMemory(logDevice, _buffer, _memory, 0);
     }
 
     VkBuffer& VkEngineBuffer::getVkBuffer() {
@@ -71,25 +61,21 @@ namespace mat {
         return _memory;
     }
 
-    VkDeviceAddress VkEngineBuffer::getVkDeviceAddress(std::shared_ptr<VkEngineLogicalDevice> logicalDevice) {
+    VkDeviceAddress VkEngineBuffer::getVkDeviceAddress(VkDevice logDevice) {
         VkBufferDeviceAddressInfo info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
         info.buffer = _buffer;
 
-        return vkGetBufferDeviceAddress(logicalDevice->getVkDevice(), &info);
+        return vkGetBufferDeviceAddress(logDevice, &info);
     }
 
-    void VkEngineBuffer::release(std::shared_ptr<VkEngineLogicalDevice> logicalDevice) {
-        if (logicalDevice == nullptr) {
-            throw std::runtime_error("Logical Device is nullptr!");
-        }
-
+    void VkEngineBuffer::release(VkDevice logDevice) {
         if (_buffer != VK_NULL_HANDLE) {
-            vkDestroyBuffer(logicalDevice->getVkDevice(), _buffer, nullptr);
+            vkDestroyBuffer(logDevice, _buffer, nullptr);
             _buffer = VK_NULL_HANDLE;
         }
 
         if (_memory != VK_NULL_HANDLE) {
-            vkFreeMemory(logicalDevice->getVkDevice(), _memory, nullptr);
+            vkFreeMemory(logDevice, _memory, nullptr);
             _memory = VK_NULL_HANDLE;
         }
     }
