@@ -11,8 +11,6 @@ namespace mat {
         std::vector<VkPresentModeKHR> presentModes;
     };
 
-    std::vector<const char*> extensions = {VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME};
-
 #ifdef _DEBUG
     const std::vector<const char*> validationLayers = {"VK_LAYER_KHRONOS_validation"};
     const std::vector<const char*> instanceExtensions = {VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
@@ -62,19 +60,20 @@ namespace mat {
     }
 #endif
 
-    static bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
+    static bool checkDeviceExtensionSupport(VkPhysicalDevice device,
+                                            const std::vector<const char*>& requiredExtensions) {
         uint32_t extensionCount;
         vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 
         std::vector<VkExtensionProperties> availableExtensions(extensionCount);
         vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
 
-        std::set<std::string> requiredExtensions(extensions.begin(), extensions.end());
+        std::set<std::string> missing(requiredExtensions.begin(), requiredExtensions.end());
         for (const auto& extension : availableExtensions) {
-            requiredExtensions.erase(extension.extensionName);
+            missing.erase(extension.extensionName);
         }
 
-        return requiredExtensions.empty();
+        return missing.empty();
     }
 
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) {
@@ -104,9 +103,24 @@ namespace mat {
     VkEngineContext::VkEngineContext(std::optional<VkEngineSurface> surface) {
         VK_CHECK(volkInitialize());
 
+        std::vector<const char*> requiredDeviceExtensions = {VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME};
         if (surface.has_value()) {
-            extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+            requiredDeviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
         }
+
+        std::vector<const char*> enabledInstanceExtensions;
+        if (surface.has_value()) {
+            enabledInstanceExtensions = surface->instanceExtensions;
+        }
+
+#ifdef _DEBUG
+        for (const char* ext : instanceExtensions) {
+            if (std::find(enabledInstanceExtensions.begin(), enabledInstanceExtensions.end(), ext) ==
+                enabledInstanceExtensions.end()) {
+                enabledInstanceExtensions.push_back(ext);
+            }
+        }
+#endif
 
 #ifdef _DEBUG
         if (!checkValidationLayerSupport()) {
@@ -125,11 +139,10 @@ namespace mat {
         VkInstanceCreateInfo instanceInfo{};
         instanceInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         instanceInfo.pApplicationInfo = &appInfo;
+        instanceInfo.enabledExtensionCount = static_cast<uint32_t>(enabledInstanceExtensions.size());
+        instanceInfo.ppEnabledExtensionNames = enabledInstanceExtensions.data();
 
 #ifdef _DEBUG
-        instanceInfo.enabledExtensionCount = static_cast<uint32_t>(instanceExtensions.size());
-        instanceInfo.ppEnabledExtensionNames = instanceExtensions.data();
-
         instanceInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
         instanceInfo.ppEnabledLayerNames = validationLayers.data();
 
@@ -172,6 +185,9 @@ namespace mat {
         std::optional<uint32_t> presentFamily;
 
         for (const auto& device : devices) {
+            graphicsFamily.reset();
+            presentFamily.reset();
+
             uint32_t queueFamilyCount = 0;
             vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
@@ -196,7 +212,7 @@ namespace mat {
 
             const bool hasGraphics = graphicsFamily.has_value();
             const bool hasPresent = !surface.has_value() || presentFamily.has_value();
-            const bool hasExtensions = checkDeviceExtensionSupport(device);
+            const bool hasExtensions = checkDeviceExtensionSupport(device, requiredDeviceExtensions);
 
             bool hasSwapchainSupport = true;
             if (surface.has_value()) {
@@ -219,6 +235,9 @@ namespace mat {
         }
 
         std::set<uint32_t> uniqueQueueFamilies = {_graphicsFamily.value()};
+        if (_presentFamily.has_value()) {
+            uniqueQueueFamilies.insert(_presentFamily.value());
+        }
 
         float queuePriority = 1.0f;
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
@@ -231,27 +250,34 @@ namespace mat {
             queueCreateInfos.push_back(queueCreateInfo);
         }
 
-        VkDeviceCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
-        createInfo.pQueueCreateInfos = queueCreateInfos.data();
-        createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-        createInfo.ppEnabledExtensionNames = extensions.data();
+        VkDeviceCreateInfo deviceCreateInfo{};
+        deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
+        deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
+        deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(requiredDeviceExtensions.size());
+        deviceCreateInfo.ppEnabledExtensionNames = requiredDeviceExtensions.data();
 
         VkPhysicalDeviceFeatures2 deviceFeatures{};
         deviceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
         deviceFeatures.pNext = nullptr;
 
-        createInfo.pEnabledFeatures = nullptr;
-        createInfo.pNext = &deviceFeatures;
+        deviceCreateInfo.pEnabledFeatures = nullptr;
+        deviceCreateInfo.pNext = &deviceFeatures;
 
-        VK_CHECK(vkCreateDevice(_device, &createInfo, nullptr, &_logDevice));
+        VK_CHECK(vkCreateDevice(_device, &deviceCreateInfo, nullptr, &_logDevice));
 
         vkGetDeviceQueue(_logDevice, _graphicsFamily.value(), 0, &_graphicsQueue);
+        if (_presentFamily.has_value()) {
+            vkGetDeviceQueue(_logDevice, _presentFamily.value(), 0, &_presentQueue);
+        }
 
         volkLoadDevice(_logDevice);
 
         if (surface.has_value()) {
+            if (!surface->queryFramebufferExtent) {
+                VK_CHECK(VK_ERROR_INITIALIZATION_FAILED);
+            }
+
             SwapChainSupportDetails swapChainSupport = querySwapChainSupport(_device, _surface);
 
             auto chooseSwapSurfaceFormat = [&](const std::vector<VkSurfaceFormatKHR>& availableFormats) {
@@ -289,6 +315,19 @@ namespace mat {
                 return extent;
             };
 
+            auto chooseCompositeAlpha = [](const VkSurfaceCapabilitiesKHR& capabilities) {
+                if (capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR) {
+                    return VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+                }
+                if (capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR) {
+                    return VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
+                }
+                if (capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR) {
+                    return VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR;
+                }
+                return VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+            };
+
             VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
             VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
             VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities, surface.value().queryFramebufferExtent);
@@ -299,33 +338,33 @@ namespace mat {
                 imageCount = swapChainSupport.capabilities.maxImageCount;
             }
 
-            VkSwapchainCreateInfoKHR createInfo{};
-            createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-            createInfo.surface = _surface;
+            VkSwapchainCreateInfoKHR swapchainCreateInfo{};
+            swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+            swapchainCreateInfo.surface = _surface;
 
-            createInfo.minImageCount = imageCount;
-            createInfo.imageFormat = surfaceFormat.format;
-            createInfo.imageColorSpace = surfaceFormat.colorSpace;
-            createInfo.imageExtent = extent;
-            createInfo.imageArrayLayers = 1;
-            createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+            swapchainCreateInfo.minImageCount = imageCount;
+            swapchainCreateInfo.imageFormat = surfaceFormat.format;
+            swapchainCreateInfo.imageColorSpace = surfaceFormat.colorSpace;
+            swapchainCreateInfo.imageExtent = extent;
+            swapchainCreateInfo.imageArrayLayers = 1;
+            swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
             uint32_t queueFamilyIndices[] = {_graphicsFamily.value(), _presentFamily.value()};
-
             if (_graphicsFamily != _presentFamily) {
-                createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-                createInfo.queueFamilyIndexCount = 2;
-                createInfo.pQueueFamilyIndices = queueFamilyIndices;
+                swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+                swapchainCreateInfo.queueFamilyIndexCount = 2;
+                swapchainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
             } else {
-                createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+                swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
             }
 
-            createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
-            createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-            createInfo.presentMode = presentMode;
-            createInfo.clipped = VK_TRUE;
+            swapchainCreateInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+            swapchainCreateInfo.compositeAlpha = chooseCompositeAlpha(swapChainSupport.capabilities);
+            swapchainCreateInfo.presentMode = presentMode;
+            swapchainCreateInfo.clipped = VK_TRUE;
+            swapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
 
-            VK_CHECK(vkCreateSwapchainKHR(_logDevice, &createInfo, nullptr, &_swapChain));
+            VK_CHECK(vkCreateSwapchainKHR(_logDevice, &swapchainCreateInfo, nullptr, &_swapChain));
 
             vkGetSwapchainImagesKHR(_logDevice, _swapChain, &imageCount, nullptr);
             _swapChainImages.resize(imageCount);
@@ -354,6 +393,11 @@ namespace mat {
     }
 
     VkEngineContext::~VkEngineContext() {
+        if (_swapChain != VK_NULL_HANDLE) {
+            vkDestroySwapchainKHR(_logDevice, _swapChain, nullptr);
+            _swapChain = VK_NULL_HANDLE;
+        }
+
         if (_logDevice != VK_NULL_HANDLE) {
             vkDeviceWaitIdle(_logDevice);
 
