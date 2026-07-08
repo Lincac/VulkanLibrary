@@ -1,10 +1,17 @@
 ﻿#include "matVkEngineContext.h"
 
+#include <algorithm>
 #include <set>
 
 namespace mat {
 
-    const std::vector<const char*> extensions = {VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME};
+    struct SwapChainSupportDetails {
+        VkSurfaceCapabilitiesKHR capabilities;
+        std::vector<VkSurfaceFormatKHR> formats;
+        std::vector<VkPresentModeKHR> presentModes;
+    };
+
+    std::vector<const char*> extensions = {VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME};
 
 #ifdef _DEBUG
     const std::vector<const char*> validationLayers = {"VK_LAYER_KHRONOS_validation"};
@@ -39,16 +46,15 @@ namespace mat {
                                                         VkDebugUtilsMessageTypeFlagsEXT messageType,
                                                         const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
                                                         void* pUserData) {
-        VK_PRINT(pCallbackData->pMessage);
+        fprintf(stderr, "[Vulkan Message]: %s\n", pCallbackData->pMessage);
         return VK_FALSE;
     }
 
     static void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) {
         createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        createInfo.messageSeverity =
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
         createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                                  VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                                  VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
@@ -64,7 +70,6 @@ namespace mat {
         vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
 
         std::set<std::string> requiredExtensions(extensions.begin(), extensions.end());
-
         for (const auto& extension : availableExtensions) {
             requiredExtensions.erase(extension.extensionName);
         }
@@ -72,7 +77,37 @@ namespace mat {
         return requiredExtensions.empty();
     }
 
-    VkEngineContext::VkEngineContext() {
+    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) {
+        SwapChainSupportDetails details;
+
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+
+        uint32_t formatCount;
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+
+        if (formatCount != 0) {
+            details.formats.resize(formatCount);
+            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
+        }
+
+        uint32_t presentModeCount;
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+
+        if (presentModeCount != 0) {
+            details.presentModes.resize(presentModeCount);
+            vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
+        }
+
+        return details;
+    }
+
+    VkEngineContext::VkEngineContext(std::optional<VkEngineSurface> surface) {
+        VK_CHECK(volkInitialize());
+
+        if (surface.has_value()) {
+            extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+        }
+
 #ifdef _DEBUG
         if (!checkValidationLayerSupport()) {
             VK_CHECK(VK_NOT_READY);
@@ -120,6 +155,10 @@ namespace mat {
         }
 #endif
 
+        if (surface.has_value()) {
+            VK_CHECK(surface.value().createSurface(_instance, &_surface));
+        }
+
         uint32_t deviceCount = 0;
         vkEnumeratePhysicalDevices(_instance, &deviceCount, nullptr);
         if (deviceCount == 0) {
@@ -128,6 +167,9 @@ namespace mat {
 
         std::vector<VkPhysicalDevice> devices(deviceCount);
         vkEnumeratePhysicalDevices(_instance, &deviceCount, devices.data());
+
+        std::optional<uint32_t> graphicsFamily;
+        std::optional<uint32_t> presentFamily;
 
         for (const auto& device : devices) {
             uint32_t queueFamilyCount = 0;
@@ -140,13 +182,35 @@ namespace mat {
                 const auto& queueFamily = queueFamilies[i];
 
                 if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-                    _graphicsFamily = i;
+                    graphicsFamily = i;
                 }
 
-                if (_graphicsFamily.has_value() && checkDeviceExtensionSupport(device)) {
-                    _device = device;
-                    break;
+                if (surface.has_value()) {
+                    VkBool32 presentSupport = VK_FALSE;
+                    vkGetPhysicalDeviceSurfaceSupportKHR(device, i, _surface, &presentSupport);
+                    if (presentSupport) {
+                        presentFamily = i;
+                    }
                 }
+            }
+
+            const bool hasGraphics = graphicsFamily.has_value();
+            const bool hasPresent = !surface.has_value() || presentFamily.has_value();
+            const bool hasExtensions = checkDeviceExtensionSupport(device);
+
+            bool hasSwapchainSupport = true;
+            if (surface.has_value()) {
+                SwapChainSupportDetails details = querySwapChainSupport(device, _surface);
+                hasSwapchainSupport = !details.formats.empty() && !details.presentModes.empty();
+            }
+
+            if (hasGraphics && hasPresent && hasExtensions && hasSwapchainSupport) {
+                _device = device;
+                _graphicsFamily = graphicsFamily;
+                if (surface.has_value()) {
+                    _presentFamily = presentFamily;
+                }
+                break;
             }
         }
 
@@ -187,6 +251,90 @@ namespace mat {
 
         volkLoadDevice(_logDevice);
 
+        if (surface.has_value()) {
+            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(_device, _surface);
+
+            auto chooseSwapSurfaceFormat = [&](const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+                for (const auto& availableFormat : availableFormats) {
+                    if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
+                        availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                        return availableFormat;
+                    }
+                }
+
+                return availableFormats[0];
+            };
+
+            auto chooseSwapPresentMode = [&](const std::vector<VkPresentModeKHR>& availablePresentModes) {
+                for (const auto& availablePresentMode : availablePresentModes) {
+                    if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+                        return availablePresentMode;
+                    }
+                }
+
+                return VK_PRESENT_MODE_FIFO_KHR;
+            };
+
+            auto chooseSwapExtent = [&](const VkSurfaceCapabilitiesKHR& capabilities,
+                                        const std::function<VkExtent2D()>& queryFramebufferExtent) {
+                if (capabilities.currentExtent.width != UINT32_MAX) {
+                    return capabilities.currentExtent;
+                }
+
+                VkExtent2D extent = queryFramebufferExtent();
+                extent.width =
+                    std::clamp(extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+                extent.height =
+                    std::clamp(extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+                return extent;
+            };
+
+            VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
+            VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+            VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities, surface.value().queryFramebufferExtent);
+
+            uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+            if (swapChainSupport.capabilities.maxImageCount > 0 &&
+                imageCount > swapChainSupport.capabilities.maxImageCount) {
+                imageCount = swapChainSupport.capabilities.maxImageCount;
+            }
+
+            VkSwapchainCreateInfoKHR createInfo{};
+            createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+            createInfo.surface = _surface;
+
+            createInfo.minImageCount = imageCount;
+            createInfo.imageFormat = surfaceFormat.format;
+            createInfo.imageColorSpace = surfaceFormat.colorSpace;
+            createInfo.imageExtent = extent;
+            createInfo.imageArrayLayers = 1;
+            createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+            uint32_t queueFamilyIndices[] = {_graphicsFamily.value(), _presentFamily.value()};
+
+            if (_graphicsFamily != _presentFamily) {
+                createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+                createInfo.queueFamilyIndexCount = 2;
+                createInfo.pQueueFamilyIndices = queueFamilyIndices;
+            } else {
+                createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            }
+
+            createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+            createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+            createInfo.presentMode = presentMode;
+            createInfo.clipped = VK_TRUE;
+
+            VK_CHECK(vkCreateSwapchainKHR(_logDevice, &createInfo, nullptr, &_swapChain));
+
+            vkGetSwapchainImagesKHR(_logDevice, _swapChain, &imageCount, nullptr);
+            _swapChainImages.resize(imageCount);
+            vkGetSwapchainImagesKHR(_logDevice, _swapChain, &imageCount, _swapChainImages.data());
+
+            _swapChainImageFormat = surfaceFormat.format;
+            _swapChainExtent = extent;
+        }
+
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -206,6 +354,19 @@ namespace mat {
     }
 
     VkEngineContext::~VkEngineContext() {
+        if (_logDevice != VK_NULL_HANDLE) {
+            vkDeviceWaitIdle(_logDevice);
+
+            if (_commandPool != VK_NULL_HANDLE) {
+                vkDestroyCommandPool(_logDevice, _commandPool, nullptr);
+                _commandPool = VK_NULL_HANDLE;
+            }
+            _commandBuffers.clear();
+
+            vkDestroyDevice(_logDevice, nullptr);
+            _logDevice = VK_NULL_HANDLE;
+        }
+
 #ifdef _DEBUG
         if (_debugMessenger != VK_NULL_HANDLE && _instance != VK_NULL_HANDLE) {
             auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
@@ -217,6 +378,11 @@ namespace mat {
             _debugMessenger = VK_NULL_HANDLE;
         }
 #endif  // _DEBUG
+
+        if (_surface != VK_NULL_HANDLE) {
+            vkDestroySurfaceKHR(_instance, _surface, nullptr);
+            _surface = VK_NULL_HANDLE;
+        }
 
         if (_instance != VK_NULL_HANDLE) {
             vkDestroyInstance(_instance, nullptr);
@@ -238,39 +404,6 @@ namespace mat {
 
     VkCommandPool VkEngineContext::getVkCommandPool() const {
         return _commandPool;
-    }
-
-    void VkEngineContext::submitOneTimeCommands(std::function<void(VkCommandBuffer)> recordFunc) {
-        VkFenceCreateInfo fenceInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-        VkFence fence;
-        vkCreateFence(_logDevice, &fenceInfo, nullptr, &fence);
-
-        VkCommandBufferAllocateInfo cmdAlloc{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-        cmdAlloc.commandPool = _commandPool;
-        cmdAlloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        cmdAlloc.commandBufferCount = 1;
-
-        VkCommandBuffer cmd;
-        vkAllocateCommandBuffers(_logDevice, &cmdAlloc, &cmd);
-
-        VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-        vkBeginCommandBuffer(cmd, &beginInfo);
-
-        recordFunc(cmd);
-
-        vkEndCommandBuffer(cmd);
-
-        VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
-        submit.commandBufferCount = 1;
-        submit.pCommandBuffers = &cmd;
-
-        vkQueueSubmit(_graphicsQueue, 1, &submit, fence);
-        vkWaitForFences(_logDevice, 1, &fence, VK_TRUE, UINT64_MAX);
-
-        vkFreeCommandBuffers(_logDevice, _commandPool, 1, &cmd);
-        vkDestroyFence(_logDevice, fence, nullptr);
     }
 
 };  // namespace mat

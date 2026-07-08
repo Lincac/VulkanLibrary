@@ -1,4 +1,4 @@
-# matVkEngine
+﻿# matVkEngine
 
 Vulkan **光栅渲染引擎**，核心目标是 **自由可配置管线**：用户用 **C++ struct** 描述 Pass 链、Pass 间资源、材质与 Shader，引擎编译为 Vulkan 对象并按序调度。**Forward、Deferred 都不是写死在引擎里的固定路径**，只是两种（或多种）管线 preset 配置。
 
