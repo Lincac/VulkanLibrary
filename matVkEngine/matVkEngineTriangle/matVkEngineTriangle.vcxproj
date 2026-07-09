@@ -140,6 +140,10 @@
       <Project>{96dc6313-7d9e-40ff-b02b-cc11f6712b5d}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="triangle.frag" />
+    <None Include="triangle.vert" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

@@ -48,9 +48,9 @@ static const char* vkResultToString(VkResult result) {
     }
 }
 
-#define VK_CHECK(arg)                                                                                                \
+#define VK_CHECK(arg)                                                                                              \
     do {                                                                                                           \
-        VkResult err = arg;                                                                                          \
+        VkResult err = arg;                                                                                        \
         if (err != VK_SUCCESS) {                                                                                   \
             fprintf(stderr, "[Vulkan error]: %s (%d) at %s:%d\n", vkResultToString(err), err, __FILE__, __LINE__); \
             abort();                                                                                               \
@@ -63,16 +63,22 @@ static const char* vkResultToString(VkResult result) {
         abort();                                        \
     } while (0)
 
-#define VK_ERROR(arg)                                   \
-    do {                                                \
-        fprintf(stderr, "[Vulkan ERROR]: %s\n", arg);   \
-        abort();                                        \
+#define VK_ERROR(arg)                                 \
+    do {                                              \
+        fprintf(stderr, "[Vulkan ERROR]: %s\n", arg); \
+        abort();                                      \
     } while (0)
 
 namespace mat {
 
     uint32_t findMemoryType(VkPhysicalDevice physDev, uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
-    std::vector<char> load(const std::string& path);
+    VkShaderModule loadShader(VkDevice device, const std::string& path);
+
+    void createBuffer(VkPhysicalDevice device, VkDevice logDevice, VkDeviceSize size, VkBufferUsageFlags flags,
+                      VkMemoryPropertyFlags memFlags, VkBuffer& buffer, VkDeviceMemory& memory);
+
+    void copyBuffer(VkDevice logDevice, VkQueue queue, VkCommandPool cmd, VkBuffer srcBuffer, VkBuffer dstBuffer,
+                    VkDeviceSize size);
 
 }  // namespace mat
