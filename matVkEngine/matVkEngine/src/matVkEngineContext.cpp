@@ -372,6 +372,22 @@ namespace mat {
 
             _swapChainImageFormat = surfaceFormat.format;
             _swapChainExtent = extent;
+
+            _swapChainImageViews.resize(_swapChainImages.size());
+            for (int i = 0; i < _swapChainImageViews.size(); i++) {
+                VkImageViewCreateInfo viewInfo{};
+                viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+                viewInfo.image = _swapChainImages[i];
+                viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+                viewInfo.format = _swapChainImageFormat;
+                viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                viewInfo.subresourceRange.baseMipLevel = 0;
+                viewInfo.subresourceRange.levelCount = 1;
+                viewInfo.subresourceRange.baseArrayLayer = 0;
+                viewInfo.subresourceRange.layerCount = 1;
+
+                VK_CHECK(vkCreateImageView(_logDevice, &viewInfo, nullptr, &_swapChainImageViews[i]));
+            }
         }
 
         VkCommandPoolCreateInfo poolInfo{};
@@ -379,17 +395,7 @@ namespace mat {
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         poolInfo.queueFamilyIndex = _graphicsFamily.value();
 
-        VK_CHECK(vkCreateCommandPool(_logDevice, &poolInfo, nullptr, &_commandPool));
-
-        _commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-
-        VkCommandBufferAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.commandPool = _commandPool;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = (uint32_t)_commandBuffers.size();
-
-        VK_CHECK(vkAllocateCommandBuffers(_logDevice, &allocInfo, _commandBuffers.data()));
+        VK_CHECK(vkCreateCommandPool(_logDevice, &poolInfo, nullptr, &_commandPool));        
     }
 
     VkEngineContext::~VkEngineContext() {
@@ -405,7 +411,6 @@ namespace mat {
                 vkDestroyCommandPool(_logDevice, _commandPool, nullptr);
                 _commandPool = VK_NULL_HANDLE;
             }
-            _commandBuffers.clear();
 
             vkDestroyDevice(_logDevice, nullptr);
             _logDevice = VK_NULL_HANDLE;
@@ -434,20 +439,44 @@ namespace mat {
         }
     }
 
-    VkInstance VkEngineContext::getVkInstance() const {
+    VkInstance VkEngineContext::getInstance() const {
         return _instance;
     }
 
-    VkPhysicalDevice VkEngineContext::getVkPhysicalDevice() const {
+    VkPhysicalDevice VkEngineContext::getPhysicalDevice() const {
         return _device;
     }
 
-    VkDevice VkEngineContext::getVkDevice() const {
+    VkDevice VkEngineContext::getDevice() const {
         return _logDevice;
     }
 
     VkCommandPool VkEngineContext::getVkCommandPool() const {
         return _commandPool;
+    }
+
+    VkQueue VkEngineContext::getGraphicsQueue() const {
+        return _graphicsQueue;
+    }
+
+    VkQueue VkEngineContext::getPresentQueue() const {
+        return _presentQueue;
+    }
+
+    VkSwapchainKHR VkEngineContext::getSwapChain() const {
+        return _swapChain;
+    }
+
+    VkFormat VkEngineContext::getSwapChainImageFormat() const {
+        return _swapChainImageFormat;
+    }
+
+    VkExtent2D VkEngineContext::getSwapChainImageExtent() const {
+        return _swapChainExtent;
+    }
+
+    std::vector<VkImageView> VkEngineContext::getSwapChainImageViews() const {
+        return _swapChainImageViews;
     }
 
 };  // namespace mat

@@ -1,4 +1,4 @@
-Ôªø#include <SDL3/SDL.h>
+#include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 
 #include "matVkEngineContext.h"
@@ -128,8 +128,8 @@ int main() {
         vkWaitForFences(context.getDevice(), 1, &inFlightFences[curFrame], VK_TRUE, UINT64_MAX);
 
         uint32_t imageIndex = 0;
-        vkAcquireNextImageKHR(context.getDevice(), swapChain, UINT64_MAX,
-                              imageAvailableSemaphores[curFrame], VK_NULL_HANDLE, &imageIndex);
+        vkAcquireNextImageKHR(context.getDevice(), swapChain, UINT64_MAX, imageAvailableSemaphores[curFrame],
+                              VK_NULL_HANDLE, &imageIndex);
 
         vkResetFences(context.getDevice(), 1, &inFlightFences[curFrame]);
 
@@ -154,7 +154,7 @@ int main() {
         rpInfo.pClearValues = &clearValue;
 
         vkCmdBeginRenderPass(cmdBuffer, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdEndRenderPass(cmdBuffer);  // ‰∏çË∞ÉÁî® vkCmdDrawÔºåÂè™Èù† CLEAR ‰∏äËâ≤
+        vkCmdEndRenderPass(cmdBuffer);  // ≤ªµ˜”√ vkCmdDraw£¨÷ªøø CLEAR …œ…´
 
         vkEndCommandBuffer(cmdBuffer);
 

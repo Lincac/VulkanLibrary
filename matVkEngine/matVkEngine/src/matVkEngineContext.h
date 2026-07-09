@@ -5,8 +5,6 @@
 
 #include "matVkEngineCommon.h"
 
-#define MAX_FRAMES_IN_FLIGHT 1
-
 namespace mat {
 
     struct VkEngineSurface {
@@ -21,13 +19,25 @@ namespace mat {
         explicit VkEngineContext(std::optional<VkEngineSurface> surface = {});
         ~VkEngineContext();
 
-        VkInstance getVkInstance() const;
+        VkInstance getInstance() const;
 
-        VkPhysicalDevice getVkPhysicalDevice() const;
+        VkPhysicalDevice getPhysicalDevice() const;
 
-        VkDevice getVkDevice() const;
+        VkDevice getDevice() const;
 
         VkCommandPool getVkCommandPool() const;
+
+        VkQueue getGraphicsQueue() const;
+
+        VkQueue getPresentQueue() const;
+
+        VkSwapchainKHR getSwapChain() const;
+
+        VkFormat getSwapChainImageFormat() const;
+
+        VkExtent2D getSwapChainImageExtent() const;
+
+        std::vector<VkImageView> getSwapChainImageViews() const;
 
     private:
         VkEngineContext(const VkEngineContext&) = delete;
@@ -48,7 +58,6 @@ namespace mat {
         VkQueue _graphicsQueue = VK_NULL_HANDLE;
 
         VkCommandPool _commandPool = VK_NULL_HANDLE;
-        std::vector<VkCommandBuffer> _commandBuffers;
 
         std::optional<uint32_t> _presentFamily;
         VkSurfaceKHR _surface = VK_NULL_HANDLE;
@@ -58,6 +67,8 @@ namespace mat {
         std::vector<VkImage> _swapChainImages;
         VkFormat _swapChainImageFormat;
         VkExtent2D _swapChainExtent;
+
+        std::vector<VkImageView> _swapChainImageViews;
     };
 
 };  // namespace mat
