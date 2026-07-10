@@ -2,8 +2,6 @@
 
 #include "matVkEngineImage.h"
 
-#include <memory>
-
 namespace mat {
 
     class VkEngineTexture {
@@ -11,15 +9,11 @@ namespace mat {
         VkEngineTexture();
         ~VkEngineTexture();
 
-        void create(VkDevice logDevice, std::shared_ptr<VkEngineImage> image);
+        void create(VkDevice logDevice, const VkEngineImage& image);
 
         void release(VkDevice logDevice);
 
-        std::shared_ptr<VkEngineImage> getImage() const;
-
         VkSampler getVkSampler() const;
-
-        void getResolution(uint32_t& w, uint32_t& h, uint32_t& d) const;
 
     private:
         VkEngineTexture(const VkEngineTexture&) = delete;
@@ -27,7 +21,6 @@ namespace mat {
         VkEngineTexture& operator=(const VkEngineTexture&) = delete;
         VkEngineTexture& operator=(VkEngineTexture&&) = delete;
 
-        std::shared_ptr<VkEngineImage> _image;
         VkSampler _sampler = VK_NULL_HANDLE;
     };
 

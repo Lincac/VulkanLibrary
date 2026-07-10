@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "matVkEngineTriangle", "matV
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "matVkEngineClearFrame", "matVkEngineClearFrame\matVkEngineClearFrame.vcxproj", "{680A4F5D-AECD-4FD4-A955-CF643F6A7130}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "matVkEngineTexture", "matVkEngineTexture\matVkEngineTexture.vcxproj", "{264AD46C-0F20-476A-9477-47C722CCF3AF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -27,6 +29,10 @@ Global
 		{680A4F5D-AECD-4FD4-A955-CF643F6A7130}.Debug|x64.Build.0 = Debug|x64
 		{680A4F5D-AECD-4FD4-A955-CF643F6A7130}.Release|x64.ActiveCfg = Release|x64
 		{680A4F5D-AECD-4FD4-A955-CF643F6A7130}.Release|x64.Build.0 = Release|x64
+		{264AD46C-0F20-476A-9477-47C722CCF3AF}.Debug|x64.ActiveCfg = Debug|x64
+		{264AD46C-0F20-476A-9477-47C722CCF3AF}.Debug|x64.Build.0 = Debug|x64
+		{264AD46C-0F20-476A-9477-47C722CCF3AF}.Release|x64.ActiveCfg = Release|x64
+		{264AD46C-0F20-476A-9477-47C722CCF3AF}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

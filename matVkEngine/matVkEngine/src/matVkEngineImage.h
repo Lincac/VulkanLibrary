@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "matVkEngineCommon.h"
+#include "matVkEngineContext.h"
 
 namespace mat {
 
@@ -15,29 +15,29 @@ namespace mat {
         VkEngineImage();
         ~VkEngineImage();
 
-        void setResolution(uint32_t w, uint32_t h, uint32_t d = 1);
-
-        void setVkFormat(VkFormat format);
-
-        void setVkImageUsageFlags(VkImageUsageFlags usage);
-
         void load(const std::string& path);
 
         void load(const std::string& path, uint32_t width, uint32_t height, uint32_t depth);
 
-        void create(VkPhysicalDevice device, VkDevice logDevice);
+        void setResolution(uint32_t w, uint32_t h, uint32_t d = 1);
+
+        void setFormat(VkFormat format);
+
+        void setImageUsageFlags(VkImageUsageFlags usage);
+
+        void create(const VkEngineContext& context);
 
         void getResolution(uint32_t& w, uint32_t& h, uint32_t& d) const;
 
-        VkFormat getVkFormat() const;
+        VkFormat getFormat() const;
 
         ImageType getImageType() const;
 
-        VkImage getVkImage() const;
+        VkImage getImage() const;
 
-        VkImageView getVkImageView() const;
+        VkImageView getImageView() const;
 
-        VkDeviceMemory getVkDeviceMemory() const;
+        VkDeviceMemory getDeviceMemory() const;
 
         void release(VkDevice logDevice);
 

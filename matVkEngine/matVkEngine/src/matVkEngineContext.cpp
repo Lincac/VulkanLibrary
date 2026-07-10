@@ -451,7 +451,7 @@ namespace mat {
         return _logDevice;
     }
 
-    VkCommandPool VkEngineContext::getVkCommandPool() const {
+    VkCommandPool VkEngineContext::getCommandPool() const {
         return _commandPool;
     }
 

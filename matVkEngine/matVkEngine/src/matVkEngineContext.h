@@ -25,7 +25,7 @@ namespace mat {
 
         VkDevice getDevice() const;
 
-        VkCommandPool getVkCommandPool() const;
+        VkCommandPool getCommandPool() const;
 
         VkQueue getGraphicsQueue() const;
 

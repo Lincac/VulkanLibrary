@@ -59,14 +59,14 @@ namespace mat {
                      stagingBufferMemory);
 
         void* temp;
-        vkMapMemory(context.getDevice(), stagingBufferMemory, 0, _size, 0, &temp);
+        VK_CHECK(vkMapMemory(context.getDevice(), stagingBufferMemory, 0, _size, 0, &temp));
         std::memcpy(temp, data, (size_t)_size);
         vkUnmapMemory(context.getDevice(), stagingBufferMemory);
 
         createBuffer(context.getPhysicalDevice(), context.getDevice(), _size, _usage, _memoryProperties, _buffer,
                      _memory);
 
-        copyBuffer(context.getDevice(), context.getGraphicsQueue(), context.getVkCommandPool(), stagingBuffer, _buffer,
+        copyBuffer(context.getDevice(), context.getGraphicsQueue(), context.getCommandPool(), stagingBuffer, _buffer,
                    _size);
 
         vkDestroyBuffer(context.getDevice(), stagingBuffer, nullptr);

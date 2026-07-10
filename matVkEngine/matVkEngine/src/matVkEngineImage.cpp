@@ -47,23 +47,11 @@ namespace mat {
 
     VkEngineImage::~VkEngineImage() {}
 
-    void VkEngineImage::setResolution(uint32_t w, uint32_t h, uint32_t d) {
-        width = w;
-        height = h;
-        depth = d;
-    }
-
-    void VkEngineImage::setVkFormat(VkFormat format) {
-        _format = format;
-    }
-
-    void VkEngineImage::setVkImageUsageFlags(VkImageUsageFlags usage) {
-        _usage = usage;
-    }
-
     void VkEngineImage::load(const std::string& path) {
         _pixelData.clear();
         _pixelSize = 0;
+
+        stbi_set_flip_vertically_on_load(true);
 
         int w = 0;
         int h = 0;
@@ -131,7 +119,21 @@ namespace mat {
                        VK_FORMAT_R8G8B8A8_UNORM, fileData.data(), expectedSize);
     }
 
-    void VkEngineImage::create(VkPhysicalDevice device, VkDevice logDevice) {
+    void VkEngineImage::setResolution(uint32_t w, uint32_t h, uint32_t d) {
+        width = w;
+        height = h;
+        depth = d;
+    }
+
+    void VkEngineImage::setFormat(VkFormat format) {
+        _format = format;
+    }
+
+    void VkEngineImage::setImageUsageFlags(VkImageUsageFlags usage) {
+        _usage = usage;
+    }
+
+    void VkEngineImage::create(const VkEngineContext& context) {
         if (_imageView != VK_NULL_HANDLE) {
             return;
         }
@@ -151,18 +153,19 @@ namespace mat {
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        VK_CHECK(vkCreateImage(logDevice, &imageInfo, nullptr, &_image));
+        VK_CHECK(vkCreateImage(context.getDevice(), &imageInfo, nullptr, &_image));
 
         VkMemoryRequirements memReq{};
-        vkGetImageMemoryRequirements(logDevice, _image, &memReq);
+        vkGetImageMemoryRequirements(context.getDevice(), _image, &memReq);
 
         VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
         allocInfo.allocationSize = memReq.size;
-        allocInfo.memoryTypeIndex = findMemoryType(device, memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        allocInfo.memoryTypeIndex =
+            findMemoryType(context.getPhysicalDevice(), memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-        VK_CHECK(vkAllocateMemory(logDevice, &allocInfo, nullptr, &_memory));
+        VK_CHECK(vkAllocateMemory(context.getDevice(), &allocInfo, nullptr, &_memory));
 
-        vkBindImageMemory(logDevice, _image, _memory, 0);
+        vkBindImageMemory(context.getDevice(), _image, _memory, 0);
 
         VkImageViewCreateInfo viewInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
         viewInfo.image = _image;
@@ -170,7 +173,76 @@ namespace mat {
         viewInfo.format = _format;
         viewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-        VK_CHECK(vkCreateImageView(logDevice, &viewInfo, nullptr, &_imageView));
+        VK_CHECK(vkCreateImageView(context.getDevice(), &viewInfo, nullptr, &_imageView));
+
+        if (_image == VK_NULL_HANDLE) {
+            VK_ERROR("image is not created!");
+        }
+
+        if (_pixelData.empty() || _pixelSize == 0) {
+            VK_ERROR("no pixel data to upload!");
+        }
+
+        VkBuffer stagingBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
+        createBuffer(context.getPhysicalDevice(), context.getDevice(), _pixelSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer,
+                     stagingMemory);
+
+        void* mapped = nullptr;
+        VK_CHECK(vkMapMemory(context.getDevice(), stagingMemory, 0, _pixelSize, 0, &mapped));
+        std::memcpy(mapped, _pixelData.data(), static_cast<size_t>(_pixelSize));
+        vkUnmapMemory(context.getDevice(), stagingMemory);
+
+        VkCommandBufferAllocateInfo cmdAllocInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+        cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        cmdAllocInfo.commandPool = context.getCommandPool();
+        cmdAllocInfo.commandBufferCount = 1;
+
+        VkCommandBuffer cmd = VK_NULL_HANDLE;
+        VK_CHECK(vkAllocateCommandBuffers(context.getDevice(), &cmdAllocInfo, &cmd));
+
+        VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
+
+        // UNDEFINED -> TRANSFER_DST
+        VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = _image;
+        barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
+                             nullptr, 1, &barrier);
+
+        VkBufferImageCopy region{};
+        region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        region.imageExtent = {width, height, depth};
+        vkCmdCopyBufferToImage(cmd, stagingBuffer, _image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+        // TRANSFER_DST -> SHADER_READ_ONLY
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr,
+                             0, nullptr, 1, &barrier);
+
+        VK_CHECK(vkEndCommandBuffer(cmd));
+
+        VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+        submit.commandBufferCount = 1;
+        submit.pCommandBuffers = &cmd;
+        VK_CHECK(vkQueueSubmit(context.getGraphicsQueue(), 1, &submit, VK_NULL_HANDLE));
+        VK_CHECK(vkQueueWaitIdle(context.getGraphicsQueue()));
+
+        vkFreeCommandBuffers(context.getDevice(), context.getCommandPool(), 1, &cmd);
+        vkDestroyBuffer(context.getDevice(), stagingBuffer, nullptr);
+        vkFreeMemory(context.getDevice(), stagingMemory, nullptr);
     }
 
     void VkEngineImage::getResolution(uint32_t& w, uint32_t& h, uint32_t& d) const {
@@ -179,7 +251,7 @@ namespace mat {
         d = depth;
     }
 
-    VkFormat VkEngineImage::getVkFormat() const {
+    VkFormat VkEngineImage::getFormat() const {
         return _format;
     }
 
@@ -187,15 +259,15 @@ namespace mat {
         return _imageType;
     }
 
-    VkImage VkEngineImage::getVkImage() const {
+    VkImage VkEngineImage::getImage() const {
         return _image;
     }
 
-    VkImageView VkEngineImage::getVkImageView() const {
+    VkImageView VkEngineImage::getImageView() const {
         return _imageView;
     }
 
-    VkDeviceMemory VkEngineImage::getVkDeviceMemory() const {
+    VkDeviceMemory VkEngineImage::getDeviceMemory() const {
         return _memory;
     }
 
